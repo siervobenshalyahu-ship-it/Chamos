@@ -1,4 +1,4 @@
-name: Compilar Chamos 2.0
+name: Chamos 2.0
 
 on:
   workflow_dispatch:
