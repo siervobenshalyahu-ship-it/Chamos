@@ -1,0 +1,154 @@
+name: Compilar Chamos 2.0
+
+on:
+  workflow_dispatch:
+
+env:
+  VERSION_BASE: v26.10.1
+  GRADLE_OPTS: -Dorg.gradle.jvmargs=-Xmx6g -XX:MaxMetaspaceSize=512m -Dfile.encoding=UTF-8 -XX:+UseG1GC -Dkotlin.daemon.jvm.options=-Xmx3g
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: Descargar el código base (Element X Android, licencia AGPL-3.0)
+        run: git clone --depth 1 --branch $VERSION_BASE https://github.com/element-hq/element-x-android chamos
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Cambiar nombre, textos e identificador a Chamos
+        working-directory: chamos
+        run: |
+          sed -i 's/APPLICATION_ID = "io.element.android.x"/APPLICATION_ID = "com.chamos.app"/' plugins/src/main/kotlin/config/BuildTimeConfig.kt
+          sed -i 's/APPLICATION_NAME = "Element X"/APPLICATION_NAME = "Chamos"/' plugins/src/main/kotlin/config/BuildTimeConfig.kt
+          sed -i 's/"$baseAppName dbg"/baseAppName/' app/build.gradle.kts
+          sed -i 's/^    val VERSION_NAME = .*/    val VERSION_NAME = "2.0.0"/' plugins/src/main/kotlin/Versions.kt
+          grep -n 'VERSION_NAME = ' plugins/src/main/kotlin/Versions.kt
+          grep -n 'com.chamos.app\|"Chamos"' plugins/src/main/kotlin/config/BuildTimeConfig.kt
+          grep -n 'app_name", baseAppName' app/build.gradle.kts
+          grep -rl "Element X" --include=localazy.xml --include=translations.xml . | xargs -r sed -i 's/Element X/Chamos/g'
+
+      - name: Cambiar el ícono a Chamos
+        run: |
+          pip install pillow
+          cat > rebrand.py <<'EOF'
+          # Ícono de Chamos 2.0: burbuja de chat ámbar con una "C" sobre fondo azul noche (diseño original y sobrio).
+          # Uso: python3 rebrand.py RAIZ_DEL_REPO
+          import sys, os, re
+          from PIL import Image, ImageDraw
+
+          root = sys.argv[1]
+          res = os.path.join(root, "appicon/element/src/main/res")
+          BG = "#0B1020"
+          AMBER = "#F4B54A"
+          NAVY = "#0B1020"
+          dens = {"mdpi": 1, "hdpi": 1.5, "xhdpi": 2, "xxhdpi": 3, "xxxhdpi": 4}
+          CLEAR = (0, 0, 0, 0)
+          S = 1000
+
+          def scene(size, mono=False):
+              big = Image.new("RGBA", (S, S), CLEAR)
+              d = ImageDraw.Draw(big)
+              fill = (255, 255, 255, 255) if mono else AMBER
+              d.rounded_rectangle((90, 110, 910, 760), 230, fill=fill)          # burbuja
+              d.polygon([(250, 700), (250, 920), (470, 740)], fill=fill)          # cola
+              hole = CLEAR if mono else NAVY
+              d.arc((300, 215, 700, 655), 40, 320, fill=hole, width=92)           # letra C
+              d.ellipse((652, 355, 744, 447), fill=fill)                          # abre la boca de la C
+              d.rectangle((640, 350, 760, 450), fill=fill)
+              return big.resize((size, size), Image.LANCZOS)
+
+          def tight(img, scale):
+              n = int(img.width * scale)
+              out = Image.new("RGBA", img.size, CLEAR)
+              o = (img.width - n) // 2
+              out.alpha_composite(img.resize((n, n), Image.LANCZOS), (o, o))
+              return out
+
+          def save(img, path):
+              os.makedirs(os.path.dirname(path), exist_ok=True)
+              img.save(path, "WEBP", quality=95)
+
+          for name, k in dens.items():
+              d = os.path.join(res, "mipmap-" + name)
+              fg = int(108 * k)
+              save(tight(scene(fg), 0.62), os.path.join(d, "ic_launcher_foreground.webp"))
+              save(tight(scene(fg, mono=True), 0.62), os.path.join(d, "ic_launcher_monochrome.webp"))
+              lg = int(48 * k)
+              sq = Image.new("RGBA", (lg, lg), BG)
+              sq.alpha_composite(tight(scene(lg), 0.80))
+              save(sq, os.path.join(d, "ic_launcher.webp"))
+              mask = Image.new("L", (lg * 4, lg * 4), 0)
+              ImageDraw.Draw(mask).ellipse((0, 0, lg * 4 - 1, lg * 4 - 1), fill=255)
+              mask = mask.resize((lg, lg), Image.LANCZOS)
+              rnd = Image.new("RGBA", (lg, lg), CLEAR)
+              rnd.paste(sq, (0, 0), mask)
+              save(rnd, os.path.join(d, "ic_launcher_round.webp"))
+
+          for variant in ("debug", "nightly", "release"):
+              p = os.path.normpath(os.path.join(res, "..", "..", variant, "res/drawable/ic_launcher_background.xml"))
+              if os.path.exists(p):
+                  t = open(p).read()
+                  t = re.sub(r'android:fillColor="#[0-9A-Fa-f]{6,8}"', 'android:fillColor="%s"' % BG, t)
+                  open(p, "w").write(t)
+          print("Ícono de Chamos generado")
+          EOF
+          python3 rebrand.py chamos
+
+      - name: Colores y textos de Chamos 2.0 (azul noche, ámbar, venezolano)
+        run: |
+          cat > estilo.py <<'EOF'
+          # Colores (azul noche + ámbar) y textos en venezolano para Chamos 2.0. Uso: python3 estilo.py RAIZ_DEL_REPO
+          import sys, os, re, glob
+          root = sys.argv[1]
+          tok = os.path.join(root, "libraries/compound/src/main/kotlin/io/element/android/compound/tokens/generated/internal")
+          def setcolor(fname, name, hexv):
+              p = os.path.join(tok, fname)
+              t = open(p, encoding="utf8").read()
+              t2, n = re.subn(r"(val %s = Color\()0x[0-9a-fA-F]{8}(\))" % name, lambda m: m.group(1) + "0xff" + hexv + m.group(2), t)
+              open(p, "w", encoding="utf8").write(t2)
+              print(fname, name, n)
+          for f, g in (("DarkColorTokens.kt", ("F4B54A", "FFC766", "FFD48A")), ("DarkHcColorTokens.kt", ("F4B54A", "FFC766", "FFD48A")),
+                       ("LightColorTokens.kt", ("C27A0A", "A86600", "8F5500")), ("LightHcColorTokens.kt", ("C27A0A", "A86600", "8F5500"))):
+              setcolor(f, "colorGreen900", g[0]); setcolor(f, "colorGreen1000", g[1]); setcolor(f, "colorGreen1100", g[2])
+          setcolor("DarkColorTokens.kt", "colorThemeBg", "0B1020")
+          setcolor("DarkHcColorTokens.kt", "colorThemeBg", "0B1020")
+
+          TEXTS = {
+              "screen_onboarding_welcome_title": "Aquí hablamos como somos",
+              "screen_onboarding_welcome_subtitle": "Bienvenido a %1$s. Tu gente, tu barrio, tu idioma.",
+              "screen_onboarding_welcome_message": "Bienvenido a %1$s, la app hecha solo para venezolanos. Sin pedirte tu número de teléfono.",
+              "action_invite_friends": "Invitar a un pana",
+              "invite_friends_text": "Ven a Chamos, la app de mensajes solo para venezolanos. Escríbeme aquí: %2$s\\nDescárgala: https://siervobenshalyahu-ship-it.github.io/Chamos-apk-web/",
+              "invite_friends_rich_title": "Únete a %1$s, solo para venezolanos",
+          }
+          files = [f for f in glob.glob(os.path.join(root, "**/res/values/localazy.xml"), recursive=True)]
+          files += [f for f in glob.glob(os.path.join(root, "**/res/values-es*/translations.xml"), recursive=True)]
+          tot = 0
+          for p in files:
+              t = open(p, encoding="utf8").read()
+              for k, v in TEXTS.items():
+                  t, n = re.subn(r'(<string name="%s">)"[^"]*"(</string>)' % k, lambda m: m.group(1) + '"' + v + '"' + m.group(2), t)
+                  tot += n
+              open(p, "w", encoding="utf8").write(t)
+          print("textos cambiados:", tot)
+          EOF
+          python3 estilo.py chamos
+
+      - name: Compilar APK
+        working-directory: chamos
+        run: ./gradlew :app:assembleFDroidDebug --stacktrace --no-configuration-cache
+
+      - name: Ver los APK generados
+        run: ls -la chamos/app/build/outputs/apk/fdroid/debug/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: chamos-2-0-apk
+          path: chamos/app/build/outputs/apk/fdroid/debug/*arm64-v8a-debug.apk
