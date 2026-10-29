@@ -2,9 +2,22 @@ name: Chamos 2.0
 
 on:
   workflow_dispatch:
+    inputs:
+      version:
+        description: "Versión de Chamos (por ejemplo 2.0.2). Tiene que ser mayor que la anterior para que las apps instaladas ofrezcan actualizar."
+        default: "2.0.1"
+        required: true
+      publicar:
+        description: "Publicar el APK en Releases (así las apps instaladas se actualizan solas)"
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
 
 env:
   VERSION_BASE: v26.10.1
+  APP_VERSION: ${{ inputs.version || '2.0.1' }}
   GRADLE_OPTS: -Dorg.gradle.jvmargs=-Xmx6g -XX:MaxMetaspaceSize=512m -Dfile.encoding=UTF-8 -XX:+UseG1GC -Dkotlin.daemon.jvm.options=-Xmx3g
 
 jobs:
@@ -28,7 +41,9 @@ jobs:
           sed -i 's/APPLICATION_ID = "io.element.android.x"/APPLICATION_ID = "com.chamos.app"/' plugins/src/main/kotlin/config/BuildTimeConfig.kt
           sed -i 's/APPLICATION_NAME = "Element X"/APPLICATION_NAME = "Chamos"/' plugins/src/main/kotlin/config/BuildTimeConfig.kt
           sed -i 's/"$baseAppName dbg"/baseAppName/' app/build.gradle.kts
-          sed -i 's/^    val VERSION_NAME = .*/    val VERSION_NAME = "2.0.0"/' plugins/src/main/kotlin/Versions.kt
+          sed -i "s/^    val VERSION_NAME = .*/    val VERSION_NAME = \"$APP_VERSION\"/" plugins/src/main/kotlin/Versions.kt
+          sed -i "s/^    const val VERSION_CODE = .*/    const val VERSION_CODE = $((20262000 + GITHUB_RUN_NUMBER))/" plugins/src/main/kotlin/Versions.kt
+          grep -n 'VERSION_CODE = ' plugins/src/main/kotlin/Versions.kt
           grep -n 'VERSION_NAME = ' plugins/src/main/kotlin/Versions.kt
           grep -n 'com.chamos.app\|"Chamos"' plugins/src/main/kotlin/config/BuildTimeConfig.kt
           grep -n 'app_name", baseAppName' app/build.gradle.kts
@@ -145,6 +160,12 @@ jobs:
           EOF
           python3 estilo.py chamos
 
+      - name: Quitar reacciones (stickers) de las llamadas
+        run: python3 chamos-repo/patches/sin_reacciones.py chamos
+
+      - name: Actualizaciones dentro de la app
+        run: python3 chamos-repo/patches/actualizador.py chamos chamos-repo/patches/ChamosUpdater.kt
+
       - name: Compilar APK
         working-directory: chamos
         run: ./gradlew :app:assembleFDroidDebug --stacktrace --no-configuration-cache
@@ -156,3 +177,13 @@ jobs:
         with:
           name: chamos-2-0-apk
           path: chamos/app/build/outputs/apk/fdroid/debug/*arm64-v8a-debug.apk
+
+      - name: Publicar en Releases (para que la app se actualice sola)
+        if: ${{ inputs.publicar != false }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          APK=$(ls chamos/app/build/outputs/apk/fdroid/debug/*arm64-v8a-debug.apk | head -1)
+          cp "$APK" Chamos.apk
+          gh release create "V$APP_VERSION" Chamos.apk --repo "$GITHUB_REPOSITORY" --title "Chamos $APP_VERSION" --notes "Chamos $APP_VERSION" --latest \
+            || gh release upload "V$APP_VERSION" Chamos.apk --repo "$GITHUB_REPOSITORY" --clobber
