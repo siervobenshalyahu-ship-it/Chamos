@@ -34,35 +34,39 @@ jobs:
           grep -n 'app_name", baseAppName' app/build.gradle.kts
           grep -rl "Element X" --include=localazy.xml --include=translations.xml . | xargs -r sed -i 's/Element X/Chamos/g'
 
+      - uses: actions/checkout@v4
+        with:
+          path: chamos-repo
+
       - name: Cambiar el ícono a Chamos
         run: |
           pip install pillow
           cat > rebrand.py <<'EOF'
-          # Ícono de Chamos 2.0: burbuja de chat ámbar con una "C" sobre fondo azul noche (diseño original y sobrio).
-          # Uso: python3 rebrand.py RAIZ_DEL_REPO
+          # Ícono de Chamos: los dos chamos chocando puños sobre la bandera de Venezuela.
+          # Usa assets/chamos_icon_fg.png (PNG con fondo transparente).
+          # Uso: python3 rebrand.py RAIZ_DEL_REPO ICONO_PNG
           import sys, os, re
           from PIL import Image, ImageDraw
 
-          root = sys.argv[1]
+          root, icon_path = sys.argv[1], sys.argv[2]
           res = os.path.join(root, "appicon/element/src/main/res")
-          BG = "#0B1020"
-          AMBER = "#F4B54A"
-          NAVY = "#0B1020"
+          BG = "#EAF7EF"
           dens = {"mdpi": 1, "hdpi": 1.5, "xhdpi": 2, "xxhdpi": 3, "xxxhdpi": 4}
           CLEAR = (0, 0, 0, 0)
-          S = 1000
+
+          src = Image.open(icon_path).convert("RGBA")
+          src = src.crop(src.getbbox())
+          side = max(src.size)
+          square = Image.new("RGBA", (side, side), CLEAR)
+          square.alpha_composite(src, ((side - src.width) // 2, (side - src.height) // 2))
 
           def scene(size, mono=False):
-              big = Image.new("RGBA", (S, S), CLEAR)
-              d = ImageDraw.Draw(big)
-              fill = (255, 255, 255, 255) if mono else AMBER
-              d.rounded_rectangle((90, 110, 910, 760), 230, fill=fill)          # burbuja
-              d.polygon([(250, 700), (250, 920), (470, 740)], fill=fill)          # cola
-              hole = CLEAR if mono else NAVY
-              d.arc((300, 215, 700, 655), 40, 320, fill=hole, width=92)           # letra C
-              d.ellipse((652, 355, 744, 447), fill=fill)                          # abre la boca de la C
-              d.rectangle((640, 350, 760, 450), fill=fill)
-              return big.resize((size, size), Image.LANCZOS)
+              img = square.resize((size, size), Image.LANCZOS)
+              if mono:
+                  white = Image.new("RGBA", (size, size), (255, 255, 255, 255))
+                  white.putalpha(img.split()[3])
+                  return white
+              return img
 
           def tight(img, scale):
               n = int(img.width * scale)
@@ -99,7 +103,7 @@ jobs:
                   open(p, "w").write(t)
           print("Ícono de Chamos generado")
           EOF
-          python3 rebrand.py chamos
+          python3 rebrand.py chamos chamos-repo/assets/chamos_icon_fg.png
 
       - name: Colores y textos de Chamos 2.0 (azul noche, ámbar, venezolano)
         run: |
