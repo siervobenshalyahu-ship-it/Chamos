@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "91262240336",
+    "project_id": "chamos-fc545",
+    "storage_bucket": "chamos-fc545.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:91262240336:android:f6eb70e625992bcc65f355",
+        "android_client_info": {
+          "package_name": "com.chamos.app.debug"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCeC2criAj6s0GuZMmy_P3X4ItZLi8Scic"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
