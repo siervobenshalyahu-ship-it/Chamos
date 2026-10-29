@@ -166,24 +166,36 @@ jobs:
       - name: Actualizaciones dentro de la app
         run: python3 chamos-repo/patches/actualizador.py chamos chamos-repo/patches/ChamosUpdater.kt
 
+      - name: Notificaciones push (Firebase) si ya están configuradas
+        run: |
+          if [ -f chamos-repo/firebase/google-services.json ] && [ -s chamos-repo/firebase/gateway-url.txt ]; then
+            python3 chamos-repo/patches/push_firebase.py chamos chamos-repo/firebase/google-services.json "$(head -n1 chamos-repo/firebase/gateway-url.txt)"
+            echo "FLAVOR=Gplay" >> "$GITHUB_ENV"
+            echo "FLAVOR_DIR=gplay" >> "$GITHUB_ENV"
+          else
+            echo "Firebase todavía no está configurado: se compila la versión sin Google (solo UnifiedPush)."
+            echo "FLAVOR=FDroid" >> "$GITHUB_ENV"
+            echo "FLAVOR_DIR=fdroid" >> "$GITHUB_ENV"
+          fi
+
       - name: Compilar APK
         working-directory: chamos
-        run: ./gradlew :app:assembleFDroidDebug --stacktrace --no-configuration-cache
+        run: ./gradlew :app:assemble${FLAVOR}Debug --stacktrace --no-configuration-cache
 
       - name: Ver los APK generados
-        run: ls -la chamos/app/build/outputs/apk/fdroid/debug/
+        run: ls -la chamos/app/build/outputs/apk/${FLAVOR_DIR}/debug/
 
       - uses: actions/upload-artifact@v4
         with:
           name: chamos-2-0-apk
-          path: chamos/app/build/outputs/apk/fdroid/debug/*arm64-v8a-debug.apk
+          path: chamos/app/build/outputs/apk/${{ env.FLAVOR_DIR }}/debug/*arm64-v8a-debug.apk
 
       - name: Publicar en Releases (para que la app se actualice sola)
         if: ${{ inputs.publicar != false }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          APK=$(ls chamos/app/build/outputs/apk/fdroid/debug/*arm64-v8a-debug.apk | head -1)
+          APK=$(ls chamos/app/build/outputs/apk/${FLAVOR_DIR}/debug/*arm64-v8a-debug.apk | head -1)
           cp "$APK" Chamos.apk
           gh release create "V$APP_VERSION" Chamos.apk --repo "$GITHUB_REPOSITORY" --title "Chamos $APP_VERSION" --notes "Chamos $APP_VERSION" --latest \
             || gh release upload "V$APP_VERSION" Chamos.apk --repo "$GITHUB_REPOSITORY" --clobber
