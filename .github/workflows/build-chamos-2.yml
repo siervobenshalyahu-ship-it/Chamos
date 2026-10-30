@@ -183,7 +183,14 @@ jobs:
 
       - name: Compilar APK
         working-directory: chamos
-        run: ./gradlew :app:assemble${FLAVOR}Debug --stacktrace --no-configuration-cache
+        run: |
+          set -o pipefail
+          ./gradlew :app:assemble${FLAVOR}Debug --stacktrace --no-configuration-cache 2>&1 | tee ../gradle.log
+
+      - name: Mostrar errores de compilación
+        if: failure()
+        run: |
+          grep -E "^e: |What went wrong|error:" -A2 gradle.log | head -60 | while IFS= read -r l; do echo "::error::${l:0:900}"; done
 
       - name: Ver los APK generados
         run: ls -la chamos/app/build/outputs/apk/${FLAVOR_DIR}/debug/
