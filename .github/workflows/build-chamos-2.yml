@@ -190,7 +190,7 @@ jobs:
       - name: Mostrar errores de compilación
         if: failure()
         run: |
-          grep -E "^e: |What went wrong|error:" -A2 gradle.log | head -60 | while IFS= read -r l; do echo "::error::${l:0:900}"; done
+          grep -E "^e: |What went wrong|FAILED|Execution failed|Could not" -A3 gradle.log | head -60 | while IFS= read -r l; do echo "::error::${l:0:900}"; done
 
       - name: Ver los APK generados
         run: ls -la chamos/app/build/outputs/apk/${FLAVOR_DIR}/debug/
