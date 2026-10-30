@@ -79,4 +79,41 @@ rep2("""                diffCacheUpdater.updateWith(roomSummaries)
                 diffCacheUpdater.updateWith(visibles)
                 buildAndEmitAllRooms(visibles, useCache = false)""")
 open(p2, "w", encoding="utf-8").write(t)
+
+# --- datos: lista de chats sin salas de estados + salas de estados aparte
+p2 = os.path.join(d, "datasource/RoomListDataSource.kt")
+t = open(p2, encoding="utf-8").read()
+old = "    val roomSummariesFlow: Flow<ImmutableList<RoomListRoomSummary>> = _roomSummariesFlow\n"
+assert t.count(old) == 1
+t = t.replace(old, """    val roomSummariesFlow: Flow<ImmutableList<RoomListRoomSummary>> = _roomSummariesFlow
+        .map { list -> list.filterNot { it.isChamosEstado() }.toImmutableList() }
+
+    val statusRoomsFlow: Flow<ImmutableList<RoomListRoomSummary>> = _roomSummariesFlow
+        .map { list -> list.filter { it.isChamosEstado() }.toImmutableList() }
+""")
+t = t.replace("import io.element.android.features.home.impl.model.RoomListRoomSummary\n", "import io.element.android.features.home.impl.isChamosEstado\nimport io.element.android.features.home.impl.model.RoomListRoomSummary\n", 1)
+t = t.replace("import kotlinx.coroutines.flow.launchIn\n", "import kotlinx.coroutines.flow.launchIn\nimport kotlinx.coroutines.flow.map\n", 1)
+open(p2, "w", encoding="utf-8").write(t)
+
+# --- HomeState
+p3 = os.path.join(d, "HomeState.kt")
+t = open(p3, encoding="utf-8").read()
+old = "    val eventSink: (HomeEvent) -> Unit,\n) {"
+assert t.count(old) == 1
+t = t.replace(old, "    val eventSink: (HomeEvent) -> Unit,\n    val chamosEstados: ChamosEstadosState? = null,\n) {")
+open(p3, "w", encoding="utf-8").write(t)
+
+# --- HomePresenter
+p4 = os.path.join(d, "HomePresenter.kt")
+t = open(p4, encoding="utf-8").read()
+old = "    private val featureFlagService: FeatureFlagService,\n"
+assert t.count(old) == 1
+t = t.replace(old, old + "    private val roomListDataSource: io.element.android.features.home.impl.datasource.RoomListDataSource,\n")
+old = "        val snackbarMessage by snackbarDispatcher.collectSnackbarMessageAsState()\n"
+assert t.count(old) == 1
+t = t.replace(old, old + "        val chamosEstados = rememberChamosEstados(client, roomListDataSource)\n")
+old = "            eventSink = ::handleEvent,\n        )"
+assert t.count(old) == 1
+t = t.replace(old, "            eventSink = ::handleEvent,\n            chamosEstados = chamosEstados,\n        )")
+open(p4, "w", encoding="utf-8").write(t)
 print("home_estados OK")
