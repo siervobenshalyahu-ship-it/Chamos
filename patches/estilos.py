@@ -47,6 +47,7 @@ edit(os.path.join(hdir, "HomeView.kt"), [
             onClick = onStylesClick,
         )
 """),
+    ("import androidx.compose.runtime.Composable\n", "import androidx.compose.runtime.Composable\nimport androidx.compose.runtime.getValue\nimport androidx.compose.runtime.setValue\n"),
     ("    val roomsLazyListState = rememberLazyListState()\n",
      "    var mostrarEstilos by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }\n    if (mostrarEstilos) ChamosEstilosDialog(onDismiss = { mostrarEstilos = false })\n    val roomsLazyListState = rememberLazyListState()\n"),
 ])
