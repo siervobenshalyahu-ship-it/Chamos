@@ -23,7 +23,7 @@ rep("""                        RoomListContentView(
                               .padding(outerPadding)
                               .consumeWindowInsets(outerPadding)
                       ) {
-                        ChamosEstadosRow(onOpenRoom = onRoomClick)
+                        ChamosEstadosRow(state = state.chamosEstados, onOpenRoom = { id: RoomId -> onRoomClick(id) })
                         RoomListContentView(
                             contentState""")
 rep("""                            modifier = Modifier
