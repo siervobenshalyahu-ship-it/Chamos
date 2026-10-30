@@ -166,6 +166,14 @@ jobs:
       - name: Actualizaciones dentro de la app
         run: python3 chamos-repo/patches/actualizador.py chamos chamos-repo/patches/ChamosUpdater.kt
 
+      - name: Firma propia de Chamos (si está configurada)
+        env:
+          CHAMOS_KEYSTORE_B64: ${{ secrets.CHAMOS_KEYSTORE_B64 }}
+          CHAMOS_KEY_ALIAS: ${{ secrets.CHAMOS_KEY_ALIAS }}
+          CHAMOS_KEY_PASSWORD: ${{ secrets.CHAMOS_KEY_PASSWORD }}
+          CHAMOS_STORE_PASSWORD: ${{ secrets.CHAMOS_STORE_PASSWORD }}
+        run: python3 chamos-repo/patches/firma.py chamos
+
       - name: Pantalla principal con Estados
         run: python3 chamos-repo/patches/home_estados.py chamos chamos-repo/patches/ChamosEstados.kt
 
