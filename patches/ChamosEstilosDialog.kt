@@ -1,5 +1,11 @@
 package io.element.android.features.home.impl
 
+import android.content.ComponentName
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.provider.Settings
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -20,6 +26,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import io.element.android.compound.theme.ChamosEstilo
@@ -68,7 +75,45 @@ fun ChamosEstilosDialog(onDismiss: () -> Unit) {
                         Text(nombre)
                     }
                 }
+                val contexto = LocalContext.current
+                Text("Arreglar notificaciones (Xiaomi / Redmi)", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 16.dp))
+                TextButton(onClick = { abrirAjuste(contexto, notificacionesIntent(contexto)) }) { Text("1. Sonido y ventana emergente") }
+                TextButton(onClick = { abrirAjuste(contexto, *autoInicioIntents(contexto)) }) { Text("2. Inicio automático") }
+                TextButton(onClick = { abrirAjuste(contexto, *bateriaIntents(contexto)) }) { Text("3. Batería: sin restricciones") }
+                TextButton(onClick = { abrirAjuste(contexto, *otrosPermisosIntents(contexto)) }) { Text("4. Otros permisos (pantalla de bloqueo)") }
             }
         },
     )
+}
+
+private fun notificacionesIntent(c: Context) = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+    .putExtra(Settings.EXTRA_APP_PACKAGE, c.packageName)
+
+private fun autoInicioIntents(c: Context) = arrayOf(
+    Intent().setComponent(ComponentName("com.miui.securitycenter", "com.miui.permcenter.autostart.AutoStartManagementActivity")),
+    Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + c.packageName)),
+)
+
+private fun bateriaIntents(c: Context) = arrayOf(
+    Intent().setComponent(ComponentName("com.miui.powerkeeper", "com.miui.powerkeeper.ui.HiddenAppsConfigActivity"))
+        .putExtra("package_name", c.packageName).putExtra("package_label", "Chamos"),
+    Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS),
+)
+
+private fun otrosPermisosIntents(c: Context) = arrayOf(
+    Intent("miui.intent.action.APP_PERM_EDITOR").setClassName("com.miui.securitycenter", "com.miui.permcenter.permissions.PermissionsEditorActivity")
+        .putExtra("extra_pkgname", c.packageName),
+    Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + c.packageName)),
+)
+
+/** Abre la primera pantalla de ajustes que el teléfono sepa abrir. */
+private fun abrirAjuste(c: Context, vararg intents: Intent) {
+    for (i in intents) {
+        try {
+            c.startActivity(i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            return
+        } catch (_: Exception) {
+        }
+    }
+    Toast.makeText(c, "No se pudo abrir esa pantalla. Búscala en Ajustes del teléfono, Aplicaciones, Chamos.", Toast.LENGTH_LONG).show()
 }
