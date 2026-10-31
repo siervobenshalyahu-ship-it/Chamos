@@ -760,7 +760,8 @@ private fun PaginaEstado(
                                 ruta = r,
                                 activo = activo,
                                 onProgreso = { progreso.floatValue = it },
-                                onFin = { siguiente() },
+                                // Solo el estado que se está viendo puede avanzar el carrusel.
+                                onFin = { if (activo) siguiente() },
                             )
                         }
                     }
@@ -938,7 +939,7 @@ private fun VideoTextura(
                             }
                             mp.setOnPreparedListener { listo.value = true }
                             mp.setOnCompletionListener { finActual() }
-                            mp.setOnErrorListener { _, _, _ -> finActual(); true }
+                            mp.setOnErrorListener { _, what, extra -> android.util.Log.e("Chamos", "video error $what/$extra"); finActual(); true }
                             mp.prepareAsync()
                             reproductor.value = mp
                         }.onFailure { android.util.Log.e("Chamos", "video", it) }
