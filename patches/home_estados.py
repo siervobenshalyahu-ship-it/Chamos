@@ -3,6 +3,7 @@ root, kt = sys.argv[1], sys.argv[2]
 d = os.path.join(root, "features/home/impl/src/main/kotlin/io/element/android/features/home/impl")
 shutil.copy(kt, os.path.join(d, "ChamosEstados.kt"))
 shutil.copy(os.path.join(os.path.dirname(kt), "ChamosEstadosData.kt"), os.path.join(d, "ChamosEstadosData.kt"))
+shutil.copy(os.path.join(os.path.dirname(kt), "ChamosStats.kt"), os.path.join(d, "ChamosStats.kt"))
 p = os.path.join(d, "HomeView.kt")
 s = open(p, encoding="utf-8").read()
 

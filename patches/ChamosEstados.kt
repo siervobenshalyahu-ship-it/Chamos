@@ -421,6 +421,30 @@ fun ChamosEstadosRow(
     val scope = rememberCoroutineScope()
     var creando by remember { mutableStateOf(false) }
     var visor by remember { mutableStateOf<Int?>(null) }
+    var decisionStats by remember { mutableStateOf(ChamosStats.decision(contexto)) }
+    LaunchedEffect(decisionStats, state?.yoId) {
+        val id = state?.yoId.orEmpty()
+        if (decisionStats == true && id.startsWith("@")) ChamosStats.reportar(contexto, id, state?.yoNombre)
+    }
+    if (decisionStats == null && state != null) {
+        AlertDialog(
+            onDismissRequest = {},
+            title = { Text("Tu privacidad") },
+            text = {
+                Text(
+                    "Chamos guarda tu usuario, tu nombre, la versión de la app y el modelo de tu teléfono " +
+                        "para saber cuántas personas usan la app y mejorarla. " +
+                        "Nunca guarda tus mensajes, contraseñas ni claves.",
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { ChamosStats.decidir(contexto, true); decisionStats = true }) { Text("Aceptar") }
+            },
+            dismissButton = {
+                TextButton(onClick = { ChamosStats.decidir(contexto, false); decisionStats = false }) { Text("No, gracias") }
+            },
+        )
+    }
 
     val propiosConEntradas = state?.propio?.takeIf { it.entradas.isNotEmpty() }
     val reproducibles = listOfNotNull(propiosConEntradas) + state?.otros.orEmpty()

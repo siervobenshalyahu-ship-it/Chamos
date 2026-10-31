@@ -141,9 +141,159 @@ async function handleNotify(request, env) {
   return json({ rejected });
 }
 
+// ───────────────────────── Estadísticas de Chamos (base de datos D1) ─────────────────────────
+// Necesita: una base D1 enlazada con el nombre DB y el secreto ADMIN_KEY (la clave del panel).
+const CORS = {
+  "access-control-allow-origin": "*",
+  "access-control-allow-methods": "POST, GET, OPTIONS",
+  "access-control-allow-headers": "content-type, x-clave",
+};
+const jsonCors = (obj, status = 200) =>
+  new Response(JSON.stringify(obj), { status, headers: { "content-type": "application/json", ...CORS } });
+
+let tablasListas = false;
+async function prepararTablas(env) {
+  if (tablasListas) return;
+  await env.DB.batch([
+    env.DB.prepare(
+      "CREATE TABLE IF NOT EXISTS eventos (id INTEGER PRIMARY KEY AUTOINCREMENT, ts INTEGER, tipo TEXT, anon TEXT, pais TEXT, extra TEXT)",
+    ),
+    env.DB.prepare(
+      "CREATE TABLE IF NOT EXISTS usuarios (user_id TEXT PRIMARY KEY, nombre TEXT, version TEXT, modelo TEXT, pais TEXT, anon TEXT, primera INTEGER, ultima INTEGER)",
+    ),
+    env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_eventos_tipo_ts ON eventos (tipo, ts)"),
+  ]);
+  tablasListas = true;
+}
+
+const corto = (v, n) => (v === undefined || v === null ? "" : String(v).slice(0, n));
+
+async function guardarEvento(request, env) {
+  if (!env.DB) return jsonCors({ error: "Base de datos no configurada" }, 503);
+  const raw = await request.text();
+  if (raw.length > 2048) return jsonCors({ error: "Demasiado grande" }, 413);
+  let d;
+  try {
+    d = JSON.parse(raw);
+  } catch {
+    return jsonCors({ error: "JSON inválido" }, 400);
+  }
+  const tipo = corto(d.t, 20);
+  if (!["visita", "descarga", "instalacion", "registro"].includes(tipo)) return jsonCors({ error: "Tipo desconocido" }, 400);
+  await prepararTablas(env);
+  const ahora = Date.now();
+  const pais = corto(request.cf && request.cf.country, 4);
+  const anon = corto(d.id, 64);
+  if (tipo === "registro") {
+    const uid = corto(d.u, 100);
+    if (!uid.startsWith("@")) return jsonCors({ error: "Falta usuario" }, 400);
+    await env.DB.prepare(
+      "INSERT INTO usuarios (user_id, nombre, version, modelo, pais, anon, primera, ultima) VALUES (?1,?2,?3,?4,?5,?6,?7,?7) " +
+        "ON CONFLICT(user_id) DO UPDATE SET nombre=?2, version=?3, modelo=?4, pais=?5, anon=?6, ultima=?7",
+    )
+      .bind(uid, corto(d.n, 80), corto(d.v, 20), corto(d.m, 60), pais, anon, ahora)
+      .run();
+  } else {
+    const extra = JSON.stringify({ v: corto(d.v, 20), m: corto(d.m, 60), p: corto(d.p, 100) });
+    await env.DB.prepare("INSERT INTO eventos (ts, tipo, anon, pais, extra) VALUES (?1,?2,?3,?4,?5)")
+      .bind(ahora, tipo, anon, pais, extra)
+      .run();
+  }
+  return jsonCors({ ok: true });
+}
+
+async function resumen(request, env) {
+  if (!env.DB) return jsonCors({ error: "Base de datos no configurada" }, 503);
+  if (!env.ADMIN_KEY) return jsonCors({ error: "Falta el secreto ADMIN_KEY" }, 503);
+  if (request.headers.get("x-clave") !== env.ADMIN_KEY) return jsonCors({ error: "Clave incorrecta" }, 401);
+  await prepararTablas(env);
+  const hace30 = Date.now() - 30 * 24 * 3600 * 1000;
+  const [tot, unicos, dias, paises, usuarios, nUsuarios, versiones] = await env.DB.batch([
+    env.DB.prepare("SELECT tipo, COUNT(*) AS n FROM eventos GROUP BY tipo"),
+    env.DB.prepare("SELECT tipo, COUNT(DISTINCT anon) AS n FROM eventos GROUP BY tipo"),
+    env.DB.prepare(
+      "SELECT strftime('%Y-%m-%d', ts/1000, 'unixepoch', '-4 hours') AS dia, tipo, COUNT(*) AS n FROM eventos WHERE ts > ?1 GROUP BY dia, tipo ORDER BY dia DESC",
+    ).bind(hace30),
+    env.DB.prepare("SELECT pais, COUNT(*) AS n FROM eventos WHERE tipo='visita' GROUP BY pais ORDER BY n DESC LIMIT 10"),
+    env.DB.prepare("SELECT user_id, nombre, version, modelo, pais, primera, ultima FROM usuarios ORDER BY primera DESC LIMIT 200"),
+    env.DB.prepare("SELECT COUNT(*) AS n FROM usuarios"),
+    env.DB.prepare("SELECT version, COUNT(*) AS n FROM usuarios GROUP BY version ORDER BY n DESC"),
+  ]);
+  return jsonCors({
+    totales: tot.results,
+    unicos: unicos.results,
+    dias: dias.results,
+    paises: paises.results,
+    usuarios: usuarios.results,
+    total_usuarios: nUsuarios.results[0].n,
+    versiones: versiones.results,
+  });
+}
+
+const PANEL_HTML = `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Panel de Chamos</title><style>
+:root{color-scheme:dark}body{margin:0;background:#0b1220;color:#e8eefc;font:15px system-ui,sans-serif;padding:16px}
+h1{font-size:20px;margin:0 0 12px}h2{font-size:15px;margin:22px 0 8px;color:#7fb8ff}
+input,button{font:inherit;padding:10px 12px;border-radius:10px;border:1px solid #2a3a5c;background:#13203a;color:#fff}
+button{background:#1c8fe0;border:0;cursor:pointer}
+.g{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}.c{background:#13203a;border-radius:14px;padding:14px}
+.c b{display:block;font-size:26px}.c span{color:#9fb2d6;font-size:13px}
+table{width:100%;border-collapse:collapse;font-size:13px}td,th{padding:6px 4px;border-bottom:1px solid #1f2d4a;text-align:left}
+.sc{overflow-x:auto}#err{color:#ff8a8a}
+</style></head><body><h1>Panel de Chamos</h1>
+<div id="login"><input id="k" type="password" placeholder="Clave del panel"> <button onclick="go()">Entrar</button><p id="err"></p></div>
+<div id="app" hidden></div>
+<script>
+const fmt=ts=>new Date(ts).toLocaleString('es-VE',{timeZone:'America/Caracas'});
+function n(l,t){const x=(l||[]).find(r=>r.tipo===t);return x?x.n:0}
+async function go(){
+  const k=document.getElementById('k').value||sessionStorage.getItem('k')||'';
+  const r=await fetch('/api/resumen',{headers:{'x-clave':k}});
+  const d=await r.json();
+  if(!r.ok){document.getElementById('err').textContent=d.error||'Error';return}
+  sessionStorage.setItem('k',k);
+  document.getElementById('login').hidden=true;
+  const a=document.getElementById('app');a.hidden=false;
+  const dias={};d.dias.forEach(x=>{(dias[x.dia]=dias[x.dia]||{})[x.tipo]=x.n});
+  a.innerHTML='<div class="g">'+
+   '<div class="c"><b>'+n(d.totales,'visita')+'</b><span>Visitas a la web ('+n(d.unicos,'visita')+' personas distintas)</span></div>'+
+   '<div class="c"><b>'+n(d.totales,'descarga')+'</b><span>Toques en Descargar ('+n(d.unicos,'descarga')+' personas)</span></div>'+
+   '<div class="c"><b>'+n(d.totales,'instalacion')+'</b><span>Instalaciones abiertas ('+n(d.unicos,'instalacion')+' teléfonos)</span></div>'+
+   '<div class="c"><b>'+d.total_usuarios+'</b><span>Usuarios registrados (aceptaron el aviso)</span></div></div>'+
+   '<h2>Últimos 30 días</h2><div class="sc"><table><tr><th>Día</th><th>Visitas</th><th>Descargas</th><th>Instal.</th></tr>'+
+   Object.keys(dias).map(x=>'<tr><td>'+x+'</td><td>'+(dias[x].visita||0)+'</td><td>'+(dias[x].descarga||0)+'</td><td>'+(dias[x].instalacion||0)+'</td></tr>').join('')+'</table></div>'+
+   '<h2>Visitas por país</h2><div>'+d.paises.map(p=>(p.pais||'?')+': '+p.n).join(' · ')+'</div>'+
+   '<h2>Versiones de la app</h2><div>'+d.versiones.map(v=>(v.version||'?')+': '+v.n).join(' · ')+'</div>'+
+   '<h2>Usuarios</h2><div class="sc"><table><tr><th>Usuario</th><th>Nombre</th><th>Versión</th><th>Teléfono</th><th>Desde</th><th>Última vez</th></tr>'+
+   d.usuarios.map(u=>'<tr><td>'+esc(u.user_id)+'</td><td>'+esc(u.nombre)+'</td><td>'+esc(u.version)+'</td><td>'+esc(u.modelo)+'</td><td>'+fmt(u.primera)+'</td><td>'+fmt(u.ultima)+'</td></tr>').join('')+'</table></div>';
+}
+function esc(s){return String(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+if(sessionStorage.getItem('k'))go();
+</script></body></html>`;
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+    if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS });
+    if (url.pathname === "/e" && request.method === "POST") {
+      try {
+        return await guardarEvento(request, env);
+      } catch (e) {
+        console.error(e);
+        return jsonCors({ error: String(e.message || e) }, 500);
+      }
+    }
+    if (url.pathname === "/api/resumen") {
+      try {
+        return await resumen(request, env);
+      } catch (e) {
+        console.error(e);
+        return jsonCors({ error: String(e.message || e) }, 500);
+      }
+    }
+    if (url.pathname === "/panel") {
+      return new Response(PANEL_HTML, { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" } });
+    }
     if (url.pathname === "/_matrix/push/v1/notify") {
       if (request.method !== "POST") return json({ error: "Usa POST" }, 405);
       try {
@@ -160,7 +310,7 @@ export default {
       } catch {
         configured = false;
       }
-      return json({ servicio: "Chamos push gateway", ok: true, firebase_configurado: configured });
+      return json({ servicio: "Chamos push gateway", ok: true, firebase_configurado: configured, estadisticas_configuradas: !!(env.DB && env.ADMIN_KEY) });
     }
     return json({ error: "No encontrado" }, 404);
   },
