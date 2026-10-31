@@ -3,7 +3,6 @@ package io.element.android.features.home.impl
 import android.graphics.BitmapFactory
 import android.net.Uri
 import android.widget.Toast
-import android.widget.VideoView
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -135,6 +134,8 @@ data class ChamosEstadosState(
     val publicarTexto: suspend (String) -> Boolean,
     val cargarArchivo: suspend (EstadoEntrada) -> String?,
     val marcarVisto: (ChamosEstadoItem) -> Unit,
+    val alcanceTodos: Boolean = false,
+    val cambiarAlcance: (Boolean) -> Unit = {},
     val yoId: String = "",
     val yoNombre: String? = null,
     val yoAvatar: String? = null,
@@ -167,6 +168,13 @@ fun rememberChamosEstados(
         Class.forName("android.app.ActivityThread").getMethod("currentApplication").invoke(null) as android.content.Context
     }
     val perfil by client.userProfile.collectAsState()
+    var todos by remember {
+        mutableStateOf(contexto.getSharedPreferences("chamos_estados_cfg", android.content.Context.MODE_PRIVATE).getBoolean("todos", false))
+    }
+    val cambiarAlcance: (Boolean) -> Unit = { v ->
+        todos = v
+        contexto.getSharedPreferences("chamos_estados_cfg", android.content.Context.MODE_PRIVATE).edit().putBoolean("todos", v).apply()
+    }
     val perfiles: SnapshotStateMap<RoomId, io.element.android.libraries.matrix.api.user.MatrixUser> = remember { mutableStateMapOf() }
     val salas by dataSource.statusRoomsFlow.collectAsState(initial = emptyList())
     val chats by dataSource.roomSummariesFlow.collectAsState(initial = emptyList())
@@ -245,17 +253,43 @@ fun rememberChamosEstados(
 
     val contactosIds = chats.filter { it.isDm && it.displayType == RoomSummaryDisplayType.ROOM }.map { it.roomId }
 
-    suspend fun contactos(): List<UserId> = contactosIds.mapNotNull { id ->
-        runCatching { client.getRoom(id)?.getDirectRoomMember()?.userId }.getOrNull()
-    }.distinct()
+    val otrosChatsIds = chats.filter { !it.isDm && it.displayType == RoomSummaryDisplayType.ROOM }.map { it.roomId }
+
+    suspend fun contactos(): List<UserId> {
+        val directos = contactosIds.mapNotNull { id ->
+            runCatching { client.getRoom(id)?.getDirectRoomMember()?.userId }.getOrNull()
+        }
+        // "Todos": además, cualquier persona con la que comparto algún grupo.
+        val deGrupos = if (todos) {
+            otrosChatsIds.take(40).flatMap { id ->
+                runCatching { client.getRoom(id)?.getMembers(200)?.getOrNull().orEmpty().map { it.userId } }.getOrDefault(emptyList())
+            }
+        } else {
+            emptyList()
+        }
+        return (directos + deGrupos).filter { it != client.sessionId }.distinct()
+    }
 
     // Invitar a los contactos a mi sala de estados.
     val invitados = remember { mutableSetOf<UserId>() }
-    LaunchedEffect(propia?.roomId, contactosIds) {
+    LaunchedEffect(propia?.roomId, contactosIds, otrosChatsIds, todos) {
         try {
         val id = propia?.roomId ?: return@LaunchedEffect
         val sala = client.getJoinedRoom(id) ?: return@LaunchedEffect
-        for (usuario in contactos()) {
+        // Esperar a que la lista de chats se estabilice (si cambia, este bloque se cancela y reinicia).
+        delay(4000)
+        val permitidos = contactos()
+        // Quitar a quien ya no debe verlos (cuando se vuelve a "solo contactos").
+        if (!todos && contactosIds.isNotEmpty()) {
+            val actuales = sala.getMembers(1000).getOrNull().orEmpty().map { it.userId }
+            for (u in actuales) {
+                if (u != client.sessionId && u !in permitidos) {
+                    sala.kickUser(u, "Estado solo para contactos")
+                    invitados.remove(u)
+                }
+            }
+        }
+        for (usuario in permitidos) {
             if (invitados.add(usuario)) sala.inviteUserById(usuario)
         }
         } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Throwable) { android.util.Log.e("Chamos", "estados", e) }
@@ -369,6 +403,8 @@ fun rememberChamosEstados(
         publicarTexto = publicarTexto,
         cargarArchivo = cargarArchivo,
         marcarVisto = marcarVisto,
+        alcanceTodos = todos,
+        cambiarAlcance = cambiarAlcance,
         yoId = perfil.userId.value,
         yoNombre = perfil.displayName,
         yoAvatar = perfil.avatarUrl,
@@ -444,6 +480,8 @@ fun ChamosEstadosRow(
 
     if (creando && state != null) {
         NuevoEstadoDialogo(
+            todos = state.alcanceTodos,
+            onAlcance = state.cambiarAlcance,
             onCerrar = { creando = false },
             onMedia = { uri, mime ->
                 Toast.makeText(contexto, "Publicando estado…", Toast.LENGTH_SHORT).show()
@@ -539,6 +577,8 @@ private fun EstadoCirculo(
 
 @Composable
 private fun NuevoEstadoDialogo(
+    todos: Boolean,
+    onAlcance: (Boolean) -> Unit,
     onCerrar: () -> Unit,
     onMedia: (Uri, String) -> Unit,
     onTexto: (String) -> Unit,
@@ -570,6 +610,25 @@ private fun NuevoEstadoDialogo(
                         selector.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo))
                     }) { Text("Foto o video") }
                     TextButton(onClick = { modoTexto = true }) { Text("Texto") }
+                    Text(
+                        "¿Quién ve mis estados?",
+                        fontSize = 13.sp,
+                        modifier = Modifier.padding(start = 12.dp, top = 12.dp),
+                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.clickable { onAlcance(false) }.padding(horizontal = 4.dp),
+                    ) {
+                        androidx.compose.material3.RadioButton(selected = !todos, onClick = { onAlcance(false) })
+                        Text("Solo mis contactos")
+                    }
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.clickable { onAlcance(true) }.padding(horizontal = 4.dp),
+                    ) {
+                        androidx.compose.material3.RadioButton(selected = todos, onClick = { onAlcance(true) })
+                        Text("Todos")
+                    }
                 }
             }
         },
@@ -683,27 +742,12 @@ private fun PaginaEstado(
                                 Text("Cargando…", color = Color.White)
                             }
                         } else {
-                            var vista by remember { mutableStateOf<VideoView?>(null) }
-                            AndroidView(
-                                modifier = Modifier.fillMaxSize(),
-                                factory = { ctx ->
-                                    VideoView(ctx).apply {
-                                        setVideoPath(r)
-                                        setOnPreparedListener { it.isLooping = false }
-                                        setOnCompletionListener { siguiente() }
-                                        setOnErrorListener { _, _, _ -> siguiente(); true }
-                                        vista = this
-                                    }
-                                },
+                            VideoTextura(
+                                ruta = r,
+                                activo = activo,
+                                onProgreso = { progreso.floatValue = it },
+                                onFin = { siguiente() },
                             )
-                            LaunchedEffect(vista, activo) {
-                                if (activo) vista?.start() else vista?.pause()
-                                while (true) {
-                                    val v = vista
-                                    if (v != null && v.duration > 0) progreso.floatValue = v.currentPosition.toFloat() / v.duration
-                                    delay(200)
-                                }
-                            }
                         }
                     }
                 }
@@ -829,6 +873,72 @@ private fun VisorEstados(
                     },
                 )
             }
+        }
+    }
+}
+
+
+/** Video sobre TextureView (un SurfaceView se queda en negro dentro del carrusel 3D). */
+@Composable
+private fun VideoTextura(
+    ruta: String,
+    activo: Boolean,
+    onProgreso: (Float) -> Unit,
+    onFin: () -> Unit,
+) {
+    val activoActual by androidx.compose.runtime.rememberUpdatedState(activo)
+    val finActual by androidx.compose.runtime.rememberUpdatedState(onFin)
+    val reproductor = remember { mutableStateOf<android.media.MediaPlayer?>(null) }
+    val listo = remember { mutableStateOf(false) }
+
+    androidx.compose.runtime.DisposableEffect(ruta) {
+        onDispose {
+            runCatching { reproductor.value?.release() }
+            reproductor.value = null
+        }
+    }
+    AndroidView(
+        modifier = Modifier.fillMaxSize(),
+        factory = { ctx ->
+            android.view.TextureView(ctx).apply {
+                surfaceTextureListener = object : android.view.TextureView.SurfaceTextureListener {
+                    override fun onSurfaceTextureAvailable(st: android.graphics.SurfaceTexture, w: Int, h: Int) {
+                        val tv = this@apply
+                        runCatching {
+                            val mp = android.media.MediaPlayer()
+                            mp.setDataSource(ruta)
+                            mp.setSurface(android.view.Surface(st))
+                            mp.setOnVideoSizeChangedListener { _, vw, vh ->
+                                if (vw > 0 && vh > 0 && tv.width > 0 && tv.height > 0) {
+                                    val escala = minOf(tv.width.toFloat() / vw, tv.height.toFloat() / vh)
+                                    val m = android.graphics.Matrix()
+                                    m.setScale(vw * escala / tv.width, vh * escala / tv.height, tv.width / 2f, tv.height / 2f)
+                                    tv.setTransform(m)
+                                }
+                            }
+                            mp.setOnPreparedListener { listo.value = true }
+                            mp.setOnCompletionListener { finActual() }
+                            mp.setOnErrorListener { _, _, _ -> finActual(); true }
+                            mp.prepareAsync()
+                            reproductor.value = mp
+                        }.onFailure { android.util.Log.e("Chamos", "video", it) }
+                    }
+                    override fun onSurfaceTextureSizeChanged(st: android.graphics.SurfaceTexture, w: Int, h: Int) {}
+                    override fun onSurfaceTextureDestroyed(st: android.graphics.SurfaceTexture): Boolean = true
+                    override fun onSurfaceTextureUpdated(st: android.graphics.SurfaceTexture) {}
+                }
+            }
+        },
+    )
+    LaunchedEffect(activo, listo.value) {
+        val mp = reproductor.value ?: return@LaunchedEffect
+        if (!listo.value) return@LaunchedEffect
+        runCatching { if (activoActual) mp.start() else mp.pause() }
+        while (true) {
+            runCatching {
+                if (mp.duration > 0) onProgreso(mp.currentPosition.toFloat() / mp.duration)
+            }
+            delay(200)
         }
     }
 }
