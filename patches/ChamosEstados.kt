@@ -657,32 +657,22 @@ private fun decodificar(ruta: String): androidx.compose.ui.graphics.ImageBitmap?
 @Composable
 private fun PaginaEstado(
     item: ChamosEstadoItem,
+    iEntrada: Int,
     activo: Boolean,
     cargar: suspend (EstadoEntrada) -> String?,
-    onVisto: (ChamosEstadoItem) -> Unit,
     onCerrar: () -> Unit,
-    onSiguienteItem: () -> Unit,
-    onAnteriorItem: () -> Unit,
+    onSiguiente: () -> Unit,
+    onAnterior: () -> Unit,
 ) {
-    var iEntrada by remember { mutableIntStateOf(0) }
     val entrada = item.entradas.getOrNull(iEntrada)
     if (entrada == null) {
         Box(Modifier.fillMaxSize().background(Color.Black))
         return
     }
 
-    fun siguiente() {
-        if (iEntrada < item.entradas.lastIndex) {
-            iEntrada++
-        } else {
-            onVisto(item)
-            onSiguienteItem()
-        }
-    }
+    fun siguiente() = onSiguiente()
 
-    fun anterior() {
-        if (iEntrada > 0) iEntrada-- else onAnteriorItem()
-    }
+    fun anterior() = onAnterior()
 
     run {
         Box(
@@ -802,10 +792,7 @@ private fun PaginaEstado(
                             color = Color.White,
                             fontSize = 22.sp,
                             modifier = Modifier
-                                .clickable {
-                                    onVisto(item)
-                                    onCerrar()
-                                }
+                                .clickable { onCerrar() }
                                 .padding(8.dp),
                         )
                     }
@@ -837,9 +824,17 @@ private fun VisorEstados(
     onVisto: (ChamosEstadoItem) -> Unit,
     onCerrar: () -> Unit,
 ) {
-    val estado = androidx.compose.foundation.pager.rememberPagerState(initialPage = inicio.coerceIn(0, items.lastIndex)) { items.size }
+    // Cada estado (de cada persona) es una página del carrusel.
+    val paginas = remember(items) {
+        items.flatMapIndexed { i, it -> it.entradas.indices.map { e -> i to e } }
+    }
+    val primera = paginas.indexOfFirst { it.first == inicio.coerceIn(0, items.lastIndex) }.coerceAtLeast(0)
+    val estado = androidx.compose.foundation.pager.rememberPagerState(initialPage = primera) { paginas.size }
     val scope = rememberCoroutineScope()
-    LaunchedEffect(estado.currentPage) { items.getOrNull(estado.currentPage)?.let { onVisto(it) } }
+    LaunchedEffect(estado.currentPage) {
+        val (i, e) = paginas.getOrNull(estado.currentPage) ?: return@LaunchedEffect
+        if (e == items[i].entradas.lastIndex) onVisto(items[i])
+    }
     Dialog(
         onDismissRequest = { onCerrar() },
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
@@ -859,16 +854,17 @@ private fun VisorEstados(
                         rotationY = 90f * posicion.coerceIn(-1f, 1f)
                     },
             ) {
+                val (iItem, iEntrada) = paginas[pagina]
                 PaginaEstado(
-                    item = items[pagina],
+                    item = items[iItem],
+                    iEntrada = iEntrada,
                     activo = estado.currentPage == pagina,
                     cargar = cargar,
-                    onVisto = onVisto,
-                    onCerrar = onCerrar,
-                    onSiguienteItem = {
-                        if (pagina < items.lastIndex) scope.launch { estado.animateScrollToPage(pagina + 1) } else onCerrar()
+                    onCerrar = { onVisto(items[iItem]); onCerrar() },
+                    onSiguiente = {
+                        if (pagina < paginas.lastIndex) scope.launch { estado.animateScrollToPage(pagina + 1) } else { onVisto(items[iItem]); onCerrar() }
                     },
-                    onAnteriorItem = {
+                    onAnterior = {
                         if (pagina > 0) scope.launch { estado.animateScrollToPage(pagina - 1) }
                     },
                 )
