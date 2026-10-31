@@ -15,9 +15,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -59,6 +57,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
@@ -126,6 +125,7 @@ data class ChamosEstadoItem(
     val titulo: String,
     val nuevo: Boolean,
     val entradas: List<EstadoEntrada>,
+    val avatar: AvatarData? = null,
 )
 
 data class ChamosEstadosState(
@@ -167,6 +167,7 @@ fun rememberChamosEstados(
         Class.forName("android.app.ActivityThread").getMethod("currentApplication").invoke(null) as android.content.Context
     }
     val perfil by client.userProfile.collectAsState()
+    val perfiles: SnapshotStateMap<RoomId, io.element.android.libraries.matrix.api.user.MatrixUser> = remember { mutableStateMapOf() }
     val salas by dataSource.statusRoomsFlow.collectAsState(initial = emptyList())
     val chats by dataSource.roomSummariesFlow.collectAsState(initial = emptyList())
     val esMia: SnapshotStateMap<RoomId, Boolean> = remember { mutableStateMapOf() }
@@ -186,6 +187,10 @@ fun rememberChamosEstados(
             if (esMia[sala.roomId] == null) {
                 val info = client.getRoomInfo(sala.roomId).getOrNull()
                 esMia[sala.roomId] = info?.creators?.contains(client.sessionId) == true
+                val creador = info?.creators?.firstOrNull()
+                if (creador != null && creador != client.sessionId) {
+                    client.getProfile(creador).getOrNull()?.let { perfiles[sala.roomId] = it }
+                }
             }
             if (sala.displayType == RoomSummaryDisplayType.INVITE && esMia[sala.roomId] != true && intentos.add(sala.roomId)) {
                 client.joinRoom(sala.roomId)
@@ -347,6 +352,7 @@ fun rememberChamosEstados(
             titulo = titulo,
             nuevo = entradas.isNotEmpty() && vistos[sala.roomId.value] != entradas.last().id,
             entradas = entradas,
+            avatar = perfiles[sala.roomId]?.let { AvatarData(it.userId.value, it.displayName, it.avatarUrl, AvatarSize.UserListItem) },
         )
     }
 
@@ -358,7 +364,7 @@ fun rememberChamosEstados(
                 nuevo = false,
             )
         },
-        otros = otras.map { item(it, it.tituloEstado()) }.filter { it.entradas.isNotEmpty() },
+        otros = otras.map { sala -> item(sala, perfiles[sala.roomId]?.displayName?.takeIf { it.isNotBlank() } ?: sala.tituloEstado()) }.filter { it.entradas.isNotEmpty() },
         publicarMedia = publicarMedia,
         publicarTexto = publicarTexto,
         cargarArchivo = cargarArchivo,
@@ -426,6 +432,7 @@ fun ChamosEstadosRow(
                 EstadoCirculo(
                     texto = estado.titulo.firstOrNull()?.uppercase() ?: "?",
                     titulo = estado.titulo,
+                    avatar = estado.avatar,
                     anillo = estado.nuevo,
                     conMas = false,
                     onMas = {},
@@ -587,21 +594,21 @@ private fun decodificar(ruta: String): androidx.compose.ui.graphics.ImageBitmap?
     return BitmapFactory.decodeFile(ruta, opciones)?.asImageBitmap()
 }
 
-/** Reproductor de estados a pantalla completa: toca a la derecha para avanzar, a la izquierda para volver. */
+/** Una persona dentro del carrusel: toca a la derecha para avanzar, a la izquierda para volver. */
 @Composable
-private fun VisorEstados(
-    items: List<ChamosEstadoItem>,
-    inicio: Int,
+private fun PaginaEstado(
+    item: ChamosEstadoItem,
+    activo: Boolean,
     cargar: suspend (EstadoEntrada) -> String?,
     onVisto: (ChamosEstadoItem) -> Unit,
     onCerrar: () -> Unit,
+    onSiguienteItem: () -> Unit,
+    onAnteriorItem: () -> Unit,
 ) {
-    var iItem by remember { mutableIntStateOf(inicio) }
     var iEntrada by remember { mutableIntStateOf(0) }
-    val item = items.getOrNull(iItem)
-    val entrada = item?.entradas?.getOrNull(iEntrada)
-    if (item == null || entrada == null) {
-        LaunchedEffect(Unit) { onCerrar() }
+    val entrada = item.entradas.getOrNull(iEntrada)
+    if (entrada == null) {
+        Box(Modifier.fillMaxSize().background(Color.Black))
         return
     }
 
@@ -610,50 +617,24 @@ private fun VisorEstados(
             iEntrada++
         } else {
             onVisto(item)
-            if (iItem < items.lastIndex) {
-                iItem++
-                iEntrada = 0
-            } else {
-                onCerrar()
-            }
+            onSiguienteItem()
         }
     }
 
     fun anterior() {
-        if (iEntrada > 0) {
-            iEntrada--
-        } else if (iItem > 0) {
-            iItem--
-            iEntrada = items[iItem].entradas.lastIndex.coerceAtLeast(0)
-        }
+        if (iEntrada > 0) iEntrada-- else onAnteriorItem()
     }
 
-    Dialog(
-        onDismissRequest = {
-            onVisto(item)
-            onCerrar()
-        },
-        properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
-    ) {
+    run {
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(Color.Black)
-                .pointerInput(iItem, iEntrada) {
+                .pointerInput(iEntrada) {
                     detectTapGestures { punto -> if (punto.x < size.width / 3f) anterior() else siguiente() }
-                }
-                .pointerInput(iItem, iEntrada) {
-                    var acum = 0f
-                    detectHorizontalDragGestures(
-                        onDragEnd = {
-                            if (acum > 120f) anterior() else if (acum < -120f) siguiente()
-                            acum = 0f
-                        },
-                        onDragCancel = { acum = 0f },
-                    ) { _, d -> acum += d }
                 },
         ) {
-            androidx.compose.runtime.key(iItem, iEntrada) {
+            androidx.compose.runtime.key(iEntrada) {
                 val progreso = remember { mutableFloatStateOf(0f) }
                 val ruta by produceState<String?>(null, entrada.id) {
                     value = if (entrada.tipo == TipoEstado.TEXTO) null else cargar(entrada)
@@ -708,14 +689,15 @@ private fun VisorEstados(
                                 factory = { ctx ->
                                     VideoView(ctx).apply {
                                         setVideoPath(r)
-                                        setOnPreparedListener { it.isLooping = false; start() }
+                                        setOnPreparedListener { it.isLooping = false }
                                         setOnCompletionListener { siguiente() }
                                         setOnErrorListener { _, _, _ -> siguiente(); true }
                                         vista = this
                                     }
                                 },
                             )
-                            LaunchedEffect(vista) {
+                            LaunchedEffect(vista, activo) {
+                                if (activo) vista?.start() else vista?.pause()
                                 while (true) {
                                     val v = vista
                                     if (v != null && v.duration > 0) progreso.floatValue = v.currentPosition.toFloat() / v.duration
@@ -727,7 +709,8 @@ private fun VisorEstados(
                 }
                 if (entrada.tipo != TipoEstado.VIDEO) {
                     val anim = remember { Animatable(0f) }
-                    LaunchedEffect(Unit) {
+                    LaunchedEffect(activo) {
+                        if (!activo) return@LaunchedEffect
                         // El tiempo empieza a correr cuando el contenido ya está listo.
                         if (entrada.tipo == TipoEstado.IMAGEN) {
                             while (ruta == null) delay(100)
@@ -783,29 +766,6 @@ private fun VisorEstados(
                         )
                     }
                 }
-                // Flechas para ir al estado anterior / siguiente y contador
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.align(Alignment.CenterStart).fillMaxWidth().padding(horizontal = 4.dp),
-                ) {
-                    Box(
-                        contentAlignment = Alignment.Center,
-                        modifier = Modifier.size(44.dp).clip(CircleShape)
-                            .background(Color.Black.copy(alpha = 0.35f)).clickable { anterior() },
-                    ) { Text("‹", color = Color.White, fontSize = 30.sp) }
-                    Spacer(Modifier.weight(1f))
-                    Box(
-                        contentAlignment = Alignment.Center,
-                        modifier = Modifier.size(44.dp).clip(CircleShape)
-                            .background(Color.Black.copy(alpha = 0.35f)).clickable { siguiente() },
-                    ) { Text("›", color = Color.White, fontSize = 30.sp) }
-                }
-                Text(
-                    "${iEntrada + 1} / ${item.entradas.size}",
-                    color = Color.White,
-                    fontSize = 13.sp,
-                    modifier = Modifier.align(Alignment.TopCenter).padding(top = 52.dp),
-                )
                 if (entrada.tipo != TipoEstado.TEXTO && entrada.texto.isNotBlank()) {
                     Text(
                         entrada.texto,
@@ -819,6 +779,55 @@ private fun VisorEstados(
                             .padding(16.dp),
                     )
                 }
+            }
+        }
+    }
+}
+
+/** Reproductor de estados a pantalla completa: desliza entre personas con efecto de cubo 3D, como Telegram. */
+@Composable
+private fun VisorEstados(
+    items: List<ChamosEstadoItem>,
+    inicio: Int,
+    cargar: suspend (EstadoEntrada) -> String?,
+    onVisto: (ChamosEstadoItem) -> Unit,
+    onCerrar: () -> Unit,
+) {
+    val estado = androidx.compose.foundation.pager.rememberPagerState(initialPage = inicio.coerceIn(0, items.lastIndex)) { items.size }
+    val scope = rememberCoroutineScope()
+    LaunchedEffect(estado.currentPage) { items.getOrNull(estado.currentPage)?.let { onVisto(it) } }
+    Dialog(
+        onDismissRequest = { onCerrar() },
+        properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
+    ) {
+        androidx.compose.foundation.pager.HorizontalPager(
+            state = estado,
+            modifier = Modifier.fillMaxSize().background(Color.Black),
+            beyondViewportPageCount = 1,
+        ) { pagina ->
+            val posicion = pagina - estado.currentPage - estado.currentPageOffsetFraction
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .graphicsLayer {
+                        cameraDistance = 24f * density
+                        transformOrigin = androidx.compose.ui.graphics.TransformOrigin(if (posicion < 0f) 1f else 0f, 0.5f)
+                        rotationY = 90f * posicion.coerceIn(-1f, 1f)
+                    },
+            ) {
+                PaginaEstado(
+                    item = items[pagina],
+                    activo = estado.currentPage == pagina,
+                    cargar = cargar,
+                    onVisto = onVisto,
+                    onCerrar = onCerrar,
+                    onSiguienteItem = {
+                        if (pagina < items.lastIndex) scope.launch { estado.animateScrollToPage(pagina + 1) } else onCerrar()
+                    },
+                    onAnteriorItem = {
+                        if (pagina > 0) scope.launch { estado.animateScrollToPage(pagina - 1) }
+                    },
+                )
             }
         }
     }
