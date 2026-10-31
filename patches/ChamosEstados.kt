@@ -1,38 +1,71 @@
 package io.element.android.features.home.impl
 
+import android.graphics.BitmapFactory
+import android.net.Uri
+import android.widget.Toast
+import android.widget.VideoView
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateMap
-import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import io.element.android.compound.theme.ChamosEstilo
 import io.element.android.features.home.impl.datasource.RoomListDataSource
 import io.element.android.features.home.impl.model.RoomListRoomSummary
 import io.element.android.features.home.impl.model.RoomSummaryDisplayType
@@ -41,47 +74,97 @@ import io.element.android.libraries.matrix.api.core.RoomId
 import io.element.android.libraries.matrix.api.core.UserId
 import io.element.android.libraries.matrix.api.createroom.CreateRoomParameters
 import io.element.android.libraries.matrix.api.createroom.RoomPreset
+import io.element.android.libraries.matrix.api.media.MediaSource
+import io.element.android.libraries.matrix.api.media.toFile
+import io.element.android.libraries.matrix.api.room.JoinedRoom
 import io.element.android.libraries.matrix.api.room.RoomNotificationMode
 import io.element.android.libraries.matrix.api.roomdirectory.RoomVisibility
 import io.element.android.libraries.matrix.api.timeline.MatrixTimelineItem
 import io.element.android.libraries.matrix.api.timeline.Timeline
 import io.element.android.libraries.matrix.api.timeline.item.event.EventOrTransactionId
+import io.element.android.libraries.matrix.api.timeline.item.event.ImageMessageType
 import io.element.android.libraries.matrix.api.timeline.item.event.MessageContent
+import io.element.android.libraries.matrix.api.timeline.item.event.TextMessageType
+import io.element.android.libraries.matrix.api.timeline.item.event.VideoMessageType
+import io.element.android.libraries.mediaupload.api.MediaOptimizationConfigProviderFactory
+import io.element.android.libraries.mediaupload.api.MediaSenderRoomFactory
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /** Las salas de estados de Chamos empiezan con este caracter invisible. */
 const val CHAMOS_ESTADO_MARCA = "⁣"
 private const val CHAMOS_ESTADO_PREFIJO = "Estado de "
 private const val CHAMOS_ESTADO_HORAS = 24L
+private const val DURACION_FIJA_MS = 6000
 
 fun RoomListRoomSummary.isChamosEstado(): Boolean = name?.startsWith(CHAMOS_ESTADO_MARCA) == true
+
+enum class TipoEstado { IMAGEN, VIDEO, TEXTO }
+
+data class EstadoEntrada(
+    val id: String,
+    val timestamp: Long,
+    val tipo: TipoEstado,
+    val texto: String,
+    val fuente: MediaSource?,
+    val mime: String?,
+    val nombre: String,
+)
 
 data class ChamosEstadoItem(
     val roomId: RoomId,
     val titulo: String,
     val nuevo: Boolean,
+    val entradas: List<EstadoEntrada>,
 )
 
 data class ChamosEstadosState(
     val propio: ChamosEstadoItem?,
     val otros: List<ChamosEstadoItem>,
-    /** Abre mi sala de estados; si no existe todavía, la crea e invita a mis contactos. */
-    val abrirPropio: suspend () -> RoomId?,
+    val publicarMedia: suspend (Uri, String) -> Boolean,
+    val publicarTexto: suspend (String) -> Boolean,
+    val cargarArchivo: suspend (EstadoEntrada) -> String?,
+    val marcarVisto: (ChamosEstadoItem) -> Unit,
 )
 
 private fun RoomListRoomSummary.tituloEstado(): String =
     (name ?: "").removePrefix(CHAMOS_ESTADO_MARCA).removePrefix(CHAMOS_ESTADO_PREFIJO).ifBlank { "Contacto" }
 
+private fun extraerEntrada(item: MatrixTimelineItem): EstadoEntrada? {
+    val ev = (item as? MatrixTimelineItem.Event)?.event ?: return null
+    val contenido = ev.content as? MessageContent ?: return null
+    val id = ev.eventId?.value ?: ev.transactionId?.value ?: return null
+    return when (val t = contenido.type) {
+        is ImageMessageType -> EstadoEntrada(id, ev.timestamp, TipoEstado.IMAGEN, t.caption ?: "", t.source, t.info?.mimetype, t.filename)
+        is VideoMessageType -> EstadoEntrada(id, ev.timestamp, TipoEstado.VIDEO, t.caption ?: "", t.source, t.info?.mimetype, t.filename)
+        is TextMessageType -> EstadoEntrada(id, ev.timestamp, TipoEstado.TEXTO, t.body, null, null, "")
+        else -> null
+    }
+}
+
 @Composable
-fun rememberChamosEstados(client: MatrixClient, dataSource: RoomListDataSource): ChamosEstadosState {
+fun rememberChamosEstados(
+    client: MatrixClient,
+    dataSource: RoomListDataSource,
+    mediaSenderFactory: MediaSenderRoomFactory,
+    mediaConfigFactory: MediaOptimizationConfigProviderFactory,
+): ChamosEstadosState {
+    val contexto = LocalContext.current
     val salas by dataSource.statusRoomsFlow.collectAsState(initial = emptyList())
     val chats by dataSource.roomSummariesFlow.collectAsState(initial = emptyList())
     val esMia: SnapshotStateMap<RoomId, Boolean> = remember { mutableStateMapOf() }
     val intentos = remember { mutableSetOf<RoomId>() }
     val silenciadas = remember { mutableSetOf<RoomId>() }
+    val entradasPorSala: SnapshotStateMap<RoomId, List<EstadoEntrada>> = remember { mutableStateMapOf() }
+    val vistos: SnapshotStateMap<String, String> = remember {
+        val prefs = contexto.getSharedPreferences("chamos_estados_vistos", android.content.Context.MODE_PRIVATE)
+        mutableStateMapOf<String, String>().also { m -> prefs.all.forEach { (k, v) -> if (v is String) m[k] = v } }
+    }
+    val cacheArchivos = remember { mutableMapOf<String, String>() }
 
     // Saber cuáles son mías (soy la creadora) y entrar solo a las invitaciones de otras personas.
     LaunchedEffect(salas.map { it.roomId to it.displayType }) {
@@ -103,8 +186,23 @@ fun rememberChamosEstados(client: MatrixClient, dataSource: RoomListDataSource):
     }
 
     val propia = salas.firstOrNull { esMia[it.roomId] == true && it.displayType == RoomSummaryDisplayType.ROOM }
-    val otras = salas.filter {
-        esMia[it.roomId] == false && it.displayType == RoomSummaryDisplayType.ROOM
+    val otras = salas.filter { esMia[it.roomId] == false && it.displayType == RoomSummaryDisplayType.ROOM }
+    val idsActivos = (listOfNotNull(propia) + otras).map { it.roomId }
+
+    // Leer los estados de cada sala (los de las últimas 24 horas).
+    LaunchedEffect(idsActivos) {
+        for (id in idsActivos) {
+            launch {
+                val sala = client.getJoinedRoom(id) ?: return@launch
+                runCatching { sala.liveTimeline.paginate(Timeline.PaginationDirection.BACKWARDS) }
+                sala.liveTimeline.timelineItems.collect { items ->
+                    val limite = System.currentTimeMillis() - CHAMOS_ESTADO_HORAS * 60 * 60 * 1000L
+                    entradasPorSala[id] = items.mapNotNull { extraerEntrada(it) }
+                        .filter { it.timestamp >= limite }
+                        .sortedBy { it.timestamp }
+                }
+            }
+        }
     }
 
     val contactosIds = chats.filter { it.isDm && it.displayType == RoomSummaryDisplayType.ROOM }.map { it.roomId }
@@ -127,7 +225,6 @@ fun rememberChamosEstados(client: MatrixClient, dataSource: RoomListDataSource):
     LaunchedEffect(propia?.roomId) {
         val id = propia?.roomId ?: return@LaunchedEffect
         val sala = client.getJoinedRoom(id) ?: return@LaunchedEffect
-        runCatching { sala.liveTimeline.paginate(Timeline.PaginationDirection.BACKWARDS) }
         val borrados = mutableSetOf<String>()
         val reloj = flow {
             while (true) {
@@ -147,8 +244,8 @@ fun rememberChamosEstados(client: MatrixClient, dataSource: RoomListDataSource):
         }
     }
 
-    val abrirPropio: suspend () -> RoomId? = abrir@{
-        propia?.roomId?.let { return@abrir it }
+    suspend fun salaPropia(): JoinedRoom? {
+        propia?.roomId?.let { id -> client.getJoinedRoom(id)?.let { return it } }
         val nombre = client.userProfile.value.displayName ?: client.sessionId.value
         val creada = client.createRoom(
             CreateRoomParameters(
@@ -159,34 +256,87 @@ fun rememberChamosEstados(client: MatrixClient, dataSource: RoomListDataSource):
                 preset = RoomPreset.PRIVATE_CHAT,
                 invite = contactos(),
             )
-        ).getOrNull() ?: return@abrir null
+        ).getOrNull() ?: return null
         esMia[creada] = true
-        client.getJoinedRoom(creada)?.let { sala ->
-            // Solo yo puedo publicar; los demás solo ven.
-            sala.powerLevels().getOrNull()?.let { niveles ->
-                sala.updatePowerLevels(niveles.copy(eventsDefault = 50))
+        var sala: JoinedRoom? = null
+        repeat(10) {
+            if (sala == null) {
+                sala = client.getJoinedRoom(creada)
+                if (sala == null) delay(500)
             }
         }
+        val s = sala ?: return null
+        // Solo yo puedo publicar; los demás solo ven.
+        s.powerLevels().getOrNull()?.let { niveles -> s.updatePowerLevels(niveles.copy(eventsDefault = 50)) }
         client.notificationSettingsService.setRoomNotificationMode(creada, RoomNotificationMode.MUTE)
-        creada
+        return s
+    }
+
+    val publicarMedia: suspend (Uri, String) -> Boolean = publicar@{ uri, mime ->
+        val sala = salaPropia() ?: return@publicar false
+        val sender = mediaSenderFactory.create(client, sala)
+        val config = mediaConfigFactory.create(client).get()
+        val resultado = sender.sendMedia(uri = uri, mimeType = mime, mediaOptimizationConfig = config)
+        sender.cleanUp()
+        resultado.isSuccess
+    }
+
+    val publicarTexto: suspend (String) -> Boolean = publicar@{ texto ->
+        val sala = salaPropia() ?: return@publicar false
+        sala.liveTimeline.sendMessage(texto, null, emptyList()).isSuccess
+    }
+
+    val cargarArchivo: suspend (EstadoEntrada) -> String? = cargar@{ e ->
+        cacheArchivos[e.id]?.let { return@cargar it }
+        val fuente = e.fuente ?: return@cargar null
+        val archivo = client.matrixMediaLoader.downloadMediaFile(fuente, e.mime, e.nombre).getOrNull() ?: return@cargar null
+        val ruta = archivo.toFile().absolutePath
+        cacheArchivos[e.id] = ruta
+        ruta
+    }
+
+    val marcarVisto: (ChamosEstadoItem) -> Unit = { item ->
+        item.entradas.lastOrNull()?.let { ultima ->
+            vistos[item.roomId.value] = ultima.id
+            contexto.getSharedPreferences("chamos_estados_vistos", android.content.Context.MODE_PRIVATE)
+                .edit().putString(item.roomId.value, ultima.id).apply()
+        }
+    }
+
+    fun item(sala: RoomListRoomSummary, titulo: String): ChamosEstadoItem {
+        val entradas = entradasPorSala[sala.roomId].orEmpty()
+        return ChamosEstadoItem(
+            roomId = sala.roomId,
+            titulo = titulo,
+            nuevo = entradas.isNotEmpty() && vistos[sala.roomId.value] != entradas.last().id,
+            entradas = entradas,
+        )
     }
 
     return ChamosEstadosState(
-        propio = propia?.let { ChamosEstadoItem(it.roomId, "Mi estado", false) },
-        otros = otras.map { ChamosEstadoItem(it.roomId, it.tituloEstado(), it.hasNewContent) },
-        abrirPropio = abrirPropio,
+        propio = propia?.let { item(it, "Mi estado") },
+        otros = otras.map { item(it, it.tituloEstado()) }.filter { it.entradas.isNotEmpty() },
+        publicarMedia = publicarMedia,
+        publicarTexto = publicarTexto,
+        cargarArchivo = cargarArchivo,
+        marcarVisto = marcarVisto,
     )
 }
 
-/** Fila "Estados" en la parte superior de la pantalla principal de Chamos. */
+/** Fila "Estados" arriba de la pantalla principal: mi estado y los de mis contactos, en carrusel. */
 @Composable
 fun ChamosEstadosRow(
     state: ChamosEstadosState?,
-    onOpenRoom: (RoomId) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val contexto = LocalContext.current
     val scope = rememberCoroutineScope()
-    var ocupado by remember { mutableStateOf(false) }
+    var creando by remember { mutableStateOf(false) }
+    var visor by remember { mutableStateOf<Int?>(null) }
+
+    val propiosConEntradas = state?.propio?.takeIf { it.entradas.isNotEmpty() }
+    val reproducibles = listOfNotNull(propiosConEntradas) + state?.otros.orEmpty()
+
     Column(modifier = modifier.fillMaxWidth()) {
         Text(
             text = "Estados",
@@ -200,19 +350,12 @@ fun ChamosEstadosRow(
         ) {
             item {
                 EstadoCirculo(
-                    texto = if (state?.propio != null) "✓" else "+",
+                    texto = "Yo",
                     titulo = "Mi estado",
-                    anillo = state?.propio != null,
-                    onClick = {
-                        if (state != null && !ocupado) {
-                            ocupado = true
-                            scope.launch {
-                                val id = state.abrirPropio()
-                                ocupado = false
-                                if (id != null) onOpenRoom(id)
-                            }
-                        }
-                    },
+                    anillo = propiosConEntradas != null,
+                    conMas = true,
+                    onMas = { creando = true },
+                    onClick = { if (propiosConEntradas != null) visor = 0 else creando = true },
                 )
             }
             items(state?.otros.orEmpty(), key = { it.roomId.value }) { estado ->
@@ -220,15 +363,54 @@ fun ChamosEstadosRow(
                     texto = estado.titulo.firstOrNull()?.uppercase() ?: "?",
                     titulo = estado.titulo,
                     anillo = estado.nuevo,
-                    onClick = { onOpenRoom(estado.roomId) },
+                    conMas = false,
+                    onMas = {},
+                    onClick = { visor = reproducibles.indexOfFirst { it.roomId == estado.roomId }.coerceAtLeast(0) },
                 )
             }
         }
     }
+
+    if (creando && state != null) {
+        NuevoEstadoDialogo(
+            onCerrar = { creando = false },
+            onMedia = { uri, mime ->
+                Toast.makeText(contexto, "Publicando estado…", Toast.LENGTH_SHORT).show()
+                scope.launch {
+                    val ok = state.publicarMedia(uri, mime)
+                    Toast.makeText(contexto, if (ok) "Estado publicado" else "No se pudo publicar", Toast.LENGTH_SHORT).show()
+                }
+            },
+            onTexto = { texto ->
+                scope.launch {
+                    val ok = state.publicarTexto(texto)
+                    Toast.makeText(contexto, if (ok) "Estado publicado" else "No se pudo publicar", Toast.LENGTH_SHORT).show()
+                }
+            },
+        )
+    }
+
+    val abierto = visor
+    if (abierto != null && state != null && reproducibles.isNotEmpty()) {
+        VisorEstados(
+            items = reproducibles,
+            inicio = abierto.coerceIn(0, reproducibles.lastIndex),
+            cargar = state.cargarArchivo,
+            onVisto = state.marcarVisto,
+            onCerrar = { visor = null },
+        )
+    }
 }
 
 @Composable
-private fun EstadoCirculo(texto: String, titulo: String, anillo: Boolean, onClick: () -> Unit) {
+private fun EstadoCirculo(
+    texto: String,
+    titulo: String,
+    anillo: Boolean,
+    conMas: Boolean,
+    onMas: () -> Unit,
+    onClick: () -> Unit,
+) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
@@ -236,20 +418,36 @@ private fun EstadoCirculo(texto: String, titulo: String, anillo: Boolean, onClic
             .padding(4.dp)
             .size(width = 68.dp, height = 90.dp),
     ) {
-        Box(
-            contentAlignment = Alignment.Center,
-            modifier = Modifier
-                .size(60.dp)
-                .clip(CircleShape)
-                .border(
-                    BorderStroke(if (anillo) 3.dp else 0.dp, MaterialTheme.colorScheme.primary),
-                    CircleShape,
-                )
-                .padding(4.dp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.primaryContainer),
-        ) {
-            Text(texto, fontSize = 26.sp, color = MaterialTheme.colorScheme.onPrimaryContainer)
+        Box(modifier = Modifier.size(62.dp)) {
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .size(60.dp)
+                    .clip(CircleShape)
+                    .border(
+                        BorderStroke(if (anillo) 3.dp else 0.dp, MaterialTheme.colorScheme.primary),
+                        CircleShape,
+                    )
+                    .padding(4.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primaryContainer),
+            ) {
+                Text(texto, fontSize = 24.sp, color = MaterialTheme.colorScheme.onPrimaryContainer)
+            }
+            if (conMas) {
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .offset(x = 4.dp, y = 2.dp)
+                        .size(24.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primary)
+                        .clickable(onClick = onMas),
+                ) {
+                    Text("+", fontSize = 18.sp, color = MaterialTheme.colorScheme.onPrimary)
+                }
+            }
         }
         Text(
             text = titulo,
@@ -260,5 +458,266 @@ private fun EstadoCirculo(texto: String, titulo: String, anillo: Boolean, onClic
             color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.padding(top = 4.dp),
         )
+    }
+}
+
+@Composable
+private fun NuevoEstadoDialogo(
+    onCerrar: () -> Unit,
+    onMedia: (Uri, String) -> Unit,
+    onTexto: (String) -> Unit,
+) {
+    val contexto = LocalContext.current
+    var modoTexto by remember { mutableStateOf(false) }
+    var texto by remember { mutableStateOf("") }
+    val selector = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        if (uri != null) {
+            val mime = contexto.contentResolver.getType(uri) ?: "image/jpeg"
+            onMedia(uri, mime)
+        }
+        onCerrar()
+    }
+    AlertDialog(
+        onDismissRequest = onCerrar,
+        title = { Text("Nuevo estado") },
+        text = {
+            if (modoTexto) {
+                OutlinedTextField(
+                    value = texto,
+                    onValueChange = { texto = it.take(300) },
+                    placeholder = { Text("Escribe tu estado") },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            } else {
+                Column {
+                    TextButton(onClick = {
+                        selector.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo))
+                    }) { Text("Foto o video") }
+                    TextButton(onClick = { modoTexto = true }) { Text("Texto") }
+                }
+            }
+        },
+        confirmButton = {
+            if (modoTexto) {
+                TextButton(onClick = {
+                    if (texto.isNotBlank()) onTexto(texto.trim())
+                    onCerrar()
+                }) { Text("Publicar") }
+            }
+        },
+        dismissButton = { TextButton(onClick = onCerrar) { Text("Cancelar") } },
+    )
+}
+
+private fun decodificar(ruta: String): androidx.compose.ui.graphics.ImageBitmap? {
+    val bordes = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    BitmapFactory.decodeFile(ruta, bordes)
+    var muestra = 1
+    while (bordes.outWidth / muestra > 2048 || bordes.outHeight / muestra > 2048) muestra *= 2
+    val opciones = BitmapFactory.Options().apply { inSampleSize = muestra }
+    return BitmapFactory.decodeFile(ruta, opciones)?.asImageBitmap()
+}
+
+/** Reproductor de estados a pantalla completa: toca a la derecha para avanzar, a la izquierda para volver. */
+@Composable
+private fun VisorEstados(
+    items: List<ChamosEstadoItem>,
+    inicio: Int,
+    cargar: suspend (EstadoEntrada) -> String?,
+    onVisto: (ChamosEstadoItem) -> Unit,
+    onCerrar: () -> Unit,
+) {
+    var iItem by remember { mutableIntStateOf(inicio) }
+    var iEntrada by remember { mutableIntStateOf(0) }
+    val item = items.getOrNull(iItem)
+    val entrada = item?.entradas?.getOrNull(iEntrada)
+    if (item == null || entrada == null) {
+        LaunchedEffect(Unit) { onCerrar() }
+        return
+    }
+
+    fun siguiente() {
+        if (iEntrada < item.entradas.lastIndex) {
+            iEntrada++
+        } else {
+            onVisto(item)
+            if (iItem < items.lastIndex) {
+                iItem++
+                iEntrada = 0
+            } else {
+                onCerrar()
+            }
+        }
+    }
+
+    fun anterior() {
+        if (iEntrada > 0) {
+            iEntrada--
+        } else if (iItem > 0) {
+            iItem--
+            iEntrada = items[iItem].entradas.lastIndex.coerceAtLeast(0)
+        }
+    }
+
+    Dialog(
+        onDismissRequest = {
+            onVisto(item)
+            onCerrar()
+        },
+        properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black)
+                .pointerInput(iItem, iEntrada) {
+                    detectTapGestures { punto -> if (punto.x < size.width / 3f) anterior() else siguiente() }
+                },
+        ) {
+            androidx.compose.runtime.key(iItem, iEntrada) {
+                val progreso = remember { mutableFloatStateOf(0f) }
+                val ruta by produceState<String?>(null, entrada.id) {
+                    value = if (entrada.tipo == TipoEstado.TEXTO) null else cargar(entrada)
+                }
+                when (entrada.tipo) {
+                    TipoEstado.TEXTO -> {
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(
+                                    Brush.verticalGradient(
+                                        listOf(ChamosEstilo.paletas[ChamosEstilo.paleta].acento, Color(0xFF101820)),
+                                    ),
+                                )
+                                .padding(32.dp),
+                        ) {
+                            Text(
+                                entrada.texto,
+                                color = Color.White,
+                                fontSize = 28.sp,
+                                fontWeight = FontWeight.Bold,
+                                textAlign = TextAlign.Center,
+                            )
+                        }
+                    }
+                    TipoEstado.IMAGEN -> {
+                        val imagen by produceState<androidx.compose.ui.graphics.ImageBitmap?>(null, ruta) {
+                            value = ruta?.let { r -> withContext(Dispatchers.IO) { decodificar(r) } }
+                        }
+                        imagen?.let {
+                            Image(
+                                bitmap = it,
+                                contentDescription = null,
+                                contentScale = ContentScale.Fit,
+                                modifier = Modifier.fillMaxSize(),
+                            )
+                        } ?: Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            Text("Cargando…", color = Color.White)
+                        }
+                    }
+                    TipoEstado.VIDEO -> {
+                        val r = ruta
+                        if (r == null) {
+                            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                Text("Cargando…", color = Color.White)
+                            }
+                        } else {
+                            var vista by remember { mutableStateOf<VideoView?>(null) }
+                            AndroidView(
+                                modifier = Modifier.fillMaxSize(),
+                                factory = { ctx ->
+                                    VideoView(ctx).apply {
+                                        setVideoPath(r)
+                                        setOnPreparedListener { it.isLooping = false; start() }
+                                        setOnCompletionListener { siguiente() }
+                                        setOnErrorListener { _, _, _ -> siguiente(); true }
+                                        vista = this
+                                    }
+                                },
+                            )
+                            LaunchedEffect(vista) {
+                                while (true) {
+                                    val v = vista
+                                    if (v != null && v.duration > 0) progreso.floatValue = v.currentPosition.toFloat() / v.duration
+                                    delay(200)
+                                }
+                            }
+                        }
+                    }
+                }
+                if (entrada.tipo != TipoEstado.VIDEO) {
+                    val anim = remember { Animatable(0f) }
+                    LaunchedEffect(Unit) {
+                        // El tiempo empieza a correr cuando el contenido ya está listo.
+                        if (entrada.tipo == TipoEstado.IMAGEN) {
+                            while (ruta == null) delay(100)
+                        }
+                        anim.animateTo(1f, tween(DURACION_FIJA_MS, easing = LinearEasing)) {
+                            progreso.floatValue = value
+                        }
+                        siguiente()
+                    }
+                }
+
+                // Barras de progreso, nombre y cerrar
+                Column(modifier = Modifier.fillMaxWidth().padding(top = 36.dp, start = 12.dp, end = 12.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()) {
+                        item.entradas.forEachIndexed { i, _ ->
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(3.dp)
+                                    .clip(CircleShape)
+                                    .background(Color.White.copy(alpha = 0.35f)),
+                            ) {
+                                val llenado = when {
+                                    i < iEntrada -> 1f
+                                    i == iEntrada -> progreso.floatValue
+                                    else -> 0f
+                                }
+                                Box(
+                                    Modifier
+                                        .fillMaxWidth(llenado.coerceIn(0f, 1f))
+                                        .height(3.dp)
+                                        .background(Color.White),
+                                )
+                            }
+                        }
+                    }
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
+                    ) {
+                        Text(item.titulo, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                        Text(
+                            "✕",
+                            color = Color.White,
+                            fontSize = 22.sp,
+                            modifier = Modifier
+                                .clickable {
+                                    onVisto(item)
+                                    onCerrar()
+                                }
+                                .padding(8.dp),
+                        )
+                    }
+                }
+                if (entrada.tipo != TipoEstado.TEXTO && entrada.texto.isNotBlank()) {
+                    Text(
+                        entrada.texto,
+                        color = Color.White,
+                        fontSize = 18.sp,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .fillMaxWidth()
+                            .background(Color.Black.copy(alpha = 0.45f))
+                            .padding(16.dp),
+                    )
+                }
+            }
+        }
     }
 }

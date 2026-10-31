@@ -23,7 +23,7 @@ rep("""                        RoomListContentView(
                               .padding(outerPadding)
                               .consumeWindowInsets(outerPadding)
                       ) {
-                        ChamosEstadosRow(state = state.chamosEstados, onOpenRoom = { id: RoomId -> onRoomClick(id) })
+                        ChamosEstadosRow(state = state.chamosEstados)
                         RoomListContentView(
                             contentState""")
 rep("""                            modifier = Modifier
@@ -108,12 +108,20 @@ p4 = os.path.join(d, "HomePresenter.kt")
 t = open(p4, encoding="utf-8").read()
 old = "    private val featureFlagService: FeatureFlagService,\n"
 assert t.count(old) == 1
-t = t.replace(old, old + "    private val roomListDataSource: io.element.android.features.home.impl.datasource.RoomListDataSource,\n")
+t = t.replace(old, old + "    private val roomListDataSource: io.element.android.features.home.impl.datasource.RoomListDataSource,\n    private val mediaSenderFactory: io.element.android.libraries.mediaupload.api.MediaSenderRoomFactory,\n    private val mediaConfigFactory: io.element.android.libraries.mediaupload.api.MediaOptimizationConfigProviderFactory,\n")
 old = "        val snackbarMessage by snackbarDispatcher.collectSnackbarMessageAsState()\n"
 assert t.count(old) == 1
-t = t.replace(old, old + "        val chamosEstados = rememberChamosEstados(client, roomListDataSource)\n")
+t = t.replace(old, old + "        val chamosEstados = rememberChamosEstados(client, roomListDataSource, mediaSenderFactory, mediaConfigFactory)\n")
 old = "            eventSink = ::handleEvent,\n        )"
 assert t.count(old) == 1
 t = t.replace(old, "            eventSink = ::handleEvent,\n            chamosEstados = chamosEstados,\n        )")
 open(p4, "w", encoding="utf-8").write(t)
+
+# dependencia para enviar fotos y videos de los estados
+gp = os.path.join(root, "features/home/impl/build.gradle.kts")
+g = open(gp, encoding="utf-8").read()
+oldg = "    implementation(projects.libraries.matrix.api)\n"
+assert g.count(oldg) == 1
+g = g.replace(oldg, oldg + "    implementation(projects.libraries.mediaupload.api)\n")
+open(gp, "w", encoding="utf-8").write(g)
 print("home_estados OK")
