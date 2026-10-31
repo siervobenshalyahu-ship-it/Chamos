@@ -899,7 +899,11 @@ private fun VisorEstados(
 }
 
 
-/** Video sobre TextureView (un SurfaceView se queda en negro dentro del carrusel 3D). */
+/**
+ * Video sobre TextureView (un SurfaceView se queda en negro dentro del carrusel 3D).
+ * Solo se prepara el reproductor del estado que se está viendo; los demás no tocan el decodificador.
+ * Un error NUNCA salta al siguiente de golpe: muestra un aviso y avanza a los 3 segundos.
+ */
 @Composable
 private fun VideoTextura(
     ruta: String,
@@ -907,59 +911,87 @@ private fun VideoTextura(
     onProgreso: (Float) -> Unit,
     onFin: () -> Unit,
 ) {
-    val activoActual by androidx.compose.runtime.rememberUpdatedState(activo)
     val finActual by androidx.compose.runtime.rememberUpdatedState(onFin)
-    val reproductor = remember { mutableStateOf<android.media.MediaPlayer?>(null) }
-    val listo = remember { mutableStateOf(false) }
+    val superficie = remember { mutableStateOf<android.graphics.SurfaceTexture?>(null) }
+    val vista = remember { mutableStateOf<android.view.TextureView?>(null) }
+    var fallo by remember { mutableStateOf(false) }
 
-    androidx.compose.runtime.DisposableEffect(ruta) {
-        onDispose {
-            runCatching { reproductor.value?.release() }
-            reproductor.value = null
-        }
-    }
     AndroidView(
         modifier = Modifier.fillMaxSize(),
         factory = { ctx ->
             android.view.TextureView(ctx).apply {
                 surfaceTextureListener = object : android.view.TextureView.SurfaceTextureListener {
                     override fun onSurfaceTextureAvailable(st: android.graphics.SurfaceTexture, w: Int, h: Int) {
-                        val tv = this@apply
-                        runCatching {
-                            val mp = android.media.MediaPlayer()
-                            mp.setDataSource(ruta)
-                            mp.setSurface(android.view.Surface(st))
-                            mp.setOnVideoSizeChangedListener { _, vw, vh ->
-                                if (vw > 0 && vh > 0 && tv.width > 0 && tv.height > 0) {
-                                    val escala = minOf(tv.width.toFloat() / vw, tv.height.toFloat() / vh)
-                                    val m = android.graphics.Matrix()
-                                    m.setScale(vw * escala / tv.width, vh * escala / tv.height, tv.width / 2f, tv.height / 2f)
-                                    tv.setTransform(m)
-                                }
-                            }
-                            mp.setOnPreparedListener { listo.value = true }
-                            mp.setOnCompletionListener { finActual() }
-                            mp.setOnErrorListener { _, what, extra -> android.util.Log.e("Chamos", "video error $what/$extra"); finActual(); true }
-                            mp.prepareAsync()
-                            reproductor.value = mp
-                        }.onFailure { android.util.Log.e("Chamos", "video", it) }
+                        superficie.value = st
                     }
                     override fun onSurfaceTextureSizeChanged(st: android.graphics.SurfaceTexture, w: Int, h: Int) {}
-                    override fun onSurfaceTextureDestroyed(st: android.graphics.SurfaceTexture): Boolean = true
+                    override fun onSurfaceTextureDestroyed(st: android.graphics.SurfaceTexture): Boolean {
+                        superficie.value = null
+                        return true
+                    }
                     override fun onSurfaceTextureUpdated(st: android.graphics.SurfaceTexture) {}
                 }
+                vista.value = this
             }
         },
     )
-    LaunchedEffect(activo, listo.value) {
-        val mp = reproductor.value ?: return@LaunchedEffect
-        if (!listo.value) return@LaunchedEffect
-        runCatching { if (activoActual) mp.start() else mp.pause() }
-        while (true) {
-            runCatching {
-                if (mp.duration > 0) onProgreso(mp.currentPosition.toFloat() / mp.duration)
+
+    LaunchedEffect(activo, superficie.value, ruta) {
+        val st = superficie.value ?: return@LaunchedEffect
+        if (!activo) return@LaunchedEffect
+        fallo = false
+        val mp = android.media.MediaPlayer()
+        val pantalla = android.view.Surface(st)
+        try {
+            val listo = kotlinx.coroutines.CompletableDeferred<Boolean>()
+            mp.setDataSource(ruta)
+            mp.setSurface(pantalla)
+            mp.setOnVideoSizeChangedListener { _, vw, vh ->
+                val tv = vista.value
+                if (tv != null && vw > 0 && vh > 0 && tv.width > 0 && tv.height > 0) {
+                    val escala = minOf(tv.width.toFloat() / vw, tv.height.toFloat() / vh)
+                    val m = android.graphics.Matrix()
+                    m.setScale(vw * escala / tv.width, vh * escala / tv.height, tv.width / 2f, tv.height / 2f)
+                    tv.setTransform(m)
+                }
             }
-            delay(200)
+            mp.setOnPreparedListener { listo.complete(true) }
+            mp.setOnCompletionListener { finActual() }
+            mp.setOnErrorListener { _, what, extra ->
+                android.util.Log.e("Chamos", "video error $what/$extra")
+                listo.complete(false)
+                fallo = true
+                true
+            }
+            mp.prepareAsync()
+            if (listo.await()) {
+                mp.start()
+                while (true) {
+                    val dur = mp.duration
+                    if (dur > 0) onProgreso(mp.currentPosition.toFloat() / dur)
+                    delay(200)
+                }
+            } else {
+                fallo = true
+            }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            android.util.Log.e("Chamos", "video", e)
+            fallo = true
+        } finally {
+            runCatching { mp.release() }
+            runCatching { pantalla.release() }
+        }
+    }
+
+    if (fallo) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Text("No se pudo reproducir este video", color = Color.White)
+        }
+        LaunchedEffect(Unit) {
+            delay(3000)
+            finActual()
         }
     }
 }
