@@ -168,6 +168,7 @@ fun rememberChamosEstados(
 
     // Saber cuáles son mías (soy la creadora) y entrar solo a las invitaciones de otras personas.
     LaunchedEffect(salas.map { it.roomId to it.displayType }) {
+        try {
         for (sala in salas) {
             if (esMia[sala.roomId] == null) {
                 val info = client.getRoomInfo(sala.roomId).getOrNull()
@@ -183,26 +184,35 @@ fun rememberChamosEstados(
                 client.notificationSettingsService.setRoomNotificationMode(sala.roomId, RoomNotificationMode.MUTE)
             }
         }
+        } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Throwable) { android.util.Log.e("Chamos", "estados", e) }
     }
 
     val propia = salas.firstOrNull { esMia[it.roomId] == true && it.displayType == RoomSummaryDisplayType.ROOM }
-    val otras = salas.filter { esMia[it.roomId] == false && it.displayType == RoomSummaryDisplayType.ROOM }
+    val otras = salas.filter { esMia[it.roomId] == false && it.displayType == RoomSummaryDisplayType.ROOM }.distinctBy { it.roomId }
     val idsActivos = (listOfNotNull(propia) + otras).map { it.roomId }
 
     // Leer los estados de cada sala (los de las últimas 24 horas).
     LaunchedEffect(idsActivos) {
+        try {
         for (id in idsActivos) {
             launch {
-                val sala = client.getJoinedRoom(id) ?: return@launch
-                runCatching { sala.liveTimeline.paginate(Timeline.PaginationDirection.BACKWARDS) }
-                sala.liveTimeline.timelineItems.collect { items ->
-                    val limite = System.currentTimeMillis() - CHAMOS_ESTADO_HORAS * 60 * 60 * 1000L
-                    entradasPorSala[id] = items.mapNotNull { extraerEntrada(it) }
-                        .filter { it.timestamp >= limite }
-                        .sortedBy { it.timestamp }
+                try {
+                    val sala = client.getJoinedRoom(id) ?: return@launch
+                    runCatching { sala.liveTimeline.paginate(Timeline.PaginationDirection.BACKWARDS) }
+                    sala.liveTimeline.timelineItems.collect { items ->
+                        val limite = System.currentTimeMillis() - CHAMOS_ESTADO_HORAS * 60 * 60 * 1000L
+                        entradasPorSala[id] = items.mapNotNull { extraerEntrada(it) }
+                            .filter { it.timestamp >= limite }
+                            .sortedBy { it.timestamp }
+                    }
+                } catch (e: kotlinx.coroutines.CancellationException) {
+                    throw e
+                } catch (e: Throwable) {
+                    android.util.Log.e("Chamos", "estados", e)
                 }
             }
         }
+        } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Throwable) { android.util.Log.e("Chamos", "estados", e) }
     }
 
     val contactosIds = chats.filter { it.isDm && it.displayType == RoomSummaryDisplayType.ROOM }.map { it.roomId }
@@ -214,15 +224,18 @@ fun rememberChamosEstados(
     // Invitar a los contactos a mi sala de estados.
     val invitados = remember { mutableSetOf<UserId>() }
     LaunchedEffect(propia?.roomId, contactosIds) {
+        try {
         val id = propia?.roomId ?: return@LaunchedEffect
         val sala = client.getJoinedRoom(id) ?: return@LaunchedEffect
         for (usuario in contactos()) {
             if (invitados.add(usuario)) sala.inviteUserById(usuario)
         }
+        } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Throwable) { android.util.Log.e("Chamos", "estados", e) }
     }
 
     // Borrar mis estados con más de 24 horas.
     LaunchedEffect(propia?.roomId) {
+        try {
         val id = propia?.roomId ?: return@LaunchedEffect
         val sala = client.getJoinedRoom(id) ?: return@LaunchedEffect
         val borrados = mutableSetOf<String>()
@@ -242,6 +255,7 @@ fun rememberChamosEstados(
                 }
             }
         }
+        } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Throwable) { android.util.Log.e("Chamos", "estados", e) }
     }
 
     suspend fun salaPropia(): JoinedRoom? {

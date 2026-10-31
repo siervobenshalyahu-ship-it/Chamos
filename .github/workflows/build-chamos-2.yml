@@ -174,6 +174,9 @@ jobs:
           CHAMOS_STORE_PASSWORD: ${{ secrets.CHAMOS_STORE_PASSWORD }}
         run: python3 chamos-repo/patches/firma.py chamos
 
+      - name: Registro de errores dentro de la app
+        run: python3 chamos-repo/patches/crash.py chamos
+
       - name: Pantalla principal con Estados
         run: python3 chamos-repo/patches/home_estados.py chamos chamos-repo/patches/ChamosEstados.kt
 
