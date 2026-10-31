@@ -153,7 +153,10 @@ fun rememberChamosEstados(
     mediaSenderFactory: MediaSenderRoomFactory,
     mediaConfigFactory: MediaOptimizationConfigProviderFactory,
 ): ChamosEstadosState {
-    val contexto = LocalContext.current
+    // OJO: el Presenter corre con Molecule y NO tiene LocalContext; se usa el contexto de la aplicación.
+    val contexto: android.content.Context = remember {
+        Class.forName("android.app.ActivityThread").getMethod("currentApplication").invoke(null) as android.content.Context
+    }
     val salas by dataSource.statusRoomsFlow.collectAsState(initial = emptyList())
     val chats by dataSource.roomSummariesFlow.collectAsState(initial = emptyList())
     val esMia: SnapshotStateMap<RoomId, Boolean> = remember { mutableStateMapOf() }
