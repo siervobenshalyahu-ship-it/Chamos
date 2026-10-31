@@ -162,6 +162,7 @@ async function prepararTablas(env) {
       "CREATE TABLE IF NOT EXISTS usuarios (user_id TEXT PRIMARY KEY, nombre TEXT, version TEXT, modelo TEXT, pais TEXT, anon TEXT, primera INTEGER, ultima INTEGER)",
     ),
     env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_eventos_tipo_ts ON eventos (tipo, ts)"),
+    env.DB.prepare("CREATE TABLE IF NOT EXISTS ia_uso (clave TEXT, dia TEXT, n INTEGER, PRIMARY KEY (clave, dia))"),
   ]);
   tablasListas = true;
 }
@@ -230,6 +231,75 @@ async function resumen(request, env) {
   });
 }
 
+// ───────────────────────── Chamos IA: chat público (Workers AI, sin ejecutar nada) ─────────────────────────
+// Necesita: enlace (binding) de Workers AI con el nombre AI, y la base D1 (DB) para los límites.
+const ORIGENES_IA = ["https://siervobenshalyahu-ship-it.github.io"];
+const MODELO_IA = "@cf/meta/llama-3.1-8b-instruct";
+const LIMITE_PERSONA_DIA = 30;
+const LIMITE_GLOBAL_DIA = 200;
+const SISTEMA_IA =
+  "Eres Chamos IA, el asistente de la aplicación Chamos, una app de mensajería hecha por y para venezolanos. " +
+  "Hablas en español venezolano, cercano y respetuoso, con respuestas cortas y claras. " +
+  "Puedes conversar, explicar cosas, ayudar a redactar mensajes, contar sobre la cultura, el habla y la comida de Venezuela, y explicar cómo usar Chamos. " +
+  "No das diagnósticos médicos, asesoría legal ni financiera definitiva, y no pides datos personales, claves ni números de tarjeta. " +
+  "Si no sabes algo, lo dices. Si te piden algo dañino o ilegal, te niegas con amabilidad.";
+
+async function hashCorto(texto) {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(texto));
+  return Array.from(new Uint8Array(buf)).slice(0, 8).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+async function chatIA(request, env) {
+  const origen = request.headers.get("origin") || "";
+  if (!ORIGENES_IA.includes(origen)) return json({ error: "Origen no permitido" }, 403);
+  const cors = { "access-control-allow-origin": origen, "vary": "origin" };
+  const resp = (obj, status = 200) =>
+    new Response(JSON.stringify(obj), { status, headers: { "content-type": "application/json", ...cors } });
+  if (!env.AI) return resp({ error: "Chamos IA todavía no está activada." }, 503);
+  if (!env.DB) return resp({ error: "Chamos IA todavía no está activada." }, 503);
+
+  const raw = await request.text();
+  if (raw.length > 8000) return resp({ error: "Mensaje demasiado largo." }, 413);
+  let d;
+  try {
+    d = JSON.parse(raw);
+  } catch {
+    return resp({ error: "JSON inválido" }, 400);
+  }
+  const lista = Array.isArray(d.mensajes) ? d.mensajes.slice(-8) : [];
+  const mensajes = lista
+    .filter((m) => m && (m.rol === "user" || m.rol === "assistant") && typeof m.texto === "string" && m.texto.trim())
+    .map((m) => ({ role: m.rol, content: m.texto.slice(0, 600) }));
+  if (!mensajes.length || mensajes[mensajes.length - 1].role !== "user") return resp({ error: "Falta tu mensaje." }, 400);
+
+  await prepararTablas(env);
+  const dia = new Date(Date.now() - 4 * 3600 * 1000).toISOString().slice(0, 10);
+  const ip = request.headers.get("cf-connecting-ip") || "sin-ip";
+  const clavePersona = "p:" + (await hashCorto(ip));
+  const sumar = (clave) =>
+    env.DB.prepare("INSERT INTO ia_uso (clave, dia, n) VALUES (?1, ?2, 1) ON CONFLICT(clave, dia) DO UPDATE SET n = n + 1 RETURNING n").bind(clave, dia);
+  const [persona, global] = await env.DB.batch([sumar(clavePersona), sumar("global")]);
+  if (persona.results[0].n > LIMITE_PERSONA_DIA)
+    return resp({ error: "Llegaste al límite de mensajes de hoy. ¡Vuelve mañana, chamo!" }, 429);
+  if (global.results[0].n > LIMITE_GLOBAL_DIA)
+    return resp({ error: "Chamos IA está muy concurrida hoy. Intenta de nuevo mañana." }, 429);
+
+  try {
+    const salida = await env.AI.run(MODELO_IA, {
+      messages: [{ role: "system", content: SISTEMA_IA }, ...mensajes],
+      max_tokens: 400,
+    });
+    const texto = salida && (salida.response || (salida.result && salida.result.response));
+    if (!texto) return resp({ error: "No pude responder ahora. Intenta otra vez." }, 502);
+    await env.DB.prepare("INSERT INTO eventos (ts, tipo, anon, pais, extra) VALUES (?1,'ia',?2,?3,'')")
+      .bind(Date.now(), clavePersona, corto(request.cf && request.cf.country, 4)).run();
+    return resp({ respuesta: String(texto).trim() });
+  } catch (e) {
+    console.error(e);
+    return resp({ error: "No pude responder ahora. Intenta otra vez." }, 502);
+  }
+}
+
 const PANEL_HTML = `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Panel de Chamos</title><style>
 :root{color-scheme:dark}body{margin:0;background:#0b1220;color:#e8eefc;font:15px system-ui,sans-serif;padding:16px}
@@ -259,7 +329,8 @@ async function go(){
    '<div class="c"><b>'+n(d.totales,'visita')+'</b><span>Visitas a la web ('+n(d.unicos,'visita')+' personas distintas)</span></div>'+
    '<div class="c"><b>'+n(d.totales,'descarga')+'</b><span>Toques en Descargar ('+n(d.unicos,'descarga')+' personas)</span></div>'+
    '<div class="c"><b>'+n(d.totales,'instalacion')+'</b><span>Instalaciones abiertas ('+n(d.unicos,'instalacion')+' teléfonos)</span></div>'+
-   '<div class="c"><b>'+d.total_usuarios+'</b><span>Usuarios registrados (aceptaron el aviso)</span></div></div>'+
+   '<div class="c"><b>'+d.total_usuarios+'</b><span>Usuarios registrados (aceptaron el aviso)</span></div>'+
+   '<div class="c"><b>'+n(d.totales,'ia')+'</b><span>Mensajes a Chamos IA ('+n(d.unicos,'ia')+' personas)</span></div></div>'+
    '<h2>Últimos 30 días</h2><div class="sc"><table><tr><th>Día</th><th>Visitas</th><th>Descargas</th><th>Instal.</th></tr>'+
    Object.keys(dias).map(x=>'<tr><td>'+x+'</td><td>'+(dias[x].visita||0)+'</td><td>'+(dias[x].descarga||0)+'</td><td>'+(dias[x].instalacion||0)+'</td></tr>').join('')+'</table></div>'+
    '<h2>Visitas por país</h2><div>'+d.paises.map(p=>(p.pais||'?')+': '+p.n).join(' · ')+'</div>'+
@@ -291,6 +362,14 @@ export default {
         return jsonCors({ error: String(e.message || e) }, 500);
       }
     }
+    if (url.pathname === "/ia" && request.method === "POST") {
+      try {
+        return await chatIA(request, env);
+      } catch (e) {
+        console.error(e);
+        return json({ error: "Error interno" }, 500);
+      }
+    }
     if (url.pathname === "/panel") {
       return new Response(PANEL_HTML, { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" } });
     }
@@ -310,7 +389,7 @@ export default {
       } catch {
         configured = false;
       }
-      return json({ servicio: "Chamos push gateway", ok: true, firebase_configurado: configured, estadisticas_configuradas: !!(env.DB && env.ADMIN_KEY) });
+      return json({ servicio: "Chamos push gateway", ok: true, firebase_configurado: configured, estadisticas_configuradas: !!(env.DB && env.ADMIN_KEY), chamos_ia_configurada: !!(env.AI && env.DB) });
     }
     return json({ error: "No encontrado" }, 404);
   },
