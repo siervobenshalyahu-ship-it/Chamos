@@ -338,12 +338,29 @@ fun ChamosEstadosRow(
     val reproducibles = listOfNotNull(propiosConEntradas) + state?.otros.orEmpty()
 
     Column(modifier = modifier.fillMaxWidth()) {
-        Text(
-            text = "Estados",
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.padding(start = 16.dp, top = 8.dp, bottom = 4.dp),
-        )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+            modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 8.dp, bottom = 4.dp),
+        ) {
+            Text(
+                text = "Estados",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            TextButton(onClick = {
+                var a: android.content.Context? = contexto
+                while (a is android.content.ContextWrapper && a !is android.app.Activity) a = a.baseContext
+                val activity = a as? android.app.Activity
+                if (activity != null) {
+                    runCatching {
+                        Class.forName("io.element.android.x.ChamosUpdater")
+                            .getMethod("checkNow", android.app.Activity::class.java)
+                            .invoke(null, activity)
+                    }
+                }
+            }) { Text("Buscar actualización") }
+        }
         LazyRow(
             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),

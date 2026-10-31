@@ -27,24 +27,38 @@ object ChamosUpdater {
     private const val REPO = "siervobenshalyahu-ship-it/Chamos"
     private const val PREFS = "chamos_updater"
     private const val KEY_LAST_CHECK = "last_check"
-    private const val CHECK_EVERY_MS = 6L * 60L * 60L * 1000L
+    private const val CHECK_EVERY_MS = 60L * 60L * 1000L
     private const val APK_MIME = "application/vnd.android.package-archive"
 
-    fun checkForUpdate(activity: Activity) {
+    /** Botón «Buscar actualización»: ignora el intervalo y avisa del resultado. */
+    @JvmStatic
+    fun checkNow(activity: Activity) = checkForUpdate(activity, force = true)
+
+    fun checkForUpdate(activity: Activity, force: Boolean = false) {
         val prefs = activity.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         val now = System.currentTimeMillis()
-        if (now - prefs.getLong(KEY_LAST_CHECK, 0L) < CHECK_EVERY_MS) return
+        if (!force && now - prefs.getLong(KEY_LAST_CHECK, 0L) < CHECK_EVERY_MS) return
+        fun aviso(texto: String) {
+            if (force) activity.runOnUiThread { Toast.makeText(activity, texto, Toast.LENGTH_LONG).show() }
+        }
+        aviso("Buscando actualizaciones…")
         thread(name = "chamos-update-check", isDaemon = true) {
             try {
                 val conn = URL("https://api.github.com/repos/$REPO/releases/latest").openConnection() as HttpURLConnection
                 conn.connectTimeout = 10_000
                 conn.readTimeout = 10_000
                 conn.setRequestProperty("Accept", "application/vnd.github+json")
-                if (conn.responseCode != 200) return@thread
+                if (conn.responseCode != 200) {
+                    aviso("No se pudo buscar la actualización. Intenta de nuevo en un rato.")
+                    return@thread
+                }
                 val json = JSONObject(conn.inputStream.bufferedReader().use { it.readText() })
                 prefs.edit().putLong(KEY_LAST_CHECK, now).apply()
                 val tag = json.optString("tag_name")
-                if (!isNewer(tag, BuildConfig.VERSION_NAME)) return@thread
+                if (!isNewer(tag, BuildConfig.VERSION_NAME)) {
+                    aviso("Ya tienes la última versión de Chamos (${BuildConfig.VERSION_NAME}).")
+                    return@thread
+                }
                 val assets = json.optJSONArray("assets") ?: return@thread
                 var apkUrl = ""
                 for (i in 0 until assets.length()) {
@@ -60,7 +74,7 @@ object ChamosUpdater {
                     if (!activity.isFinishing) askToUpdate(activity, tag, apkUrl)
                 }
             } catch (_: Exception) {
-                // Sin internet o GitHub no responde: se intenta otra vez en el próximo arranque.
+                aviso("No se pudo buscar la actualización. Revisa tu internet.")
             }
         }
     }
