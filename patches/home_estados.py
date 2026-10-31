@@ -111,7 +111,9 @@ assert t.count(old) == 1
 t = t.replace(old, old + "    private val roomListDataSource: io.element.android.features.home.impl.datasource.RoomListDataSource,\n    private val mediaSenderFactory: io.element.android.libraries.mediaupload.api.MediaSenderRoomFactory,\n    private val mediaConfigFactory: io.element.android.libraries.mediaupload.api.MediaOptimizationConfigProviderFactory,\n")
 old = "        val snackbarMessage by snackbarDispatcher.collectSnackbarMessageAsState()\n"
 assert t.count(old) == 1
-t = t.replace(old, old + "        val chamosEstados = rememberChamosEstados(client, roomListDataSource, mediaSenderFactory, mediaConfigFactory)\n")
+_seguro = os.path.exists(os.path.join(os.path.dirname(os.path.abspath(__file__)), "MODO_SEGURO"))
+_linea = "        val chamosEstados: ChamosEstadosState? = null\n" if _seguro else "        val chamosEstados = rememberChamosEstados(client, roomListDataSource, mediaSenderFactory, mediaConfigFactory)\n"
+t = t.replace(old, old + _linea)
 old = "            eventSink = ::handleEvent,\n        )"
 assert t.count(old) == 1
 t = t.replace(old, "            eventSink = ::handleEvent,\n            chamosEstados = chamosEstados,\n        )")
