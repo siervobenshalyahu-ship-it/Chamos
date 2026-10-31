@@ -206,6 +206,20 @@ jobs:
         run: |
           grep -E "^e: |What went wrong|FAILED|Execution failed|Could not" -A3 gradle.log | head -60 | while IFS= read -r l; do echo "::error::${l:0:900}"; done
 
+      - name: Huella de la firma del APK
+        run: |
+          APK=$(ls chamos/app/build/outputs/apk/${FLAVOR_DIR}/debug/*.apk | head -1)
+          AS=$(ls -d $ANDROID_HOME/build-tools/*/apksigner | sort -V | tail -1)
+          echo "APK: $APK"
+          "$AS" verify --print-certs "$APK" | tee cert.txt
+          SHA=$(grep -i "SHA-256 digest" cert.txt | head -1 | awk '{print $NF}')
+          echo "::notice::Huella SHA-256 del APK: $SHA"
+          if [ "$SHA" = "7c13b8f28ea511a38ece5bdefdf91072e8a584cde92b96a7162907a48fee6931" ]; then
+            echo "::notice::FIRMA OFICIAL DE CHAMOS: correcta"
+          else
+            echo "::warning::LA FIRMA NO ES LA OFICIAL DE CHAMOS"
+          fi
+
       - name: Ver los APK generados
         run: ls -la chamos/app/build/outputs/apk/${FLAVOR_DIR}/debug/
 
