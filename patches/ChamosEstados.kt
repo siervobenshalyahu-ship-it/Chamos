@@ -15,7 +15,9 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -45,6 +47,10 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import io.element.android.libraries.designsystem.components.avatar.Avatar
+import io.element.android.libraries.designsystem.components.avatar.AvatarData
+import io.element.android.libraries.designsystem.components.avatar.AvatarSize
+import io.element.android.libraries.designsystem.components.avatar.AvatarType
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateMap
@@ -129,6 +135,9 @@ data class ChamosEstadosState(
     val publicarTexto: suspend (String) -> Boolean,
     val cargarArchivo: suspend (EstadoEntrada) -> String?,
     val marcarVisto: (ChamosEstadoItem) -> Unit,
+    val yoId: String = "",
+    val yoNombre: String? = null,
+    val yoAvatar: String? = null,
 )
 
 private fun RoomListRoomSummary.tituloEstado(): String =
@@ -157,6 +166,7 @@ fun rememberChamosEstados(
     val contexto: android.content.Context = remember {
         Class.forName("android.app.ActivityThread").getMethod("currentApplication").invoke(null) as android.content.Context
     }
+    val perfil by client.userProfile.collectAsState()
     val salas by dataSource.statusRoomsFlow.collectAsState(initial = emptyList())
     val chats by dataSource.roomSummariesFlow.collectAsState(initial = emptyList())
     val esMia: SnapshotStateMap<RoomId, Boolean> = remember { mutableStateMapOf() }
@@ -190,9 +200,10 @@ fun rememberChamosEstados(
         } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Throwable) { android.util.Log.e("Chamos", "estados", e) }
     }
 
-    val propia = salas.firstOrNull { esMia[it.roomId] == true && it.displayType == RoomSummaryDisplayType.ROOM }
+    val propias = salas.filter { esMia[it.roomId] == true && it.displayType == RoomSummaryDisplayType.ROOM }.distinctBy { it.roomId }
+    val propia = propias.firstOrNull()
     val otras = salas.filter { esMia[it.roomId] == false && it.displayType == RoomSummaryDisplayType.ROOM }.distinctBy { it.roomId }
-    val idsActivos = (listOfNotNull(propia) + otras).map { it.roomId }
+    val idsActivos = (propias + otras).map { it.roomId }
 
     // Leer los estados de cada sala (los de las últimas 24 horas).
     LaunchedEffect(idsActivos) {
@@ -201,7 +212,16 @@ fun rememberChamosEstados(
             launch {
                 try {
                     val sala = client.getJoinedRoom(id) ?: return@launch
-                    runCatching { sala.liveTimeline.paginate(Timeline.PaginationDirection.BACKWARDS) }
+                    launch {
+                        // Cargar hacia atrás hasta cubrir las últimas 24 horas.
+                        repeat(8) {
+                            val mas = sala.liveTimeline.paginate(Timeline.PaginationDirection.BACKWARDS).getOrNull() ?: false
+                            val limiteP = System.currentTimeMillis() - CHAMOS_ESTADO_HORAS * 60 * 60 * 1000L
+                            val masViejo = entradasPorSala[id]?.minOfOrNull { it.timestamp }
+                            if (!mas || (masViejo != null && masViejo < limiteP)) return@launch
+                            delay(300)
+                        }
+                    }
                     sala.liveTimeline.timelineItems.collect { items ->
                         val limite = System.currentTimeMillis() - CHAMOS_ESTADO_HORAS * 60 * 60 * 1000L
                         entradasPorSala[id] = items.mapNotNull { extraerEntrada(it) }
@@ -331,12 +351,21 @@ fun rememberChamosEstados(
     }
 
     return ChamosEstadosState(
-        propio = propia?.let { item(it, "Mi estado") },
+        propio = propia?.let { p ->
+            val todas = propias.flatMap { entradasPorSala[it.roomId].orEmpty() }.distinctBy { it.id }.sortedBy { it.timestamp }
+            item(p, "Mi estado").copy(
+                entradas = todas,
+                nuevo = false,
+            )
+        },
         otros = otras.map { item(it, it.tituloEstado()) }.filter { it.entradas.isNotEmpty() },
         publicarMedia = publicarMedia,
         publicarTexto = publicarTexto,
         cargarArchivo = cargarArchivo,
         marcarVisto = marcarVisto,
+        yoId = perfil.userId.value,
+        yoNombre = perfil.displayName,
+        yoAvatar = perfil.avatarUrl,
     )
 }
 
@@ -385,6 +414,7 @@ fun ChamosEstadosRow(
             item {
                 EstadoCirculo(
                     texto = "Yo",
+                    avatar = state?.let { AvatarData(it.yoId, it.yoNombre, it.yoAvatar, AvatarSize.UserListItem) },
                     titulo = "Mi estado",
                     anillo = propiosConEntradas != null,
                     conMas = true,
@@ -444,6 +474,7 @@ private fun EstadoCirculo(
     conMas: Boolean,
     onMas: () -> Unit,
     onClick: () -> Unit,
+    avatar: AvatarData? = null,
 ) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -466,7 +497,11 @@ private fun EstadoCirculo(
                     .clip(CircleShape)
                     .background(MaterialTheme.colorScheme.primaryContainer),
             ) {
-                Text(texto, fontSize = 24.sp, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                if (avatar != null) {
+                    Avatar(avatarData = avatar, avatarType = AvatarType.User, forcedAvatarSize = 52.dp)
+                } else {
+                    Text(texto, fontSize = 24.sp, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                }
             }
             if (conMas) {
                 Box(
@@ -606,6 +641,16 @@ private fun VisorEstados(
                 .background(Color.Black)
                 .pointerInput(iItem, iEntrada) {
                     detectTapGestures { punto -> if (punto.x < size.width / 3f) anterior() else siguiente() }
+                }
+                .pointerInput(iItem, iEntrada) {
+                    var acum = 0f
+                    detectHorizontalDragGestures(
+                        onDragEnd = {
+                            if (acum > 120f) anterior() else if (acum < -120f) siguiente()
+                            acum = 0f
+                        },
+                        onDragCancel = { acum = 0f },
+                    ) { _, d -> acum += d }
                 },
         ) {
             androidx.compose.runtime.key(iItem, iEntrada) {
@@ -738,6 +783,29 @@ private fun VisorEstados(
                         )
                     }
                 }
+                // Flechas para ir al estado anterior / siguiente y contador
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.align(Alignment.CenterStart).fillMaxWidth().padding(horizontal = 4.dp),
+                ) {
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier.size(44.dp).clip(CircleShape)
+                            .background(Color.Black.copy(alpha = 0.35f)).clickable { anterior() },
+                    ) { Text("‹", color = Color.White, fontSize = 30.sp) }
+                    Spacer(Modifier.weight(1f))
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier.size(44.dp).clip(CircleShape)
+                            .background(Color.Black.copy(alpha = 0.35f)).clickable { siguiente() },
+                    ) { Text("›", color = Color.White, fontSize = 30.sp) }
+                }
+                Text(
+                    "${iEntrada + 1} / ${item.entradas.size}",
+                    color = Color.White,
+                    fontSize = 13.sp,
+                    modifier = Modifier.align(Alignment.TopCenter).padding(top = 52.dp),
+                )
                 if (entrada.tipo != TipoEstado.TEXTO && entrada.texto.isNotBlank()) {
                     Text(
                         entrada.texto,
