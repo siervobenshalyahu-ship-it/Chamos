@@ -81,6 +81,24 @@ fun ChamosEstilosDialog(onDismiss: () -> Unit) {
                 TextButton(onClick = { abrirAjuste(contexto, *autoInicioIntents(contexto)) }) { Text("2. Inicio automático") }
                 TextButton(onClick = { abrirAjuste(contexto, *bateriaIntents(contexto)) }) { Text("3. Batería: sin restricciones") }
                 TextButton(onClick = { abrirAjuste(contexto, *otrosPermisosIntents(contexto)) }) { Text("4. Otros permisos (pantalla de bloqueo)") }
+                var verCandado by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+                TextButton(onClick = { verCandado = true }) { Text("5. Candado (fijar Chamos en recientes)") }
+                if (verCandado) {
+                    AlertDialog(
+                        onDismissRequest = { verCandado = false },
+                        title = { Text("Poner el candado") },
+                        text = {
+                            Text(
+                                "Android no deja que una app se ponga el candado sola, pero toma 5 segundos:\n\n" +
+                                    "1. Cierra este aviso y abre la lista de apps recientes (el botón de las tres rayas o desliza desde abajo y mantén).\n" +
+                                    "2. Mantén presionada la tarjeta de Chamos, o toca el menú de arriba de la tarjeta.\n" +
+                                    "3. Toca el candado (Fijar o Bloquear).\n\n" +
+                                    "Con el candado, MIUI no cierra Chamos para ahorrar memoria y las notificaciones siguen llegando."
+                            )
+                        },
+                        confirmButton = { TextButton(onClick = { verCandado = false }) { Text("Entendido") } },
+                    )
+                }
             }
         },
     )
