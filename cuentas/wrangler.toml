@@ -1,0 +1,12 @@
+name = "chamos-cuentas"
+main = "worker.js"
+compatibility_date = "2024-11-01"
+
+[vars]
+TG_BOT = "CAMBIA_ESTO_por_el_nombre_de_tu_bot"
+MATRIX_SERVER = "matrix.org"
+
+# Crea el KV con:  npx wrangler kv namespace create CUENTAS   y pega aquí el id que te da.
+[[kv_namespaces]]
+binding = "CUENTAS"
+id = "CAMBIA_ESTO_por_el_id_del_KV"
