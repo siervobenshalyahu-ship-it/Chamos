@@ -363,7 +363,17 @@ fun rememberChamosEstados(
     }
 
     val cargarArchivo: suspend (EstadoEntrada) -> String? = cargar@{ e ->
-        cacheArchivos[e.id]?.let { return@cargar it }
+        cacheArchivos[e.id]?.let { if (java.io.File(it).exists()) return@cargar it }
+        // Copia guardada en el teléfono: un estado ya descargado no se vuelve a bajar.
+        val carpeta = java.io.File(contexto.filesDir, "estados_cache")
+        val local = java.io.File(
+            carpeta,
+            e.id.replace(Regex("[^A-Za-z0-9]"), "_").takeLast(80) + "_" + e.nombre.replace(Regex("[^A-Za-z0-9._]"), "_").takeLast(40),
+        )
+        if (local.exists() && local.length() > 0) {
+            cacheArchivos[e.id] = local.absolutePath
+            return@cargar local.absolutePath
+        }
         val fuente = e.fuente ?: return@cargar null
         var archivo: java.io.File? = null
         for (intento in 0 until 4) {
@@ -372,7 +382,20 @@ fun rememberChamosEstados(
             delay(1000L * (intento + 1))
         }
         if (archivo == null) return@cargar null
-        val ruta = archivo.absolutePath
+        val descargado: java.io.File = archivo
+        val ruta = try {
+            withContext(Dispatchers.IO) {
+                carpeta.mkdirs()
+                // Los estados duran 24 h: se borran las copias de más de 2 días.
+                carpeta.listFiles()?.forEach { f ->
+                    if (System.currentTimeMillis() - f.lastModified() > 48L * 3600_000L) f.delete()
+                }
+                descargado.copyTo(local, overwrite = true)
+                local.absolutePath
+            }
+        } catch (_: Throwable) {
+            descargado.absolutePath
+        }
         cacheArchivos[e.id] = ruta
         ruta
     }
