@@ -189,6 +189,20 @@ jobs:
       - name: Marco de neón, fondos propios y dictado por voz
         run: python3 chamos-repo/patches/neon.py chamos chamos-repo/patches
 
+      - name: Descargar el detector de caras (MediaPipe)
+        continue-on-error: true
+        run: |
+          set -e
+          mkdir -p mp-tmp mediapipe/wasm
+          (cd mp-tmp && npm pack @mediapipe/tasks-vision@0.10.14 && tar xzf mediapipe-tasks-vision-*.tgz)
+          cp mp-tmp/package/vision_bundle.cjs mediapipe/
+          cp mp-tmp/package/wasm/* mediapipe/wasm/
+          curl -fL -o mediapipe/face_landmarker.task https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task
+          ls -la mediapipe mediapipe/wasm
+
+      - name: Filtros de cara, de color y memes en videollamadas
+        run: python3 chamos-repo/patches/filtros.py chamos chamos-repo/patches mediapipe
+
       - name: Vincular número de teléfono (Chamos Cuentas)
         run: python3 chamos-repo/patches/numero.py chamos chamos-repo/patches "$(head -n1 chamos-repo/cuentas/servicio-url.txt 2>/dev/null || true)"
 
