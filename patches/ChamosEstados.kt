@@ -7,12 +7,15 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -40,6 +43,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
@@ -53,7 +57,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.composed
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -479,6 +490,8 @@ fun ChamosEstadosRow(
     val scope = rememberCoroutineScope()
     var creando by remember { mutableStateOf(false) }
     var visor by remember { mutableStateOf<Int?>(null) }
+    // Contactos cuyo estado se está cargando: el visor NO se abre hasta que el archivo esté completo.
+    val cargando = remember { mutableStateListOf<String>() }
     var decisionStats by remember { mutableStateOf(ChamosStats.decision(contexto)) }
     LaunchedEffect(decisionStats, state?.yoId) {
         val id = state?.yoId.orEmpty()
@@ -506,6 +519,25 @@ fun ChamosEstadosRow(
 
     val propiosConEntradas = state?.propio?.takeIf { it.entradas.isNotEmpty() }
     val reproducibles = listOfNotNull(propiosConEntradas) + state?.otros.orEmpty()
+
+    fun abrirCuandoCargue(item: ChamosEstadoItem) {
+        val clave = item.roomId.value
+        val st = state ?: return
+        if (clave in cargando) return
+        cargando.add(clave)
+        scope.launch {
+            val primera = item.entradas.firstOrNull()
+            val listo = primera == null || primera.tipo == TipoEstado.TEXTO || st.cargarArchivo(primera) != null
+            cargando.remove(clave)
+            if (listo) {
+                visor = reproducibles.indexOfFirst { it.roomId == item.roomId }.coerceAtLeast(0)
+                // Los demás estados de la persona se van bajando en segundo plano para que pasen sin esperar.
+                item.entradas.drop(1).take(3).forEach { e -> if (e.tipo != TipoEstado.TEXTO) launch { st.cargarArchivo(e) } }
+            } else {
+                Toast.makeText(contexto, "No se pudo cargar el estado. Inténtalo otra vez.", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
 
     Column(modifier = modifier.fillMaxWidth()) {
         Row(
@@ -540,10 +572,13 @@ fun ChamosEstadosRow(
                     texto = "Yo",
                     avatar = state?.let { AvatarData(it.yoId, it.yoNombre, it.yoAvatar, AvatarSize.UserListItem) },
                     titulo = "Mi estado",
-                    anillo = propiosConEntradas != null,
+                    anillo = false,
                     conMas = true,
                     onMas = { creando = true },
-                    onClick = { if (propiosConEntradas != null) visor = 0 else creando = true },
+                    onClick = { if (propiosConEntradas != null) abrirCuandoCargue(propiosConEntradas) else creando = true },
+                    neon = colorNeon(state?.yoId ?: "yo"),
+                    tieneEstado = propiosConEntradas != null,
+                    cargando = propiosConEntradas != null && propiosConEntradas.roomId.value in cargando,
                 )
             }
             items(state?.otros.orEmpty(), key = { it.roomId.value }) { estado ->
@@ -554,7 +589,10 @@ fun ChamosEstadosRow(
                     anillo = estado.nuevo,
                     conMas = false,
                     onMas = {},
-                    onClick = { visor = reproducibles.indexOfFirst { it.roomId == estado.roomId }.coerceAtLeast(0) },
+                    onClick = { abrirCuandoCargue(estado) },
+                    neon = colorNeon(estado.roomId.value),
+                    tieneEstado = true,
+                    cargando = estado.roomId.value in cargando,
                 )
             }
         }
@@ -593,6 +631,93 @@ fun ChamosEstadosRow(
     }
 }
 
+/** Colores de neón de discoteca: cada contacto tiene el suyo, siempre el mismo. */
+private val NEON_PALETA = listOf(
+    Color(0xFFFF2D95), // rosa
+    Color(0xFF00E5FF), // cian
+    Color(0xFFB6FF00), // lima
+    Color(0xFFFF9100), // naranja
+    Color(0xFFB388FF), // violeta
+    Color(0xFFFFEA00), // amarillo
+    Color(0xFF00FF9C), // verde menta
+    Color(0xFFFF4D4D), // rojo
+    Color(0xFF3D7BFF), // azul eléctrico
+    Color(0xFFFF6EFF), // fucsia
+)
+
+private fun colorNeon(clave: String): Color = NEON_PALETA[(clave.hashCode() and 0x7fffffff) % NEON_PALETA.size]
+
+/** Brocha de cometa: una cola de luz que termina en un punto blanco. Empieza en la hora de las 3 y gira con rotate(). */
+private fun cometa(color: Color, alfa: Float, largo: Float): Brush = Brush.sweepGradient(
+    0f to Color.Transparent,
+    (1f - largo) to Color.Transparent,
+    0.97f to color.copy(alpha = 0.9f * alfa),
+    1f to Color.White.copy(alpha = alfa),
+)
+
+/**
+ * Aro de luz de neón alrededor de la foto.
+ * - Con estado: aro encendido con el color del contacto (más tenue si ya lo viste) y un latido suave.
+ * - Cargando: una luz corre alrededor de la foto, en el color del contacto y otra de color contrario, hasta que el estado esté listo.
+ */
+private fun Modifier.aroNeon(color: Color, visible: Boolean, brillo: Float, cargando: Boolean): Modifier = composed {
+    val transicion = rememberInfiniteTransition(label = "neon")
+    val giro by transicion.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(tween(1100, easing = LinearEasing)),
+        label = "giro",
+    )
+    val latido by transicion.animateFloat(
+        initialValue = 0.7f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(1000, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+        label = "latido",
+    )
+    val contrario = NEON_PALETA[(NEON_PALETA.indexOf(color).coerceAtLeast(0) + NEON_PALETA.size / 2) % NEON_PALETA.size]
+    drawBehind {
+        if (!visible) return@drawBehind
+        val grosor = 3.dp.toPx()
+        val radio = size.minDimension / 2f - 2.5.dp.toPx()
+        val arcoTopLeft = Offset(center.x - radio, center.y - radio)
+        val arcoSize = Size(radio * 2f, radio * 2f)
+        val base = if (cargando) 0.35f else brillo * latido
+        // Resplandor: varias capas más anchas y más transparentes, como un tubo de neón.
+        listOf(9.dp.toPx() to 0.10f, 6.dp.toPx() to 0.16f, 3.5.dp.toPx() to 0.28f).forEach { (extra, a) ->
+            drawCircle(color.copy(alpha = a * base), radius = radio, style = Stroke(width = grosor + extra))
+        }
+        drawCircle(color.copy(alpha = 0.95f * base), radius = radio, style = Stroke(width = grosor))
+        if (cargando) {
+            rotate(giro, center) {
+                listOf(8.dp.toPx() to 0.22f, 4.dp.toPx() to 0.45f, 0f to 1f).forEach { (extra, a) ->
+                    drawArc(
+                        brush = cometa(color, a, 0.5f),
+                        startAngle = 0f,
+                        sweepAngle = 360f,
+                        useCenter = false,
+                        topLeft = arcoTopLeft,
+                        size = arcoSize,
+                        style = Stroke(width = grosor * 1.2f + extra, cap = StrokeCap.Round),
+                    )
+                }
+            }
+            rotate(giro + 180f, center) {
+                listOf(6.dp.toPx() to 0.2f, 0f to 0.9f).forEach { (extra, a) ->
+                    drawArc(
+                        brush = cometa(contrario, a, 0.25f),
+                        startAngle = 0f,
+                        sweepAngle = 360f,
+                        useCenter = false,
+                        topLeft = arcoTopLeft,
+                        size = arcoSize,
+                        style = Stroke(width = grosor + extra, cap = StrokeCap.Round),
+                    )
+                }
+            }
+        }
+    }
+}
+
 @Composable
 private fun EstadoCirculo(
     texto: String,
@@ -602,6 +727,9 @@ private fun EstadoCirculo(
     onMas: () -> Unit,
     onClick: () -> Unit,
     avatar: AvatarData? = null,
+    neon: Color = Color.White,
+    tieneEstado: Boolean = false,
+    cargando: Boolean = false,
 ) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -610,16 +738,12 @@ private fun EstadoCirculo(
             .padding(4.dp)
             .size(width = 68.dp, height = 90.dp),
     ) {
-        Box(modifier = Modifier.size(62.dp)) {
+        Box(contentAlignment = Alignment.Center, modifier = Modifier.size(62.dp).aroNeon(neon, tieneEstado, if (anillo) 1f else 0.5f, cargando)) {
             Box(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier
                     .size(60.dp)
                     .clip(CircleShape)
-                    .border(
-                        BorderStroke(if (anillo) 3.dp else 0.dp, MaterialTheme.colorScheme.primary),
-                        CircleShape,
-                    )
                     .padding(4.dp)
                     .clip(CircleShape)
                     .background(MaterialTheme.colorScheme.primaryContainer),
