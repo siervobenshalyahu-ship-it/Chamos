@@ -177,6 +177,9 @@ jobs:
       - name: Registro de errores dentro de la app
         run: python3 chamos-repo/patches/crash.py chamos
 
+      - name: Avisos al grabar notas de voz
+        run: python3 chamos-repo/patches/voz.py chamos
+
       - name: Pantalla principal con Estados
         run: python3 chamos-repo/patches/home_estados.py chamos chamos-repo/patches/ChamosEstados.kt
 
