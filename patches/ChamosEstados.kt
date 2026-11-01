@@ -1097,10 +1097,6 @@ private fun PaginaEstado(
                                     )
                                     androidx.compose.material3.DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                                         androidx.compose.material3.DropdownMenuItem(
-                                            text = { Text(if (entrada.tipo == TipoEstado.TEXTO) "Editar texto" else "Editar descripción") },
-                                            onClick = { menu = false; textoNuevo = entrada.texto; editando = true },
-                                        )
-                                        androidx.compose.material3.DropdownMenuItem(
                                             text = { Text("Borrar estado") },
                                             onClick = { menu = false; confirmarBorrar = true },
                                         )

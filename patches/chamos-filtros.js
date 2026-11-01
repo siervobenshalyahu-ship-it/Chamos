@@ -265,6 +265,7 @@
 
   /* ------------------------------------------------------------------ cámara */
   var sesiones = 0;
+  var errorFx = "";
   var original = md.getUserMedia.bind(md);
 
   async function procesar(stream, vt) {
@@ -298,7 +299,7 @@
       try { vt.stop(); } catch (e) { /* nada */ }
       video.srcObject = null;
       sesiones = Math.max(0, sesiones - 1);
-      if (!sesiones) quitarUI();
+      refrescarUI();
     }
     pista.stop = function () { pararOrig(); parar(); };
     vt.addEventListener("ended", function () { pararOrig(); parar(); });
@@ -317,7 +318,9 @@
     var vt = stream.getVideoTracks()[0];
     if (!vt) return stream;
     try { return await procesar(stream, vt); } catch (e) {
-      try { console.warn("Chamos filtros: se usa la cámara sin efectos", e && e.message); } catch (x) { /* nada */ }
+      errorFx = String(e && e.message ? e.message : e).slice(0, 120);
+      try { console.warn("Chamos filtros: se usa la cámara sin efectos", errorFx); } catch (x) { /* nada */ }
+      refrescarUI();
       return stream;
     }
   };
@@ -351,6 +354,8 @@
 
   function html() {
     var h = '<button id="fab" aria-label="Filtros y memes">✨</button><div id="panel"' + (abierto ? "" : " hidden") + ">";
+    if (errorFx) h += '<p class="nota">No se pudo aplicar a la cámara: ' + esc(errorFx) + "</p>";
+    else if (!sesiones) h += '<p class="nota">Los efectos se aplican cuando la cámara está encendida.</p>';
     h += '<div class="tabs">' + [["filtros", "Filtros"], ["caras", "Caras"], ["memes", "Memes"]].map(function (t) {
       return '<button data-tab="' + t[0] + '" class="' + (pestana === t[0] ? "on" : "") + '">' + t[1] + "</button>";
     }).join("") + "</div>";
@@ -424,5 +429,6 @@
     host = null; raiz = null; abierto = false;
   }
 
+  montarUI();
   window.__chamosFiltros = { version: 1, estado: estado, refrescar: refrescarUI, filtros: FILTROS, caras: CARAS };
 })();

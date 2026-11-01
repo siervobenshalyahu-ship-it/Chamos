@@ -34,4 +34,17 @@ edit(os.path.join(root, "features/call/impl/src/main/kotlin/io/element/android/f
      "                    android.util.Log.w(\"Chamos\", \"Filtros de video no disponibles\", e)\n"
      "                }\n"),
 ])
+# 3) además se registra como script de inicio de documento: corre antes que Element Call, sin depender de onPageStarted
+edit(os.path.join(root, "features/call/impl/src/main/kotlin/io/element/android/features/call/impl/utils/WebViewWidgetMessageInterceptor.kt"), [
+    ("        webView.webViewClient = object : WebViewClient() {\n",
+     "        try {\n"
+     "            if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {\n"
+     "                val chamosJs = webView.context.assets.open(\"chamos/filtros.js\").bufferedReader().use { it.readText() }\n"
+     "                androidx.webkit.WebViewCompat.addDocumentStartJavaScript(webView, chamosJs, setOf(\"https://appassets.androidplatform.net\"))\n"
+     "            }\n"
+     "        } catch (e: Throwable) {\n"
+     "            android.util.Log.w(\"Chamos\", \"Filtros: no se pudo registrar el script de inicio\", e)\n"
+     "        }\n"
+     "        webView.webViewClient = object : WebViewClient() {\n"),
+])
 print("filtros OK (" + ("con detector de caras" if caras else "solo filtros de color y memes") + ")")
