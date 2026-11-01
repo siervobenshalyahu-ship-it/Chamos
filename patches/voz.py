@@ -2,6 +2,31 @@ import sys, os
 root = sys.argv[1]
 
 AVISO = '''
+/** Si tras pedir el permiso del micrófono el teléfono lo rechaza en silencio (Vivo/Xiaomi), avisa y abre los ajustes. */
+internal fun chamosVerificarMicrofono() {
+    try {
+        val app = Class.forName("android.app.ActivityThread").getMethod("currentApplication").invoke(null) as android.app.Application
+        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+            try {
+                val concedido = app.checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) == android.content.pm.PackageManager.PERMISSION_GRANTED
+                if (concedido) return@postDelayed
+                val visible = try {
+                    val owner = Class.forName("androidx.lifecycle.ProcessLifecycleOwner").getMethod("get").invoke(null)
+                    val estado = owner.javaClass.getMethod("getLifecycle").invoke(owner)
+                    estado.javaClass.getMethod("getCurrentState").invoke(estado).toString() == "RESUMED"
+                } catch (_: Throwable) { true }
+                if (!visible) return@postDelayed
+                android.widget.Toast.makeText(app, "Chamos no tiene permiso de micrófono. Actívalo en Permisos > Micrófono.", android.widget.Toast.LENGTH_LONG).show()
+                val i = android.content.Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, android.net.Uri.parse("package:" + app.packageName))
+                i.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                app.startActivity(i)
+            } catch (_: Throwable) {
+            }
+        }, 2500)
+    } catch (_: Throwable) {
+    }
+}
+
 /** Muestra un aviso en pantalla (para saber por qué falla la grabación de notas de voz). */
 internal fun chamosAviso(texto: String) {
     try {
@@ -64,6 +89,16 @@ parchear(os.path.join(base, "audio/AndroidAudioReader.kt"), [
 # 2) Presentador: avisar si la grabación no puede empezar
 pres = os.path.join(root, "features/messages/impl/src/main/kotlin/io/element/android/features/messages/impl/voicemessages/composer/DefaultVoiceMessageComposerPresenter.kt")
 parchear(pres, [
+    ('''                            permissionState.eventSink(PermissionsEvent.RequestPermissions)
+                        }
+                    }
+                }
+                VoiceMessageRecorderEvent.Stop''', '''                            permissionState.eventSink(PermissionsEvent.RequestPermissions)
+                            chamosVerificarMicrofono()
+                        }
+                    }
+                }
+                VoiceMessageRecorderEvent.Stop'''),
     ('''            analyticsService.trackError(VoiceMessageException.PermissionMissing("Expected permission to record but none", e))
         }
     }''', '''            analyticsService.trackError(VoiceMessageException.PermissionMissing("Expected permission to record but none", e))
