@@ -365,8 +365,14 @@ fun rememberChamosEstados(
     val cargarArchivo: suspend (EstadoEntrada) -> String? = cargar@{ e ->
         cacheArchivos[e.id]?.let { return@cargar it }
         val fuente = e.fuente ?: return@cargar null
-        val archivo = client.matrixMediaLoader.downloadMediaFile(fuente, e.mime, e.nombre).getOrNull() ?: return@cargar null
-        val ruta = archivo.toFile().absolutePath
+        var archivo: java.io.File? = null
+        for (intento in 0 until 4) {
+            archivo = client.matrixMediaLoader.downloadMediaFile(fuente, e.mime, e.nombre).getOrNull()?.toFile()
+            if (archivo != null) break
+            delay(1000L * (intento + 1))
+        }
+        if (archivo == null) return@cargar null
+        val ruta = archivo.absolutePath
         cacheArchivos[e.id] = ruta
         ruta
     }
@@ -940,49 +946,56 @@ private fun VideoTextura(
         val st = superficie.value ?: return@LaunchedEffect
         if (!activo) return@LaunchedEffect
         fallo = false
-        val mp = android.media.MediaPlayer()
-        val pantalla = android.view.Surface(st)
-        try {
-            val listo = kotlinx.coroutines.CompletableDeferred<Boolean>()
-            mp.setDataSource(ruta)
-            mp.setSurface(pantalla)
-            mp.setOnVideoSizeChangedListener { _, vw, vh ->
-                val tv = vista.value
-                if (tv != null && vw > 0 && vh > 0 && tv.width > 0 && tv.height > 0) {
-                    val escala = minOf(tv.width.toFloat() / vw, tv.height.toFloat() / vh)
-                    val m = android.graphics.Matrix()
-                    m.setScale(vw * escala / tv.width, vh * escala / tv.height, tv.width / 2f, tv.height / 2f)
-                    tv.setTransform(m)
+        // Algunos teléfonos tardan en liberar el decodificador del video anterior: se reintenta.
+        var intento = 0
+        while (intento < 4) {
+            if (intento > 0) delay(600L * intento)
+            intento++
+            val mp = android.media.MediaPlayer()
+            val pantalla = android.view.Surface(st)
+            var ok = false
+            try {
+                val listo = kotlinx.coroutines.CompletableDeferred<Boolean>()
+                mp.setDataSource(ruta)
+                mp.setSurface(pantalla)
+                mp.setOnVideoSizeChangedListener { _, vw, vh ->
+                    val tv = vista.value
+                    if (tv != null && vw > 0 && vh > 0 && tv.width > 0 && tv.height > 0) {
+                        val escala = minOf(tv.width.toFloat() / vw, tv.height.toFloat() / vh)
+                        val m = android.graphics.Matrix()
+                        m.setScale(vw * escala / tv.width, vh * escala / tv.height, tv.width / 2f, tv.height / 2f)
+                        tv.setTransform(m)
+                    }
                 }
-            }
-            mp.setOnPreparedListener { listo.complete(true) }
-            mp.setOnCompletionListener { finActual() }
-            mp.setOnErrorListener { _, what, extra ->
-                android.util.Log.e("Chamos", "video error $what/$extra")
-                listo.complete(false)
-                fallo = true
-                true
-            }
-            mp.prepareAsync()
-            if (listo.await()) {
-                mp.start()
-                while (true) {
-                    val dur = mp.duration
-                    if (dur > 0) onProgreso(mp.currentPosition.toFloat() / dur)
-                    delay(200)
+                mp.setOnPreparedListener { listo.complete(true) }
+                mp.setOnCompletionListener { finActual() }
+                mp.setOnErrorListener { _, what, extra ->
+                    android.util.Log.e("Chamos", "video error $what/$extra")
+                    listo.complete(false)
+                    true
                 }
-            } else {
-                fallo = true
+                mp.prepareAsync()
+                val preparado = kotlinx.coroutines.withTimeoutOrNull(8000) { listo.await() } == true
+                if (preparado) {
+                    mp.start()
+                    ok = true
+                    while (true) {
+                        val dur = mp.duration
+                        if (dur > 0) onProgreso(mp.currentPosition.toFloat() / dur)
+                        delay(200)
+                    }
+                }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                android.util.Log.e("Chamos", "video", e)
+            } finally {
+                runCatching { mp.release() }
+                runCatching { pantalla.release() }
             }
-        } catch (e: kotlinx.coroutines.CancellationException) {
-            throw e
-        } catch (e: Throwable) {
-            android.util.Log.e("Chamos", "video", e)
-            fallo = true
-        } finally {
-            runCatching { mp.release() }
-            runCatching { pantalla.release() }
+            if (ok) break
         }
+        fallo = true
     }
 
     if (fallo) {
