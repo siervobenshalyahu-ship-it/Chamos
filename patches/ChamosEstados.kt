@@ -96,6 +96,7 @@ import io.element.android.libraries.matrix.api.room.RoomNotificationMode
 import io.element.android.libraries.matrix.api.roomdirectory.RoomVisibility
 import io.element.android.libraries.matrix.api.timeline.MatrixTimelineItem
 import io.element.android.libraries.matrix.api.timeline.Timeline
+import io.element.android.libraries.matrix.api.core.EventId
 import io.element.android.libraries.matrix.api.timeline.item.event.EventOrTransactionId
 import io.element.android.libraries.matrix.api.timeline.item.event.ImageMessageType
 import io.element.android.libraries.matrix.api.timeline.item.event.MessageContent
@@ -136,6 +137,7 @@ data class ChamosEstadoItem(
     val nuevo: Boolean,
     val entradas: List<EstadoEntrada>,
     val avatar: AvatarData? = null,
+    val propio: Boolean = false,
 )
 
 data class ChamosEstadosState(
@@ -150,6 +152,9 @@ data class ChamosEstadosState(
     val yoId: String = "",
     val yoNombre: String? = null,
     val yoAvatar: String? = null,
+    val borrar: suspend (EstadoEntrada) -> Boolean = { false },
+    val editar: suspend (EstadoEntrada, String) -> Boolean = { _, _ -> false },
+    val diagnostico: String = "",
 )
 
 private fun RoomListRoomSummary.tituloEstado(): String =
@@ -287,13 +292,20 @@ fun rememberChamosEstados(
         } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Throwable) { android.util.Log.e("Chamos", "estados", e) }
     }
 
-    val contactosIds = chats.filter { it.isDm && it.displayType == RoomSummaryDisplayType.ROOM }.map { it.roomId }
+    val contactosIds = chats.filter { (it.isDm || it.isDirect) && it.displayType == RoomSummaryDisplayType.ROOM }.map { it.roomId }
 
-    val otrosChatsIds = chats.filter { !it.isDm && it.displayType == RoomSummaryDisplayType.ROOM }.map { it.roomId }
+    val otrosChatsIds = chats.filter { !(it.isDm || it.isDirect) && it.displayType == RoomSummaryDisplayType.ROOM && !it.isSpace }.map { it.roomId }
 
     suspend fun contactos(): List<UserId> {
         val directos = contactosIds.mapNotNull { id ->
             runCatching { client.getRoom(id)?.getDirectRoomMember()?.userId }.getOrNull()
+        }
+        // Salas de dos personas que el teléfono no marcó como "directas" (también son contactos).
+        val pares = otrosChatsIds.take(60).mapNotNull { id ->
+            runCatching {
+                val otros = client.getRoom(id)?.getMembers(4)?.getOrNull().orEmpty().map { it.userId }.filter { it != client.sessionId }.distinct()
+                if (otros.size == 1) otros.first() else null
+            }.getOrNull()
         }
         // "Todos": además, cualquier persona con la que comparto algún grupo.
         val deGrupos = if (todos) {
@@ -303,11 +315,12 @@ fun rememberChamosEstados(
         } else {
             emptyList()
         }
-        return (directos + deGrupos).filter { it != client.sessionId }.distinct()
+        return (directos + pares + deGrupos).filter { it != client.sessionId }.distinct()
     }
 
     // Invitar a los contactos a mi sala de estados.
     val invitados = remember { mutableSetOf<UserId>() }
+    var nContactos by remember { mutableStateOf(0) }
     LaunchedEffect(propia?.roomId, contactosIds, otrosChatsIds, todos, latido) {
         try {
         val id = propia?.roomId ?: return@LaunchedEffect
@@ -315,8 +328,9 @@ fun rememberChamosEstados(
         // Esperar a que la lista de chats se estabilice (si cambia, este bloque se cancela y reinicia).
         delay(4000)
         val permitidos = contactos()
+        nContactos = permitidos.size
         // Quitar a quien ya no debe verlos (cuando se vuelve a "solo contactos").
-        if (!todos && contactosIds.isNotEmpty()) {
+        if (!todos && permitidos.isNotEmpty()) {
             val actuales = sala.getMembers(1000).getOrNull().orEmpty().map { it.userId }
             for (u in actuales) {
                 if (u != client.sessionId && u !in permitidos) {
@@ -440,6 +454,26 @@ fun rememberChamosEstados(
         ruta
     }
 
+    fun salaDe(e: EstadoEntrada): RoomId? =
+        propias.firstOrNull { s -> entradasPorSala[s.roomId]?.any { it.id == e.id } == true }?.roomId
+
+    val borrarEstado: suspend (EstadoEntrada) -> Boolean = borrar@{ e ->
+        val id = salaDe(e) ?: return@borrar false
+        val sala = client.getJoinedRoom(id) ?: return@borrar false
+        sala.liveTimeline.redactEvent(EventOrTransactionId.Event(EventId(e.id)), "Estado borrado").isSuccess
+    }
+
+    val editarEstado: suspend (EstadoEntrada, String) -> Boolean = editar@{ e, nuevo ->
+        val id = salaDe(e) ?: return@editar false
+        val sala = client.getJoinedRoom(id) ?: return@editar false
+        val evento = EventOrTransactionId.Event(EventId(e.id))
+        if (e.tipo == TipoEstado.TEXTO) {
+            sala.liveTimeline.editMessage(evento, nuevo, null, emptyList()).isSuccess
+        } else {
+            sala.liveTimeline.editCaption(evento, nuevo.ifBlank { null }, null).isSuccess
+        }
+    }
+
     val marcarVisto: (ChamosEstadoItem) -> Unit = { item ->
         item.entradas.lastOrNull()?.let { ultima ->
             vistos[item.roomId.value] = ultima.id
@@ -465,6 +499,7 @@ fun rememberChamosEstados(
             item(p, "Mi estado").copy(
                 entradas = todas,
                 nuevo = false,
+                propio = true,
             )
         },
         otros = otras.map { sala -> item(sala, perfiles[sala.roomId]?.displayName?.takeIf { it.isNotBlank() } ?: sala.tituloEstado()) }.filter { it.entradas.isNotEmpty() },
@@ -477,6 +512,9 @@ fun rememberChamosEstados(
         yoId = perfil.userId.value,
         yoNombre = perfil.displayName,
         yoAvatar = perfil.avatarUrl,
+        borrar = borrarEstado,
+        editar = editarEstado,
+        diagnostico = "salas ${salas.size} (invitaciones ${salas.count { it.displayType == RoomSummaryDisplayType.INVITE }}) · mías ${propias.size} · de otros ${otras.size} · contactos ${nContactos} · invitados ${invitados.size}",
     )
 }
 
@@ -563,6 +601,14 @@ fun ChamosEstadosRow(
                 }
             }) { Text("Buscar actualización") }
         }
+        if (state != null && state.diagnostico.isNotEmpty()) {
+            Text(
+                text = state.diagnostico,
+                fontSize = 10.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 16.dp),
+            )
+        }
         LazyRow(
             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -626,6 +672,18 @@ fun ChamosEstadosRow(
             inicio = abierto.coerceIn(0, reproducibles.lastIndex),
             cargar = state.cargarArchivo,
             onVisto = state.marcarVisto,
+            onBorrar = { e ->
+                scope.launch {
+                    val ok = state.borrar(e)
+                    Toast.makeText(contexto, if (ok) "Estado borrado" else "No se pudo borrar", Toast.LENGTH_SHORT).show()
+                }
+            },
+            onEditar = { e, texto ->
+                scope.launch {
+                    val ok = state.editar(e, texto)
+                    Toast.makeText(contexto, if (ok) "Estado editado" else "No se pudo editar", Toast.LENGTH_SHORT).show()
+                }
+            },
             onCerrar = { visor = null },
         )
     }
@@ -866,6 +924,8 @@ private fun PaginaEstado(
     iEntrada: Int,
     activo: Boolean,
     cargar: suspend (EstadoEntrada) -> String?,
+    onBorrar: (EstadoEntrada) -> Unit,
+    onEditar: (EstadoEntrada, String) -> Unit,
     onCerrar: () -> Unit,
     onSiguiente: () -> Unit,
     onAnterior: () -> Unit,
@@ -875,6 +935,12 @@ private fun PaginaEstado(
         Box(Modifier.fillMaxSize().background(Color.Black))
         return
     }
+
+    var menu by remember { mutableStateOf(false) }
+    var confirmarBorrar by remember { mutableStateOf(false) }
+    var editando by remember { mutableStateOf(false) }
+    var textoNuevo by remember { mutableStateOf("") }
+    val pausa = menu || confirmarBorrar || editando
 
     fun siguiente() = onSiguiente()
 
@@ -941,6 +1007,7 @@ private fun PaginaEstado(
                             VideoTextura(
                                 ruta = r,
                                 activo = activo,
+                                pausa = pausa,
                                 onProgreso = { progreso.floatValue = it },
                                 // Solo el estado que se está viendo puede avanzar el carrusel.
                                 onFin = { if (activo) siguiente() },
@@ -950,13 +1017,14 @@ private fun PaginaEstado(
                 }
                 if (entrada.tipo != TipoEstado.VIDEO) {
                     val anim = remember { Animatable(0f) }
-                    LaunchedEffect(activo) {
-                        if (!activo) return@LaunchedEffect
+                    LaunchedEffect(activo, pausa) {
+                        if (!activo || pausa) return@LaunchedEffect
                         // El tiempo empieza a correr cuando el contenido ya está listo.
                         if (entrada.tipo == TipoEstado.IMAGEN) {
                             while (ruta == null) delay(100)
                         }
-                        anim.animateTo(1f, tween(DURACION_FIJA_MS, easing = LinearEasing)) {
+                        val resto = ((1f - anim.value) * DURACION_FIJA_MS).toInt().coerceAtLeast(1)
+                        anim.animateTo(1f, tween(resto, easing = LinearEasing)) {
                             progreso.floatValue = value
                         }
                         siguiente()
@@ -994,14 +1062,39 @@ private fun PaginaEstado(
                         modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
                     ) {
                         Text(item.titulo, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                        Text(
-                            "✕",
-                            color = Color.White,
-                            fontSize = 22.sp,
-                            modifier = Modifier
-                                .clickable { onCerrar() }
-                                .padding(8.dp),
-                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            if (item.propio) {
+                                Box {
+                                    Text(
+                                        "⋮",
+                                        color = Color.White,
+                                        fontSize = 24.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier
+                                            .clickable { menu = true }
+                                            .padding(horizontal = 12.dp, vertical = 4.dp),
+                                    )
+                                    androidx.compose.material3.DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                                        androidx.compose.material3.DropdownMenuItem(
+                                            text = { Text(if (entrada.tipo == TipoEstado.TEXTO) "Editar texto" else "Editar descripción") },
+                                            onClick = { menu = false; textoNuevo = entrada.texto; editando = true },
+                                        )
+                                        androidx.compose.material3.DropdownMenuItem(
+                                            text = { Text("Borrar estado") },
+                                            onClick = { menu = false; confirmarBorrar = true },
+                                        )
+                                    }
+                                }
+                            }
+                            Text(
+                                "✕",
+                                color = Color.White,
+                                fontSize = 22.sp,
+                                modifier = Modifier
+                                    .clickable { onCerrar() }
+                                    .padding(8.dp),
+                            )
+                        }
                     }
                 }
                 if (entrada.tipo != TipoEstado.TEXTO && entrada.texto.isNotBlank()) {
@@ -1017,6 +1110,35 @@ private fun PaginaEstado(
                             .padding(16.dp),
                     )
                 }
+                if (confirmarBorrar) {
+                    AlertDialog(
+                        onDismissRequest = { confirmarBorrar = false },
+                        title = { Text("¿Borrar este estado?") },
+                        text = { Text("Dejará de verse para todos tus contactos.") },
+                        confirmButton = { TextButton(onClick = { confirmarBorrar = false; onBorrar(entrada); onCerrar() }) { Text("Borrar") } },
+                        dismissButton = { TextButton(onClick = { confirmarBorrar = false }) { Text("Cancelar") } },
+                    )
+                }
+                if (editando) {
+                    AlertDialog(
+                        onDismissRequest = { editando = false },
+                        title = { Text(if (entrada.tipo == TipoEstado.TEXTO) "Editar texto" else "Editar descripción") },
+                        text = {
+                            androidx.compose.material3.OutlinedTextField(
+                                value = textoNuevo,
+                                onValueChange = { textoNuevo = it.take(300) },
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        },
+                        confirmButton = {
+                            TextButton(
+                                enabled = entrada.tipo != TipoEstado.TEXTO || textoNuevo.isNotBlank(),
+                                onClick = { editando = false; onEditar(entrada, textoNuevo.trim()) },
+                            ) { Text("Guardar") }
+                        },
+                        dismissButton = { TextButton(onClick = { editando = false }) { Text("Cancelar") } },
+                    )
+                }
             }
         }
     }
@@ -1029,6 +1151,8 @@ private fun VisorEstados(
     inicio: Int,
     cargar: suspend (EstadoEntrada) -> String?,
     onVisto: (ChamosEstadoItem) -> Unit,
+    onBorrar: (EstadoEntrada) -> Unit,
+    onEditar: (EstadoEntrada, String) -> Unit,
     onCerrar: () -> Unit,
 ) {
     // Cada estado (de cada persona) es una página del carrusel.
@@ -1067,6 +1191,8 @@ private fun VisorEstados(
                     iEntrada = iEntrada,
                     activo = estado.currentPage == pagina,
                     cargar = cargar,
+                    onBorrar = onBorrar,
+                    onEditar = onEditar,
                     onCerrar = { onVisto(items[iItem]); onCerrar() },
                     onSiguiente = {
                         if (pagina < paginas.lastIndex) scope.launch { estado.animateScrollToPage(pagina + 1) } else { onVisto(items[iItem]); onCerrar() }
@@ -1090,10 +1216,12 @@ private fun VisorEstados(
 private fun VideoTextura(
     ruta: String,
     activo: Boolean,
+    pausa: Boolean = false,
     onProgreso: (Float) -> Unit,
     onFin: () -> Unit,
 ) {
     val finActual by androidx.compose.runtime.rememberUpdatedState(onFin)
+    val pausaActual by androidx.compose.runtime.rememberUpdatedState(pausa)
     val superficie = remember { mutableStateOf<android.graphics.SurfaceTexture?>(null) }
     val vista = remember { mutableStateOf<android.view.TextureView?>(null) }
     var fallo by remember { mutableStateOf(false) }
@@ -1144,7 +1272,8 @@ private fun VideoTextura(
                     }
                 }
                 mp.setOnPreparedListener { listo.complete(true) }
-                mp.setOnCompletionListener { finActual() }
+                var terminado = false
+                mp.setOnCompletionListener { terminado = true; finActual() }
                 mp.setOnErrorListener { _, what, extra ->
                     android.util.Log.e("Chamos", "video error $what/$extra")
                     listo.complete(false)
@@ -1158,6 +1287,10 @@ private fun VideoTextura(
                     while (true) {
                         val dur = mp.duration
                         if (dur > 0) onProgreso(mp.currentPosition.toFloat() / dur)
+                        if (!terminado) {
+                            if (pausaActual && mp.isPlaying) mp.pause()
+                            else if (!pausaActual && !mp.isPlaying) mp.start()
+                        }
                         delay(200)
                     }
                 }
