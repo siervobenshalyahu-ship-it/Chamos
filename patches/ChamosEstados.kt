@@ -187,9 +187,17 @@ fun rememberChamosEstados(
         mutableStateMapOf<String, String>().also { m -> prefs.all.forEach { (k, v) -> if (v is String) m[k] = v } }
     }
     val cacheArchivos = remember { mutableMapOf<String, String>() }
+    // Cada 20 segundos se reintenta entrar a salas de estado y enviar invitaciones que hayan fallado.
+    var latido by remember { mutableStateOf(0) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(20_000)
+            latido++
+        }
+    }
 
     // Saber cuáles son mías (soy la creadora) y entrar solo a las invitaciones de otras personas.
-    LaunchedEffect(salas.map { it.roomId to it.displayType }) {
+    LaunchedEffect(salas.map { it.roomId to it.displayType }, latido) {
         try {
         for (sala in salas) {
             if (esMia[sala.roomId] == null) {
@@ -201,7 +209,11 @@ fun rememberChamosEstados(
                 }
             }
             if (sala.displayType == RoomSummaryDisplayType.INVITE && esMia[sala.roomId] != true && intentos.add(sala.roomId)) {
-                client.joinRoom(sala.roomId)
+                val r = client.joinRoom(sala.roomId)
+                if (r.isFailure) {
+                    android.util.Log.e("Chamos", "no se pudo entrar a un estado", r.exceptionOrNull())
+                    intentos.remove(sala.roomId)
+                }
             }
             if (sala.displayType == RoomSummaryDisplayType.ROOM &&
                 sala.userDefinedNotificationMode != RoomNotificationMode.MUTE &&
@@ -224,7 +236,14 @@ fun rememberChamosEstados(
         for (id in idsActivos) {
             launch {
                 try {
-                    val sala = client.getJoinedRoom(id) ?: return@launch
+                    var salaLeida = client.getJoinedRoom(id)
+                    var vez = 0
+                    while (salaLeida == null && vez < 20) {
+                        delay(1000)
+                        salaLeida = client.getJoinedRoom(id)
+                        vez++
+                    }
+                    val sala = salaLeida ?: return@launch
                     launch {
                         // Cargar hacia atrás hasta cubrir las últimas 24 horas.
                         repeat(8) {
@@ -272,7 +291,7 @@ fun rememberChamosEstados(
 
     // Invitar a los contactos a mi sala de estados.
     val invitados = remember { mutableSetOf<UserId>() }
-    LaunchedEffect(propia?.roomId, contactosIds, otrosChatsIds, todos) {
+    LaunchedEffect(propia?.roomId, contactosIds, otrosChatsIds, todos, latido) {
         try {
         val id = propia?.roomId ?: return@LaunchedEffect
         val sala = client.getJoinedRoom(id) ?: return@LaunchedEffect
@@ -290,7 +309,11 @@ fun rememberChamosEstados(
             }
         }
         for (usuario in permitidos) {
-            if (invitados.add(usuario)) sala.inviteUserById(usuario)
+            if (usuario !in invitados) {
+                val r = sala.inviteUserById(usuario)
+                // Si falla por algo distinto a "ya está en la sala", se vuelve a intentar en el próximo latido.
+                if (r.isSuccess || (r.exceptionOrNull()?.message ?: "").contains("already", ignoreCase = true)) invitados.add(usuario)
+            }
         }
         } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Throwable) { android.util.Log.e("Chamos", "estados", e) }
     }
