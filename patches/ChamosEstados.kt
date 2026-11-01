@@ -98,6 +98,8 @@ import io.element.android.libraries.matrix.api.timeline.MatrixTimelineItem
 import io.element.android.libraries.matrix.api.timeline.Timeline
 import io.element.android.libraries.matrix.api.core.EventId
 import io.element.android.libraries.matrix.api.timeline.item.event.EventOrTransactionId
+import io.element.android.libraries.matrix.api.timeline.item.SendTarget
+import io.element.android.libraries.matrix.api.core.TransactionId
 import io.element.android.libraries.matrix.api.timeline.item.event.ImageMessageType
 import io.element.android.libraries.matrix.api.timeline.item.event.MessageContent
 import io.element.android.libraries.matrix.api.timeline.item.event.TextMessageType
@@ -355,6 +357,7 @@ fun rememberChamosEstados(
         val id = propia?.roomId ?: return@LaunchedEffect
         val sala = client.getJoinedRoom(id) ?: return@LaunchedEffect
         val borrados = mutableSetOf<String>()
+        val reintentados = mutableSetOf<String>()
         val reloj = flow {
             while (true) {
                 emit(Unit)
@@ -365,7 +368,16 @@ fun rememberChamosEstados(
             val limite = System.currentTimeMillis() - CHAMOS_ESTADO_HORAS * 60 * 60 * 1000L
             for (item in items) {
                 val evento = (item as? MatrixTimelineItem.Event)?.event ?: continue
-                val eventId = evento.eventId ?: continue
+                val eventId = evento.eventId
+                if (eventId == null) {
+                    // Estado propio que no llegó a enviarse: se vuelve a poner en la cola de envío.
+                    val tx = evento.transactionId
+                    if (tx != null && evento.isOwn && evento.localSendState is io.element.android.libraries.matrix.api.timeline.item.event.LocalEventSendState.Failed && reintentados.add(tx.value)) {
+                        android.util.Log.w("Chamos", "estado sin enviar, reintentando: ${evento.localSendState}")
+                        sala.liveTimeline.retrySend(EventOrTransactionId.Transaction(tx), SendTarget.Event)
+                    }
+                    continue
+                }
                 if (evento.isOwn && evento.content is MessageContent && evento.timestamp < limite && borrados.add(eventId.value)) {
                     sala.liveTimeline.redactEvent(EventOrTransactionId.Event(eventId), "Estado vencido")
                 }
@@ -460,17 +472,33 @@ fun rememberChamosEstados(
     val borrarEstado: suspend (EstadoEntrada) -> Boolean = borrar@{ e ->
         val id = salaDe(e) ?: return@borrar false
         val sala = client.getJoinedRoom(id) ?: return@borrar false
-        sala.liveTimeline.redactEvent(EventOrTransactionId.Event(EventId(e.id)), "Estado borrado").isSuccess
+        try {
+            if (e.id.startsWith("$")) {
+                sala.liveTimeline.redactEvent(EventOrTransactionId.Event(EventId(e.id)), "Estado borrado").isSuccess
+            } else {
+                sala.liveTimeline.cancelSend(TransactionId(e.id)).isSuccess
+            }
+        } catch (t: Throwable) {
+            android.util.Log.e("Chamos", "borrar estado", t)
+            false
+        }
     }
 
     val editarEstado: suspend (EstadoEntrada, String) -> Boolean = editar@{ e, nuevo ->
         val id = salaDe(e) ?: return@editar false
         val sala = client.getJoinedRoom(id) ?: return@editar false
+        // Un estado que aún no se envió no se puede editar.
+        if (!e.id.startsWith("$")) return@editar false
         val evento = EventOrTransactionId.Event(EventId(e.id))
-        if (e.tipo == TipoEstado.TEXTO) {
-            sala.liveTimeline.editMessage(evento, nuevo, null, emptyList()).isSuccess
-        } else {
-            sala.liveTimeline.editCaption(evento, nuevo.ifBlank { null }, null).isSuccess
+        try {
+            if (e.tipo == TipoEstado.TEXTO) {
+                sala.liveTimeline.editMessage(evento, nuevo, null, emptyList()).isSuccess
+            } else {
+                sala.liveTimeline.editCaption(evento, nuevo.ifBlank { null }, null).isSuccess
+            }
+        } catch (t: Throwable) {
+            android.util.Log.e("Chamos", "editar estado", t)
+            false
         }
     }
 
