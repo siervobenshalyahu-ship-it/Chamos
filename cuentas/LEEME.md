@@ -46,3 +46,11 @@ Todas las llamadas llevan `openid`: el token OpenID que la app pide a matrix.org
 | `POST /contactos/buscar` `{openid, numeros:[...]}` | Hasta 500 números de la agenda; devuelve cuáles ya usan Chamos y su cuenta. |
 
 Nota: la dirección de federación de matrix.org (`matrix-federation.matrix.org`) puede cambiar; si la verificación falla con 401, ajusta `FEDERATION_URL` en `wrangler.toml`.
+
+## Conectar la app
+Cuando el Worker esté publicado, escribe su dirección (una sola línea, con `https://`) en `cuentas/servicio-url.txt`,
+sube el cambio y genera una versión nueva con la acción "Chamos 2.0". Mientras ese archivo esté vacío, la pantalla
+«Número» de la app dice que el servidor todavía no está activado.
+
+En la app: botón **Número** (junto a Ajustes y Estilos) → *Vincular con Telegram* → compartir contacto en el bot → *Buscar mis contactos en Chamos*.
+Los números de la agenda que se guardaron sin código de país se toman como venezolanos (+58); se cambia en `patches/ChamosNumero.kt` (`PAIS`).
