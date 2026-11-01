@@ -243,7 +243,7 @@ async function resumen(request, env) {
 // ───────────────────────── Chamos IA: chat público (Workers AI, sin ejecutar nada) ─────────────────────────
 // Necesita: enlace (binding) de Workers AI con el nombre AI, y la base D1 (DB) para los límites.
 const ORIGENES_IA = ["https://siervobenshalyahu-ship-it.github.io"];
-const MODELO_IA = "@cf/meta/llama-3.1-8b-instruct";
+const MODELOS_IA = ["@cf/meta/llama-3.1-8b-instruct", "@cf/meta/llama-3.2-3b-instruct", "@cf/meta/llama-3-8b-instruct"];
 const LIMITE_PERSONA_DIA = 30;
 const LIMITE_GLOBAL_DIA = 200;
 const SISTEMA_IA =
@@ -293,20 +293,27 @@ async function chatIA(request, env) {
   if (global.results[0].n > LIMITE_GLOBAL_DIA)
     return resp({ error: "Chamos IA está muy concurrida hoy. Intenta de nuevo mañana." }, 429);
 
-  try {
-    const salida = await env.AI.run(MODELO_IA, {
-      messages: [{ role: "system", content: SISTEMA_IA }, ...mensajes],
-      max_tokens: 400,
-    });
-    const texto = salida && (salida.response || (salida.result && salida.result.response));
-    if (!texto) return resp({ error: "No pude responder ahora. Intenta otra vez." }, 502);
-    await env.DB.prepare("INSERT INTO eventos (ts, tipo, anon, pais, extra) VALUES (?1,'ia',?2,?3,'')")
-      .bind(Date.now(), clavePersona, corto(request.cf && request.cf.country, 4)).run();
-    return resp({ respuesta: String(texto).trim() });
-  } catch (e) {
-    console.error(e);
-    return resp({ error: "No pude responder ahora. Intenta otra vez." }, 502);
+  const errores = [];
+  for (const modelo of MODELOS_IA) {
+    try {
+      const salida = await env.AI.run(modelo, {
+        messages: [{ role: "system", content: SISTEMA_IA }, ...mensajes],
+        max_tokens: 400,
+      });
+      const texto = typeof salida === "string" ? salida : salida && (salida.response || (salida.result && salida.result.response));
+      if (!texto || !String(texto).trim()) {
+        errores.push(modelo + ": respuesta vacía");
+        continue;
+      }
+      await env.DB.prepare("INSERT INTO eventos (ts, tipo, anon, pais, extra) VALUES (?1,'ia',?2,?3,'')")
+        .bind(Date.now(), clavePersona, corto(request.cf && request.cf.country, 4)).run();
+      return resp({ respuesta: String(texto).trim() });
+    } catch (e) {
+      console.error(e);
+      errores.push(modelo + ": " + corto(e && e.message ? e.message : e, 160));
+    }
   }
+  return resp({ error: "No pude responder ahora. Intenta otra vez.", detalle: errores.join(" | ").slice(0, 400) }, 502);
 }
 
 const PANEL_HTML = `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
