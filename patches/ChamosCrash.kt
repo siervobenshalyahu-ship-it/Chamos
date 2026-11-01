@@ -43,3 +43,45 @@ object ChamosCrash {
             .show()
     }
 }
+
+/** Pide el permiso del micrófono (necesario para grabar notas de voz) y guía a Ajustes si el teléfono lo tiene bloqueado. */
+object ChamosPermisos {
+    private const val PERMISO = android.Manifest.permission.RECORD_AUDIO
+
+    fun pedirMicrofono(activity: Activity) {
+        try {
+            if (androidx.core.content.ContextCompat.checkSelfPermission(activity, PERMISO) ==
+                android.content.pm.PackageManager.PERMISSION_GRANTED
+            ) return
+            val prefs = activity.getSharedPreferences("chamos_permisos", Context.MODE_PRIVATE)
+            val yaPedido = prefs.getBoolean("mic_pedido", false)
+            val puedeVolverAPedir = androidx.core.app.ActivityCompat.shouldShowRequestPermissionRationale(activity, PERMISO)
+            if (!yaPedido || puedeVolverAPedir) {
+                prefs.edit().putBoolean("mic_pedido", true).apply()
+                androidx.core.app.ActivityCompat.requestPermissions(activity, arrayOf(PERMISO), 4711)
+                return
+            }
+            // El sistema ya no muestra el aviso (bloqueado): explicar cómo activarlo, como máximo una vez al día.
+            val hoy = System.currentTimeMillis() / 86_400_000L
+            if (prefs.getLong("mic_aviso_dia", -1L) == hoy) return
+            prefs.edit().putLong("mic_aviso_dia", hoy).apply()
+            AlertDialog.Builder(activity)
+                .setTitle("Activa el micrófono")
+                .setMessage(
+                    "Para grabar notas de voz, Chamos necesita permiso del micrófono.\n\n" +
+                        "Toca \"Abrir ajustes\" → Permisos → Micrófono → Permitir (solo mientras se usa la app).",
+                )
+                .setPositiveButton("Abrir ajustes") { _, _ ->
+                    val intent = android.content.Intent(
+                        android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                        android.net.Uri.fromParts("package", activity.packageName, null),
+                    )
+                    activity.startActivity(intent)
+                }
+                .setNegativeButton("Ahora no", null)
+                .show()
+        } catch (e: Throwable) {
+            Log.e("Chamos", "permisos", e)
+        }
+    }
+}

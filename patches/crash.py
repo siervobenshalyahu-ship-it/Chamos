@@ -7,6 +7,6 @@ p = os.path.join(appdir, "MainActivity.kt")
 t = open(p, encoding="utf-8").read()
 a = "        setupLockManagement(appBindings.lockScreenService(), appBindings.lockScreenEntryPoint())\n"
 assert t.count(a) == 1
-t = t.replace(a, "        ChamosCrash.instalar(this)\n        ChamosCrash.mostrarSiHay(this)\n" + a)
+t = t.replace(a, "        ChamosCrash.instalar(this)\n        ChamosCrash.mostrarSiHay(this)\n        ChamosPermisos.pedirMicrofono(this)\n" + a)
 open(p, "w", encoding="utf-8").write(t)
 print("crash OK")
