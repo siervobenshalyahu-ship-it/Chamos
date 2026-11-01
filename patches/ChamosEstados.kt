@@ -246,12 +246,18 @@ fun rememberChamosEstados(
                     val sala = salaLeida ?: return@launch
                     launch {
                         // Cargar hacia atrás hasta cubrir las últimas 24 horas.
-                        repeat(8) {
-                            val mas = sala.liveTimeline.paginate(Timeline.PaginationDirection.BACKWARDS).getOrNull() ?: false
-                            val limiteP = System.currentTimeMillis() - CHAMOS_ESTADO_HORAS * 60 * 60 * 1000L
-                            val masViejo = entradasPorSala[id]?.minOfOrNull { it.timestamp }
-                            if (!mas || (masViejo != null && masViejo < limiteP)) return@launch
-                            delay(300)
+                        // paginate() devuelve true cuando YA llegó al principio de la sala (no "hay más").
+                        // Se sigue cargando hasta llegar al principio, porque cada página incluye también eventos
+                        // internos de la sala (miembros, permisos, etc.) y los estados quedaban sin cargar.
+                        delay(800)
+                        var vecesSeguidas = 0
+                        repeat(25) {
+                            val r = sala.liveTimeline.paginate(Timeline.PaginationDirection.BACKWARDS)
+                            val alInicio = r.getOrNull() == true
+                            if (alInicio) return@launch
+                            if (r.isFailure && !sala.liveTimeline.backwardPaginationStatus.value.hasMoreToLoad) return@launch
+                            vecesSeguidas++
+                            delay(if (r.isFailure) 800 else 300)
                         }
                     }
                     sala.liveTimeline.timelineItems.collect { items ->
