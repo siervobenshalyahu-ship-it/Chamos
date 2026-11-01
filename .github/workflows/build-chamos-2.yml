@@ -186,6 +186,9 @@ jobs:
       - name: Estilos (colores y fondos de chat)
         run: python3 chamos-repo/patches/estilos.py chamos chamos-repo/patches chamos-repo/assets/fondos
 
+      - name: Marco de neón, fondos propios y dictado por voz
+        run: python3 chamos-repo/patches/neon.py chamos chamos-repo/patches
+
       - name: Notificaciones push (Firebase) si ya están configuradas
         run: |
           if [ -f chamos-repo/firebase/google-services.json ] && [ -s chamos-repo/firebase/gateway-url.txt ]; then

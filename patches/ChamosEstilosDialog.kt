@@ -12,6 +12,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -21,6 +22,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Switch
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -41,7 +44,38 @@ fun ChamosEstilosDialog(onDismiss: () -> Unit) {
         title = { Text("Estilos") },
         text = {
             Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
-                Text("Colores", style = MaterialTheme.typography.titleSmall)
+                Text("Marco de luz de neón", style = MaterialTheme.typography.titleSmall)
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                    Text("Mostrar el marco", modifier = Modifier.weight(1f))
+                    Switch(checked = ChamosEstilo.marcoActivo, onCheckedChange = { ChamosEstilo.elegirMarcoActivo(it) })
+                }
+                if (ChamosEstilo.marcoActivo) {
+                    Row(modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        ChamosEstilo.neonNombres.forEachIndexed { i, nombre ->
+                            val color = ChamosEstilo.neonColores.getOrNull(i)
+                            Row(
+                                modifier = Modifier
+                                    .size(34.dp)
+                                    .clip(CircleShape)
+                                    .background(color ?: Color.Magenta)
+                                    .border(if (ChamosEstilo.marcoColor == i) 3.dp else 1.dp, MaterialTheme.colorScheme.onSurface, CircleShape)
+                                    .clickable { ChamosEstilo.elegirMarcoColor(i) },
+                            ) {}
+                        }
+                    }
+                    Text("Color: " + ChamosEstilo.neonNombres[ChamosEstilo.marcoColor.coerceIn(0, ChamosEstilo.neonNombres.lastIndex)], style = MaterialTheme.typography.bodySmall)
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                        Text("Luz en movimiento", modifier = Modifier.weight(1f))
+                        Switch(checked = ChamosEstilo.marcoMovimiento, onCheckedChange = { ChamosEstilo.elegirMarcoMovimiento(it) })
+                    }
+                    TextButton(onClick = { ChamosEstilo.elegirMarcoActivo(false) }) { Text("Quitar el marco") }
+                }
+                Text("Dictado por voz", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 12.dp))
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                    Text("Botón \"Dictar\" en los chats (hablas y se escribe solo)", modifier = Modifier.weight(1f))
+                    Switch(checked = ChamosEstilo.dictado, onCheckedChange = { ChamosEstilo.elegirDictado(it) })
+                }
+                Text("Colores", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 12.dp))
                 ChamosEstilo.paletas.forEachIndexed { i, p ->
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -64,19 +98,9 @@ fun ChamosEstilosDialog(onDismiss: () -> Unit) {
                         Text(p.nombre, modifier = Modifier.padding(start = 12.dp))
                     }
                 }
-                Text("Fondo del chat", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 16.dp))
-                ChamosEstilo.fondos.forEachIndexed { i, nombre ->
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Start,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { ChamosEstilo.elegirFondo(i) },
-                    ) {
-                        RadioButton(selected = ChamosEstilo.fondo == i, onClick = { ChamosEstilo.elegirFondo(i) })
-                        Text(nombre)
-                    }
-                }
+                Text("Fondo de los chats", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 16.dp))
+                Text("Dentro de cada chat, el botón de imagen de arriba cambia el fondo solo de ese chat.", style = MaterialTheme.typography.bodySmall)
+                ChamosFondoPanel(null)
                 val contexto = LocalContext.current
                 Text("Arreglar notificaciones (Xiaomi / Redmi)", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 16.dp))
                 TextButton(onClick = { abrirAjuste(contexto, notificacionesIntent(contexto)) }) { Text("1. Sonido y ventana emergente") }
