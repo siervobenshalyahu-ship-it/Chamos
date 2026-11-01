@@ -601,14 +601,6 @@ fun ChamosEstadosRow(
                 }
             }) { Text("Buscar actualización") }
         }
-        if (state != null && state.diagnostico.isNotEmpty()) {
-            Text(
-                text = state.diagnostico,
-                fontSize = 10.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 16.dp),
-            )
-        }
         LazyRow(
             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -673,6 +665,7 @@ fun ChamosEstadosRow(
             cargar = state.cargarArchivo,
             onVisto = state.marcarVisto,
             onBorrar = { e ->
+                visor = null
                 scope.launch {
                     val ok = state.borrar(e)
                     Toast.makeText(contexto, if (ok) "Estado borrado" else "No se pudo borrar", Toast.LENGTH_SHORT).show()
@@ -794,20 +787,20 @@ private fun EstadoCirculo(
         modifier = Modifier
             .clickable(onClick = onClick)
             .padding(4.dp)
-            .size(width = 68.dp, height = 90.dp),
+            .size(width = 84.dp, height = 108.dp),
     ) {
-        Box(contentAlignment = Alignment.Center, modifier = Modifier.size(62.dp).aroNeon(neon, tieneEstado, if (anillo) 1f else 0.5f, cargando)) {
+        Box(contentAlignment = Alignment.Center, modifier = Modifier.size(78.dp).aroNeon(neon, tieneEstado, if (anillo) 1f else 0.5f, cargando)) {
             Box(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier
-                    .size(60.dp)
+                    .size(76.dp)
                     .clip(CircleShape)
                     .padding(4.dp)
                     .clip(CircleShape)
                     .background(MaterialTheme.colorScheme.primaryContainer),
             ) {
                 if (avatar != null) {
-                    Avatar(avatarData = avatar, avatarType = AvatarType.User, forcedAvatarSize = 52.dp)
+                    Avatar(avatarData = avatar, avatarType = AvatarType.User, forcedAvatarSize = 68.dp)
                 } else {
                     Text(texto, fontSize = 24.sp, color = MaterialTheme.colorScheme.onPrimaryContainer)
                 }
@@ -1164,7 +1157,7 @@ private fun VisorEstados(
     val scope = rememberCoroutineScope()
     LaunchedEffect(estado.currentPage) {
         val (i, e) = paginas.getOrNull(estado.currentPage) ?: return@LaunchedEffect
-        if (e == items[i].entradas.lastIndex) onVisto(items[i])
+        if (i in items.indices && e == items[i].entradas.lastIndex) onVisto(items[i])
     }
     Dialog(
         onDismissRequest = { onCerrar() },
@@ -1185,7 +1178,8 @@ private fun VisorEstados(
                         rotationY = 90f * posicion.coerceIn(-1f, 1f)
                     },
             ) {
-                val (iItem, iEntrada) = paginas[pagina]
+                val (iItem, iEntrada) = paginas.getOrNull(pagina) ?: return@HorizontalPager
+                if (iItem !in items.indices) return@HorizontalPager
                 PaginaEstado(
                     item = items[iItem],
                     iEntrada = iEntrada,
