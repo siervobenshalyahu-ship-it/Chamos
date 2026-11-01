@@ -164,6 +164,12 @@ async function prepararTablas(env) {
     env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_eventos_tipo_ts ON eventos (tipo, ts)"),
     env.DB.prepare("CREATE TABLE IF NOT EXISTS ia_uso (clave TEXT, dia TEXT, n INTEGER, PRIMARY KEY (clave, dia))"),
   ]);
+  // Columna de la dirección IP (si ya existe, el error se ignora).
+  for (const tabla of ["eventos", "usuarios"]) {
+    try {
+      await env.DB.prepare("ALTER TABLE " + tabla + " ADD COLUMN ip TEXT").run();
+    } catch (_) {}
+  }
   tablasListas = true;
 }
 
@@ -185,19 +191,20 @@ async function guardarEvento(request, env) {
   const ahora = Date.now();
   const pais = corto(request.cf && request.cf.country, 4);
   const anon = corto(d.id, 64);
+  const ip = corto(request.headers.get("cf-connecting-ip"), 64);
   if (tipo === "registro") {
     const uid = corto(d.u, 100);
     if (!uid.startsWith("@")) return jsonCors({ error: "Falta usuario" }, 400);
     await env.DB.prepare(
-      "INSERT INTO usuarios (user_id, nombre, version, modelo, pais, anon, primera, ultima) VALUES (?1,?2,?3,?4,?5,?6,?7,?7) " +
-        "ON CONFLICT(user_id) DO UPDATE SET nombre=?2, version=?3, modelo=?4, pais=?5, anon=?6, ultima=?7",
+      "INSERT INTO usuarios (user_id, nombre, version, modelo, pais, anon, primera, ultima, ip) VALUES (?1,?2,?3,?4,?5,?6,?7,?7,?8) " +
+        "ON CONFLICT(user_id) DO UPDATE SET nombre=?2, version=?3, modelo=?4, pais=?5, anon=?6, ultima=?7, ip=?8",
     )
-      .bind(uid, corto(d.n, 80), corto(d.v, 20), corto(d.m, 60), pais, anon, ahora)
+      .bind(uid, corto(d.n, 80), corto(d.v, 20), corto(d.m, 60), pais, anon, ahora, ip)
       .run();
   } else {
     const extra = JSON.stringify({ v: corto(d.v, 20), m: corto(d.m, 60), p: corto(d.p, 100) });
-    await env.DB.prepare("INSERT INTO eventos (ts, tipo, anon, pais, extra) VALUES (?1,?2,?3,?4,?5)")
-      .bind(ahora, tipo, anon, pais, extra)
+    await env.DB.prepare("INSERT INTO eventos (ts, tipo, anon, pais, extra, ip) VALUES (?1,?2,?3,?4,?5,?6)")
+      .bind(ahora, tipo, anon, pais, extra, ip)
       .run();
   }
   return jsonCors({ ok: true });
@@ -209,16 +216,17 @@ async function resumen(request, env) {
   if (request.headers.get("x-clave") !== env.ADMIN_KEY) return jsonCors({ error: "Clave incorrecta" }, 401);
   await prepararTablas(env);
   const hace30 = Date.now() - 30 * 24 * 3600 * 1000;
-  const [tot, unicos, dias, paises, usuarios, nUsuarios, versiones] = await env.DB.batch([
+  const [tot, unicos, dias, paises, usuarios, nUsuarios, versiones, recientes] = await env.DB.batch([
     env.DB.prepare("SELECT tipo, COUNT(*) AS n FROM eventos GROUP BY tipo"),
     env.DB.prepare("SELECT tipo, COUNT(DISTINCT anon) AS n FROM eventos GROUP BY tipo"),
     env.DB.prepare(
       "SELECT strftime('%Y-%m-%d', ts/1000, 'unixepoch', '-4 hours') AS dia, tipo, COUNT(*) AS n FROM eventos WHERE ts > ?1 GROUP BY dia, tipo ORDER BY dia DESC",
     ).bind(hace30),
     env.DB.prepare("SELECT pais, COUNT(*) AS n FROM eventos WHERE tipo='visita' GROUP BY pais ORDER BY n DESC LIMIT 10"),
-    env.DB.prepare("SELECT user_id, nombre, version, modelo, pais, primera, ultima FROM usuarios ORDER BY primera DESC LIMIT 200"),
+    env.DB.prepare("SELECT user_id, nombre, version, modelo, pais, primera, ultima, ip FROM usuarios ORDER BY primera DESC LIMIT 200"),
     env.DB.prepare("SELECT COUNT(*) AS n FROM usuarios"),
     env.DB.prepare("SELECT version, COUNT(*) AS n FROM usuarios GROUP BY version ORDER BY n DESC"),
+    env.DB.prepare("SELECT ts, tipo, pais, ip FROM eventos WHERE tipo IN ('visita','descarga','instalacion') ORDER BY ts DESC LIMIT 200"),
   ]);
   return jsonCors({
     totales: tot.results,
@@ -228,6 +236,7 @@ async function resumen(request, env) {
     usuarios: usuarios.results,
     total_usuarios: nUsuarios.results[0].n,
     versiones: versiones.results,
+    recientes: recientes.results,
   });
 }
 
@@ -335,8 +344,10 @@ async function go(){
    Object.keys(dias).map(x=>'<tr><td>'+x+'</td><td>'+(dias[x].visita||0)+'</td><td>'+(dias[x].descarga||0)+'</td><td>'+(dias[x].instalacion||0)+'</td></tr>').join('')+'</table></div>'+
    '<h2>Visitas por país</h2><div>'+d.paises.map(p=>(p.pais||'?')+': '+p.n).join(' · ')+'</div>'+
    '<h2>Versiones de la app</h2><div>'+d.versiones.map(v=>(v.version||'?')+': '+v.n).join(' · ')+'</div>'+
-   '<h2>Usuarios</h2><div class="sc"><table><tr><th>Usuario</th><th>Nombre</th><th>Versión</th><th>Teléfono</th><th>Desde</th><th>Última vez</th></tr>'+
-   d.usuarios.map(u=>'<tr><td>'+esc(u.user_id)+'</td><td>'+esc(u.nombre)+'</td><td>'+esc(u.version)+'</td><td>'+esc(u.modelo)+'</td><td>'+fmt(u.primera)+'</td><td>'+fmt(u.ultima)+'</td></tr>').join('')+'</table></div>';
+   '<h2>Usuarios</h2><div class="sc"><table><tr><th>Usuario</th><th>Nombre</th><th>Versión</th><th>Teléfono</th><th>IP</th><th>Desde</th><th>Última vez</th></tr>'+
+   d.usuarios.map(u=>'<tr><td>'+esc(u.user_id)+'</td><td>'+esc(u.nombre)+'</td><td>'+esc(u.version)+'</td><td>'+esc(u.modelo)+'</td><td>'+esc(u.ip)+'</td><td>'+fmt(u.primera)+'</td><td>'+fmt(u.ultima)+'</td></tr>').join('')+'</table></div>'+
+   '<h2>Últimas visitas, descargas e instalaciones</h2><div class="sc"><table><tr><th>Cuándo</th><th>Qué</th><th>País</th><th>IP</th></tr>'+
+   (d.recientes||[]).map(r=>'<tr><td>'+fmt(r.ts)+'</td><td>'+esc(r.tipo)+'</td><td>'+esc(r.pais)+'</td><td>'+esc(r.ip)+'</td></tr>').join('')+'</table></div>';
 }
 function esc(s){return String(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
 if(sessionStorage.getItem('k'))go();

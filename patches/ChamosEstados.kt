@@ -461,7 +461,7 @@ fun ChamosEstadosRow(
             title = { Text("Tu privacidad") },
             text = {
                 Text(
-                    "Chamos guarda tu usuario, tu nombre, la versión de la app y el modelo de tu teléfono " +
+                    "Chamos guarda tu usuario, tu nombre, la versión de la app, el modelo de tu teléfono y tu dirección IP " +
                         "para saber cuántas personas usan la app y mejorarla. " +
                         "Nunca guarda tus mensajes, contraseñas ni claves.",
                 )
