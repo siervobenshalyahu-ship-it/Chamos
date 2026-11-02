@@ -102,6 +102,7 @@ data class ReelItem(
     val yoLike: Boolean,
     val comentarios: Int,
     val propio: Boolean,
+    val reportes: Int = 0,
 )
 
 data class ReelComentario(
@@ -127,6 +128,7 @@ data class ChamosReelsState(
     val meGusta: suspend (ReelItem) -> Unit = {},
     val comentar: suspend (ReelItem, String) -> Boolean = { _, _ -> false },
     val borrarComentario: suspend (ReelComentario) -> Boolean = { false },
+    val reportar: suspend (ReelItem, String) -> Boolean = { _, _ -> false },
     val enviarAChat: suspend (ReelItem, RoomId) -> Boolean = { _, _ -> false },
     val cargarArchivo: suspend (ReelItem) -> String? = { null },
 )
@@ -246,6 +248,7 @@ fun rememberChamosReels(
             sala.liveTimeline.timelineItems.collect { items ->
                 val lista = mutableListOf<ReelItem>()
                 val coment = mutableMapOf<String, MutableList<ReelComentario>>()
+                val reportesPor = mutableMapOf<String, MutableSet<String>>()
                 for (item in items) {
                     val ev = (item as? MatrixTimelineItem.Event)?.event ?: continue
                     val c = ev.content as? MessageContent ?: continue
@@ -276,8 +279,13 @@ fun rememberChamosReels(
                         is TextMessageType -> {
                             val resp = c.inReplyTo?.idRespondido()
                             if (resp != null) {
-                                coment.getOrPut(resp.value) { mutableListOf() }
-                                    .add(ReelComentario(eid, ev.timestamp, nombre, t.body, ev.isOwn))
+                                if (t.body.startsWith("\uD83D\uDEA9")) {
+                                    // Un reporte (🚩) de la comunidad: no es un comentario.
+                                    reportesPor.getOrPut(resp.value) { mutableSetOf() }.add(ev.sender.value)
+                                } else {
+                                    coment.getOrPut(resp.value) { mutableListOf() }
+                                        .add(ReelComentario(eid, ev.timestamp, nombre, t.body, ev.isOwn))
+                                }
                             }
                         }
                         else -> {}
@@ -285,7 +293,10 @@ fun rememberChamosReels(
                 }
                 val ordenados = coment.mapValues { e -> e.value.sortedBy { it.timestamp } }
                 comentarios = ordenados
-                reels = lista.map { it.copy(comentarios = ordenados[it.id]?.size ?: 0) }.sortedByDescending { it.timestamp }
+                reels = lista.map { it.copy(comentarios = ordenados[it.id]?.size ?: 0, reportes = reportesPor[it.id]?.size ?: 0) }
+                    // Con 3 o más reportes distintos el video se esconde para todos (menos su dueño y el administrador).
+                    .filter { it.reportes < 3 || it.propio || soyAdmin }
+                    .sortedByDescending { it.timestamp }
                 cargando = false
             }
         } catch (e: kotlinx.coroutines.CancellationException) {
@@ -343,6 +354,11 @@ fun rememberChamosReels(
         val sala = salaId?.let { client.getJoinedRoom(it) } ?: return@bc false
         runCatching { sala.liveTimeline.redactEvent(evento(c.id), "Comentario borrado").isSuccess }.getOrDefault(false)
     }
+    val reportar: suspend (ReelItem, String) -> Boolean = reporta@{ r, motivo ->
+        val sala = salaId?.let { client.getJoinedRoom(it) } ?: return@reporta false
+        runCatching { sala.reportContent(EventId(r.id), motivo, null) }
+        runCatching { sala.liveTimeline.replyMessage(EventId(r.id), "\uD83D\uDEA9 " + motivo, null, emptyList()).isSuccess }.getOrDefault(false)
+    }
     val enviarAChat: suspend (ReelItem, RoomId) -> Boolean = enviar@{ r, destino ->
         val sala = salaId?.let { client.getJoinedRoom(it) } ?: return@enviar false
         runCatching { sala.liveTimeline.forwardEvents(listOf(EventId(r.id)), listOf(destino)).isSuccess }.getOrDefault(false)
@@ -396,6 +412,7 @@ fun rememberChamosReels(
         meGusta = meGusta,
         comentar = comentar,
         borrarComentario = borrarComentario,
+        reportar = reportar,
         enviarAChat = enviarAChat,
         cargarArchivo = cargarArchivo,
     )
@@ -487,7 +504,7 @@ fun ChamosReelsPantalla(state: ChamosReelsState, onCerrar: () -> Unit) {
                     OutlinedTextField(
                         value = desc,
                         onValueChange = { desc = it.take(200) },
-                        placeholder = { Text("Escribe una descripción (opcional)") },
+                        placeholder = { Text("Cuéntales algo a los chamos (opcional)") },
                         modifier = Modifier.fillMaxWidth(),
                     )
                     Text("Máximo $REELS_LIMITE_MB MB. Se publica para toda la comunidad Chamos.", fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp))
@@ -513,6 +530,7 @@ private fun PaginaReel(reel: ReelItem, state: ChamosReelsState, activo: Boolean,
     var verComentarios by remember { mutableStateOf(false) }
     var compartir by remember { mutableStateOf(false) }
     var confirmarBorrar by remember { mutableStateOf(false) }
+    var reportando by remember { mutableStateOf(false) }
     var editando by remember { mutableStateOf(false) }
     var textoNuevo by remember { mutableStateOf("") }
 
@@ -546,7 +564,11 @@ private fun PaginaReel(reel: ReelItem, state: ChamosReelsState, activo: Boolean,
                 .background(Brush.verticalGradient(listOf(Color.Transparent, Color(0xCC000000))))
         )
 
-        // Autor y descripción
+        if (state.soyAdmin && reel.reportes > 0) {
+            Text("\uD83D\uDEA9 Reportado " + reel.reportes + (if (reel.reportes == 1) " vez" else " veces"), color = Color(0xFFFF8A80), fontWeight = FontWeight.Bold, fontSize = 14.sp,
+                modifier = Modifier.align(Alignment.TopStart).padding(start = 14.dp, top = 90.dp))
+        }
+        // Autor y lo que dice
         Column(Modifier.align(Alignment.BottomStart).padding(start = 14.dp, bottom = 40.dp, end = 90.dp)) {
             Text("@" + reel.autor, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 17.sp)
             if (reel.descripcion.isNotBlank()) {
@@ -573,22 +595,43 @@ private fun PaginaReel(reel: ReelItem, state: ChamosReelsState, activo: Boolean,
                 DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                     if (reel.propio) {
                         DropdownMenuItem(
-                            text = { Text("Editar descripción") },
+                            text = { Text("Cambiar lo que dice") },
                             onClick = { menu = false; textoNuevo = reel.descripcion; editando = true },
                         )
                     }
                     if (reel.propio || state.soyAdmin) {
                         DropdownMenuItem(text = { Text("Borrar video") }, onClick = { menu = false; confirmarBorrar = true })
                     }
-                    DropdownMenuItem(text = { Text("Guardar copia del enlace") }, onClick = {
-                        menu = false
-                        textoCompartido(contexto, reel)
-                    })
+                    if (!reel.propio) {
+                        DropdownMenuItem(text = { Text("Reportar este video") }, onClick = { menu = false; reportando = true })
+                    }
                 }
             }
         }
     }
 
+    if (reportando) {
+        val motivos = listOf("Contenido sexual", "Violencia o crueldad", "Acoso o insultos", "Estafa o spam", "Otro problema")
+        AlertDialog(
+            onDismissRequest = { reportando = false },
+            title = { Text("¿Qué pasa con este video?") },
+            text = {
+                Column {
+                    motivos.forEach { m ->
+                        Text(m, fontSize = 16.sp, modifier = Modifier.fillMaxWidth().clickable {
+                            reportando = false
+                            scope.launch {
+                                val ok = state.reportar(reel, m)
+                                Toast.makeText(contexto, if (ok) "Gracias, ya lo reportamos" else "No se pudo reportar", Toast.LENGTH_SHORT).show()
+                            }
+                        }.padding(vertical = 12.dp))
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = { TextButton(onClick = { reportando = false }) { Text("Cancelar") } },
+        )
+    }
     if (confirmarBorrar) {
         AlertDialog(
             onDismissRequest = { confirmarBorrar = false },
@@ -609,14 +652,14 @@ private fun PaginaReel(reel: ReelItem, state: ChamosReelsState, activo: Boolean,
     if (editando) {
         AlertDialog(
             onDismissRequest = { editando = false },
-            title = { Text("Editar descripción") },
+            title = { Text("Cambiar lo que dice") },
             text = { OutlinedTextField(value = textoNuevo, onValueChange = { textoNuevo = it.take(200) }, modifier = Modifier.fillMaxWidth()) },
             confirmButton = {
                 TextButton(onClick = {
                     editando = false
                     scope.launch {
                         val ok = state.editar(reel, textoNuevo.trim())
-                        Toast.makeText(contexto, if (ok) "Descripción editada" else "No se pudo editar", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(contexto, if (ok) "Listo, ya lo cambié" else "No se pudo editar", Toast.LENGTH_SHORT).show()
                     }
                 }) { Text("Guardar") }
             },

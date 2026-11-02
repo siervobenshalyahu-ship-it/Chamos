@@ -178,6 +178,58 @@
       ctx.fillStyle = "#1b1410"; ctx.beginPath(); ctx.ellipse(c.nariz.x, c.nariz.y, c.ancho * 0.09, c.ancho * 0.065, c.ang, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = "rgba(255,255,255,.5)"; ctx.beginPath(); ctx.ellipse(c.nariz.x - c.ancho * 0.03, c.nariz.y - c.ancho * 0.02, c.ancho * 0.025, c.ancho * 0.015, c.ang, 0, Math.PI * 2); ctx.fill();
     } },
+    { id: "conejo", n: "Conejito", e: "🐰", dibujar: function (ctx, c) {
+      sobre(ctx, c.frente.x, c.frente.y, c.ang, function () {
+        [-1, 1].forEach(function (s) {
+          ctx.save(); ctx.translate(s * c.ancho * 0.22, -c.alto * 0.42); ctx.rotate(s * 0.18);
+          ctx.fillStyle = "#f4f4f6"; ctx.strokeStyle = "#c9c9d3"; ctx.lineWidth = Math.max(2, c.ancho * 0.015);
+          ctx.beginPath(); ctx.ellipse(0, 0, c.ancho * 0.1, c.alto * 0.36, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+          ctx.fillStyle = "#f6a6c0"; ctx.beginPath(); ctx.ellipse(0, c.alto * 0.03, c.ancho * 0.05, c.alto * 0.26, 0, 0, Math.PI * 2); ctx.fill();
+          ctx.restore();
+        });
+      });
+      ctx.fillStyle = "#f08fb0"; ctx.beginPath(); ctx.ellipse(c.nariz.x, c.nariz.y, c.ancho * 0.05, c.ancho * 0.037, c.ang, 0, Math.PI * 2); ctx.fill();
+    } },
+    { id: "corazones", n: "Lentes de corazón", e: "😍", dibujar: function (ctx, c) {
+      var d = dist(c.izq, c.der), s = d * 0.5;
+      sobre(ctx, c.ojos.x, c.ojos.y, c.ang, function () {
+        [-d / 2, d / 2].forEach(function (x) {
+          ctx.fillStyle = "rgba(255,45,111,.88)"; ctx.strokeStyle = "#a3123d"; ctx.lineWidth = Math.max(2, d * 0.04);
+          ctx.beginPath(); ctx.moveTo(x, s * 0.4);
+          ctx.bezierCurveTo(x - s, -s * 0.15, x - s * 0.55, -s * 0.95, x, -s * 0.38);
+          ctx.bezierCurveTo(x + s * 0.55, -s * 0.95, x + s, -s * 0.15, x, s * 0.4);
+          ctx.closePath(); ctx.fill(); ctx.stroke();
+          ctx.fillStyle = "rgba(255,255,255,.45)"; ctx.beginPath(); ctx.ellipse(x - s * 0.33, -s * 0.3, s * 0.14, s * 0.08, -0.6, 0, Math.PI * 2); ctx.fill();
+        });
+      });
+    } },
+    { id: "llanero", n: "Sombrero llanero", e: "🤠", dibujar: function (ctx, c) {
+      sobre(ctx, c.frente.x, c.frente.y + c.alto * 0.04, c.ang, function () {
+        var br = c.ancho * 0.78;
+        ctx.fillStyle = "#c9a15a"; ctx.strokeStyle = "#7a5a22"; ctx.lineWidth = Math.max(2, c.ancho * 0.015);
+        ctx.beginPath(); ctx.ellipse(0, 0, br, c.alto * 0.11, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(-c.ancho * 0.4, -c.alto * 0.02);
+        ctx.bezierCurveTo(-c.ancho * 0.42, -c.alto * 0.42, c.ancho * 0.42, -c.alto * 0.42, c.ancho * 0.4, -c.alto * 0.02);
+        ctx.closePath(); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = "#4a2d12"; ctx.fillRect(-c.ancho * 0.405, -c.alto * 0.1, c.ancho * 0.81, c.alto * 0.07);
+      });
+    } },
+    { id: "gatico", n: "Gatico", e: "🐱", dibujar: function (ctx, c) {
+      sobre(ctx, c.frente.x, c.frente.y, c.ang, function () {
+        [-1, 1].forEach(function (s) {
+          ctx.fillStyle = "#6e6e78"; ctx.strokeStyle = "#3b3b44"; ctx.lineWidth = Math.max(2, c.ancho * 0.015);
+          ctx.beginPath(); ctx.moveTo(s * c.ancho * 0.12, -c.alto * 0.02); ctx.lineTo(s * c.ancho * 0.4, -c.alto * 0.4); ctx.lineTo(s * c.ancho * 0.46, c.alto * 0.04); ctx.closePath(); ctx.fill(); ctx.stroke();
+          ctx.fillStyle = "#f6a6c0"; ctx.beginPath(); ctx.moveTo(s * c.ancho * 0.22, -c.alto * 0.04); ctx.lineTo(s * c.ancho * 0.37, -c.alto * 0.27); ctx.lineTo(s * c.ancho * 0.41, c.alto * 0.02); ctx.closePath(); ctx.fill();
+        });
+      });
+      ctx.fillStyle = "#f08fb0"; ctx.beginPath(); ctx.ellipse(c.nariz.x, c.nariz.y, c.ancho * 0.045, c.ancho * 0.034, c.ang, 0, Math.PI * 2); ctx.fill();
+      sobre(ctx, c.nariz.x, c.nariz.y, c.ang, function () {
+        ctx.strokeStyle = "rgba(255,255,255,.85)"; ctx.lineWidth = Math.max(1.5, c.ancho * 0.008);
+        [-1, 1].forEach(function (s) { [-0.06, 0.02, 0.1].forEach(function (dy) {
+          ctx.beginPath(); ctx.moveTo(s * c.ancho * 0.1, c.ancho * dy * 0.6); ctx.lineTo(s * c.ancho * 0.42, c.ancho * (dy * 1.6 - 0.02)); ctx.stroke();
+        }); });
+      });
+    } },
     { id: "payaso", n: "Payaso", e: "🤡", dibujar: function (ctx, c) {
       sobre(ctx, c.frente.x, c.frente.y, c.ang, function () {
         ["#ff7a1a", "#2fb5ff"].forEach(function (col, i) {
@@ -347,8 +399,49 @@
     ".fila{display:flex;gap:8px;flex-wrap:wrap}",
     ".fila button{padding:9px 12px;border-radius:10px;border:0;background:#1b2543;color:#fff;font-weight:700;font-size:13px}",
     ".fila button.on{background:#f4b54a;color:#1a1205}",
-    ".fila .peg{font-size:22px;padding:6px 10px}"
+    ".fila .peg{font-size:22px;padding:6px 10px}",
+    ".lnom{text-align:center;font-weight:800;font-size:15px;margin:0 0 2px;color:#f4b54a}",
+    ".car{position:relative;display:flex;gap:16px;align-items:center;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;padding:16px calc(50% - 34px);scrollbar-width:none;-webkit-overflow-scrolling:touch}",
+    ".car::-webkit-scrollbar{display:none}",
+    ".lente{flex:0 0 68px;width:68px;height:68px;border-radius:50%;border:3px solid rgba(255,255,255,.55);background:#1b2543;font-size:32px;line-height:1;padding:0;scroll-snap-align:center;transition:transform .15s,border-color .15s,box-shadow .15s}",
+    ".lente.on{transform:scale(1.28);border-color:#f4b54a;box-shadow:0 0 16px rgba(244,181,74,.85)}"
   ].join("");
+
+  function nombreCara() {
+    for (var i = 0; i < CARAS.length; i++) if (CARAS[i].id === estado.cara) return CARAS[i].n;
+    return "Sin filtro";
+  }
+  function centrarCarrusel(suave) {
+    if (!raiz) return;
+    var car = raiz.getElementById("car"), it = raiz.querySelector(".lente.on");
+    if (!car || !it) return;
+    var x = it.offsetLeft + it.offsetWidth / 2 - car.clientWidth / 2;
+    if (suave && car.scrollTo) car.scrollTo({ left: x, behavior: "smooth" }); else car.scrollLeft = x;
+  }
+  function elegirCara(id) {
+    if (estado.cara === id) return;
+    estado.cara = id;
+    if (id !== "ninguna") cargarDetector();
+    guardar();
+    var lente = raiz.querySelectorAll(".lente");
+    for (var i = 0; i < lente.length; i++) lente[i].classList.toggle("on", lente[i].dataset.cara === id);
+    var n = raiz.getElementById("lnom"); if (n) n.textContent = nombreCara();
+  }
+  var temporizador = null;
+  function alDeslizar() {
+    clearTimeout(temporizador);
+    temporizador = setTimeout(function () {
+      var car = raiz && raiz.getElementById("car");
+      if (!car) return;
+      var centro = car.scrollLeft + car.clientWidth / 2, mejor = null, dmin = 1e9;
+      var lente = car.querySelectorAll(".lente");
+      for (var i = 0; i < lente.length; i++) {
+        var d = Math.abs(lente[i].offsetLeft + lente[i].offsetWidth / 2 - centro);
+        if (d < dmin) { dmin = d; mejor = lente[i]; }
+      }
+      if (mejor) elegirCara(mejor.dataset.cara);
+    }, 90);
+  }
 
   function esc(t) { return String(t).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
 
@@ -366,9 +459,11 @@
     } else if (pestana === "caras") {
       if (lmEstado === "cargando") h += '<p class="nota">Cargando el detector de caras…</p>';
       if (lmEstado === "fallo") h += '<p class="nota">Los filtros de cara no están disponibles en esta versión o en este teléfono. Los filtros de color y los memes sí funcionan.</p>';
-      h += '<div class="grid">' + CARAS.map(function (f) {
-        return '<button class="it ' + (estado.cara === f.id ? "on" : "") + '" data-cara="' + f.id + '"' + (f.id !== "ninguna" && lmEstado === "fallo" ? " disabled" : "") + "><b>" + f.e + "</b>" + esc(f.n) + "</button>";
+      h += '<p class="lnom" id="lnom">' + esc(nombreCara()) + "</p>";
+      h += '<div class="car" id="car">' + CARAS.map(function (f) {
+        return '<button class="lente ' + (estado.cara === f.id ? "on" : "") + '" data-cara="' + f.id + '" aria-label="' + esc(f.n) + '">' + f.e + "</button>";
       }).join("") + "</div>";
+      h += '<p class="nota" style="text-align:center">Desliza de lado a lado y deja el efecto en el centro</p>';
     } else {
       h += '<div class="grid">' + MEMES.map(function (m, i) {
         return '<button class="it" data-meme="' + i + '"><b>' + (m.p || "💬") + "</b>" + esc(m.n) + "</button>";
@@ -391,6 +486,7 @@
     raiz.innerHTML = "<style>" + CSS + "</style>" + html();
     if (va !== null && raiz.getElementById("ta")) { raiz.getElementById("ta").value = va; raiz.getElementById("tb").value = vb; }
     if (raiz.getElementById("panel")) raiz.getElementById("panel").scrollTop = arriba;
+    centrarCarrusel(false);
   }
 
   function clic(e) {
@@ -400,7 +496,7 @@
     if (t.id === "fab") { abierto = !abierto; refrescarUI(); return; }
     if (t.dataset.tab) { pestana = t.dataset.tab; if (pestana === "caras") cargarDetector(); refrescarUI(); return; }
     if (t.dataset.filtro) { estado.filtro = t.dataset.filtro; guardar(); }
-    else if (t.dataset.cara) { estado.cara = t.dataset.cara; if (estado.cara !== "ninguna") cargarDetector(); guardar(); }
+    else if (t.dataset.cara) { elegirCara(t.dataset.cara); centrarCarrusel(true); return; }
     else if (t.dataset.meme) { var m = MEMES[+t.dataset.meme]; estado.arriba = m.a; estado.abajo = m.b; if (m.p) estado.pegatina = m.p; }
     else if (t.dataset.peg) { estado.pegatina = estado.pegatina === t.dataset.peg ? "" : t.dataset.peg; }
     else if (t.id === "poner") { estado.arriba = raiz.getElementById("ta").value.slice(0, 40); estado.abajo = raiz.getElementById("tb").value.slice(0, 40); }
@@ -419,6 +515,7 @@
         raiz.addEventListener(n, function (e) { e.stopPropagation(); }, { passive: true });
       });
       raiz.addEventListener("click", clic);
+      raiz.addEventListener("scroll", alDeslizar, true);
       refrescarUI();
       document.documentElement.appendChild(host);
     };
