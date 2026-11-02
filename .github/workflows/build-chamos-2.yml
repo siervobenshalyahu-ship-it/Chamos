@@ -212,6 +212,9 @@ jobs:
       - name: Vincular número de teléfono (Chamos Cuentas)
         run: python3 chamos-repo/patches/numero.py chamos chamos-repo/patches "$(head -n1 chamos-repo/cuentas/servicio-url.txt 2>/dev/null || true)"
 
+      - name: Ajustes de pantalla (stickers pequeños, barra de abajo)
+        run: python3 chamos-repo/patches/ajustes_ui.py chamos
+
       - name: Notificaciones push (Firebase) si ya están configuradas
         run: |
           if [ -f chamos-repo/firebase/google-services.json ] && [ -s chamos-repo/firebase/gateway-url.txt ]; then
