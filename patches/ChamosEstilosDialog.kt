@@ -75,6 +75,26 @@ fun ChamosEstilosDialog(onDismiss: () -> Unit) {
                     Text("Botón \"Dictar\" en los chats (hablas y se escribe solo)", modifier = Modifier.weight(1f))
                     Switch(checked = ChamosEstilo.dictado, onCheckedChange = { ChamosEstilo.elegirDictado(it) })
                 }
+                Text("Tipo de letra", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 12.dp))
+                ChamosEstilo.fuentes.forEachIndexed { i, nombre ->
+                    val previa = when (i) {
+                        1 -> androidx.compose.ui.text.font.FontFamily.Serif
+                        2 -> androidx.compose.ui.text.font.FontFamily.Monospace
+                        3 -> androidx.compose.ui.text.font.FontFamily.Cursive
+                        4 -> androidx.compose.ui.text.font.FontFamily(androidx.compose.ui.text.font.Typeface(android.graphics.Typeface.create("casual", android.graphics.Typeface.NORMAL)))
+                        5 -> androidx.compose.ui.text.font.FontFamily(androidx.compose.ui.text.font.Typeface(android.graphics.Typeface.create("sans-serif-condensed", android.graphics.Typeface.NORMAL)))
+                        6 -> androidx.compose.ui.text.font.FontFamily(androidx.compose.ui.text.font.Typeface(android.graphics.Typeface.create("sans-serif-light", android.graphics.Typeface.NORMAL)))
+                        7 -> androidx.compose.ui.text.font.FontFamily(androidx.compose.ui.text.font.Typeface(android.graphics.Typeface.create("sans-serif-black", android.graphics.Typeface.NORMAL)))
+                        else -> androidx.compose.ui.text.font.FontFamily.Default
+                    }
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth().clickable { ChamosEstilo.elegirFuente(i) }.padding(vertical = 4.dp),
+                    ) {
+                        RadioButton(selected = ChamosEstilo.fuente == i, onClick = { ChamosEstilo.elegirFuente(i) })
+                        Text("$nombre: Épale chamo, ¿qué más?", fontFamily = previa, modifier = Modifier.padding(start = 6.dp))
+                    }
+                }
                 Text("Colores", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 12.dp))
                 ChamosEstilo.paletas.forEachIndexed { i, p ->
                     Row(

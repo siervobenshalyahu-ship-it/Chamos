@@ -192,6 +192,9 @@ jobs:
       - name: Marco de neón, fondos propios y dictado por voz
         run: python3 chamos-repo/patches/neon.py chamos chamos-repo/patches
 
+      - name: Fuentes y stickers
+        run: python3 chamos-repo/patches/fuentes_stickers.py chamos chamos-repo/patches
+
       - name: Descargar el detector de caras (MediaPipe)
         continue-on-error: true
         run: |

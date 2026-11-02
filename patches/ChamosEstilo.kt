@@ -8,6 +8,7 @@ import android.graphics.Matrix
 import android.net.Uri
 import java.io.File
 import androidx.compose.material3.ColorScheme
+import androidx.compose.material3.Typography
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
@@ -15,6 +16,8 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.Typeface
 import io.element.android.compound.tokens.generated.SemanticColors
 
 /** Estilos personalizables de Chamos: paleta de colores y fondo del chat. */
@@ -36,6 +39,44 @@ object ChamosEstilo {
         "Sin fondo", "Salto Ángel", "Roraima", "Los Roques", "El Ávila",
         "Médanos de Coro", "Teleférico de Mérida", "Cómic antiguo", "Estilo anime", "Ciudad de héroes",
     )
+
+    /** Fuentes (letras) del sistema Android: no pesan nada y cambian toda la app y los mensajes. */
+    val fuentes = listOf("Normal", "Elegante", "Máquina de escribir", "Manuscrita", "Casual (cómic)", "Condensada", "Delgada", "Gruesa")
+
+    var fuente by mutableIntStateOf(0)
+        private set
+
+    val familia: FontFamily
+        get() = when (fuente) {
+            1 -> FontFamily.Serif
+            2 -> FontFamily.Monospace
+            3 -> FontFamily.Cursive
+            4 -> FontFamily(Typeface(android.graphics.Typeface.create("casual", android.graphics.Typeface.NORMAL)))
+            5 -> FontFamily(Typeface(android.graphics.Typeface.create("sans-serif-condensed", android.graphics.Typeface.NORMAL)))
+            6 -> FontFamily(Typeface(android.graphics.Typeface.create("sans-serif-light", android.graphics.Typeface.NORMAL)))
+            7 -> FontFamily(Typeface(android.graphics.Typeface.create("sans-serif-black", android.graphics.Typeface.NORMAL)))
+            else -> FontFamily.Default
+        }
+
+    /** Aplica la fuente elegida a todos los estilos de texto de Material. */
+    fun tipografia(t: Typography): Typography {
+        val f = familia
+        return t.copy(
+            displayLarge = t.displayLarge.copy(fontFamily = f), displayMedium = t.displayMedium.copy(fontFamily = f),
+            displaySmall = t.displaySmall.copy(fontFamily = f), headlineLarge = t.headlineLarge.copy(fontFamily = f),
+            headlineMedium = t.headlineMedium.copy(fontFamily = f), headlineSmall = t.headlineSmall.copy(fontFamily = f),
+            titleLarge = t.titleLarge.copy(fontFamily = f), titleMedium = t.titleMedium.copy(fontFamily = f),
+            titleSmall = t.titleSmall.copy(fontFamily = f), bodyLarge = t.bodyLarge.copy(fontFamily = f),
+            bodyMedium = t.bodyMedium.copy(fontFamily = f), bodySmall = t.bodySmall.copy(fontFamily = f),
+            labelLarge = t.labelLarge.copy(fontFamily = f), labelMedium = t.labelMedium.copy(fontFamily = f),
+            labelSmall = t.labelSmall.copy(fontFamily = f),
+        )
+    }
+
+    fun elegirFuente(i: Int) {
+        fuente = i.coerceIn(0, fuentes.lastIndex)
+        prefs?.edit()?.putInt("fuente", fuente)?.apply()
+    }
 
     var paleta by mutableIntStateOf(0)
         private set
@@ -74,6 +115,7 @@ object ChamosEstilo {
         prefs = p
         paleta = p.getInt("paleta", 0).coerceIn(0, paletas.lastIndex)
         fondo = p.getInt("fondo", 0).coerceIn(0, fondos.lastIndex)
+        fuente = p.getInt("fuente", 0).coerceIn(0, fuentes.lastIndex)
         marcoActivo = p.getBoolean("marco", true)
         marcoColor = p.getInt("marcoColor", 0).coerceIn(0, neonColores.size)
         marcoMovimiento = p.getBoolean("marcoMov", true)
