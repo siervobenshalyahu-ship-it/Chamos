@@ -34,9 +34,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
@@ -293,29 +293,34 @@ fun ChamosStickersPanel(onEnviar: (Uri) -> Unit, onCerrar: () -> Unit) {
         if (ChamosStickersStore.lista.isEmpty()) {
             Text("No tienes stickers. Crea uno con + Foto o + Texto.", color = ElementTheme.colors.textSecondary, fontSize = 13.sp)
         }
-        LazyVerticalGrid(
-            columns = GridCells.Adaptive(76.dp),
-            modifier = Modifier.fillMaxWidth().heightIn(max = 230.dp),
-        ) {
-            items(ChamosStickersStore.lista.toList(), key = { it }) { nombre ->
-                val imagen by produceState<ImageBitmap?>(null, nombre) {
-                    value = withContext(Dispatchers.IO) { ChamosStickersStore.cargarBitmap(contexto, nombre)?.asImageBitmap() }
-                }
-                Box(
-                    modifier = Modifier
-                        .size(76.dp)
-                        .padding(3.dp)
-                        .combinedClickable(
-                            onClick = {
-                                scope.launch {
-                                    val uri = withContext(Dispatchers.IO) { ChamosStickersStore.uriDe(contexto, nombre) }
-                                    onEnviar(uri)
-                                }
-                            },
-                            onLongClick = { porBorrar = nombre },
-                        ),
-                ) {
-                    imagen?.let { Image(bitmap = it, contentDescription = "Sticker", modifier = Modifier.fillMaxSize()) }
+        // Filas normales (no LazyVerticalGrid): el cuadro de escribir del chat mide su altura de antemano
+        // y las listas perezosas no lo permiten.
+        Column(modifier = Modifier.fillMaxWidth().heightIn(max = 230.dp).verticalScroll(rememberScrollState())) {
+            ChamosStickersStore.lista.toList().chunked(4).forEach { fila ->
+                Row(modifier = Modifier.fillMaxWidth()) {
+                    fila.forEach { nombre ->
+                        val imagen by produceState<ImageBitmap?>(null, nombre) {
+                            value = withContext(Dispatchers.IO) { ChamosStickersStore.cargarBitmap(contexto, nombre)?.asImageBitmap() }
+                        }
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .aspectRatio(1f)
+                                .padding(3.dp)
+                                .combinedClickable(
+                                    onClick = {
+                                        scope.launch {
+                                            val uri = withContext(Dispatchers.IO) { ChamosStickersStore.uriDe(contexto, nombre) }
+                                            onEnviar(uri)
+                                        }
+                                    },
+                                    onLongClick = { porBorrar = nombre },
+                                ),
+                        ) {
+                            imagen?.let { Image(bitmap = it, contentDescription = "Sticker", modifier = Modifier.fillMaxSize()) }
+                        }
+                    }
+                    repeat(4 - fila.size) { Spacer(modifier = Modifier.weight(1f)) }
                 }
             }
         }
