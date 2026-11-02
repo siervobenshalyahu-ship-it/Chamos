@@ -428,29 +428,36 @@ fun ChamosReelsPantalla(state: ChamosReelsState, onCerrar: () -> Unit) {
     val scope = rememberCoroutineScope()
     var subiendo by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { state.activar() }
+    var intro by remember { mutableStateOf(true) }
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(2200)
+        intro = false
+    }
 
     Dialog(
         onDismissRequest = onCerrar,
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
     ) {
         Box(Modifier.fillMaxSize().background(Color.Black)) {
-            if (state.reels.isEmpty()) {
+            if (state.reels.isEmpty() || intro) {
                 Column(
                     modifier = Modifier.fillMaxSize().padding(32.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center,
                 ) {
-                    Text("🎬", fontSize = 56.sp)
-                    Text(
-                        text = when {
-                            state.mensaje.isNotEmpty() -> state.mensaje
-                            state.cargando -> "Cargando videos…"
-                            else -> "Todavía no hay videos. ¡Sube el primero!"
-                        },
-                        color = Color.White,
-                        fontSize = 16.sp,
-                        modifier = Modifier.padding(top = 12.dp),
-                    )
+                    ChamosReelNeon()
+                    if (state.reels.isEmpty()) {
+                        Text(
+                            text = when {
+                                state.mensaje.isNotEmpty() -> state.mensaje
+                                state.cargando -> "Cargando videos…"
+                                else -> "Todavía no hay videos. ¡Sube el primero!"
+                            },
+                            color = Color.White,
+                            fontSize = 16.sp,
+                            modifier = Modifier.padding(top = 32.dp),
+                        )
+                    }
                 }
             } else {
                 val pager = rememberPagerState { state.reels.size }
@@ -476,7 +483,7 @@ fun ChamosReelsPantalla(state: ChamosReelsState, onCerrar: () -> Unit) {
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text("✕", color = Color.White, fontSize = 26.sp, modifier = Modifier.clickable { onCerrar() }.padding(8.dp))
-                Text("Reels", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                if (state.reels.isEmpty() || intro) Text("", fontSize = 18.sp) else Text("Reels", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
                 Text("＋", color = Color.White, fontSize = 30.sp, modifier = Modifier.clickable { subiendo = true }.padding(8.dp))
             }
         }
@@ -781,4 +788,47 @@ private fun CompartirDialogo(reel: ReelItem, state: ChamosReelsState, onCerrar: 
         confirmButton = {},
         dismissButton = { TextButton(onClick = onCerrar) { Text("Cerrar") } },
     )
+}
+
+private val NEON_REEL = listOf(
+    Color(0xFF00E5FF), Color(0xFFFF2D95), Color(0xFFB6FF00), Color(0xFFFF9100),
+    Color(0xFFB388FF), Color(0xFFFFEA00), Color(0xFF00FF9C), Color(0xFFFF4D4D),
+)
+
+/** "CHAMOS REEL" en letras de neón: cada letra va cambiando de color, con brillo, sobre fondo negro. */
+@Composable
+private fun ChamosReelNeon() {
+    var paso by remember { mutableStateOf(0) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            kotlinx.coroutines.delay(650)
+            paso++
+        }
+    }
+    @Composable
+    fun Linea(texto: String, tam: Int, desfase: Int) {
+        Row(horizontalArrangement = Arrangement.Center) {
+            texto.forEachIndexed { i, letra ->
+                val objetivo = NEON_REEL[(i + desfase + paso) % NEON_REEL.size]
+                val color by androidx.compose.animation.animateColorAsState(objetivo, androidx.compose.animation.core.tween(600), label = "neon")
+                Text(
+                    text = letra.toString(),
+                    color = color,
+                    fontSize = tam.sp,
+                    fontWeight = FontWeight.Black,
+                    style = androidx.compose.ui.text.TextStyle(
+                        color = color,
+                        fontSize = tam.sp,
+                        fontWeight = FontWeight.Black,
+                        shadow = androidx.compose.ui.graphics.Shadow(color = color, offset = androidx.compose.ui.geometry.Offset.Zero, blurRadius = 34f),
+                    ),
+                    modifier = Modifier.padding(horizontal = 2.dp),
+                )
+            }
+        }
+    }
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Linea("CHAMOS", 54, 0)
+        Linea("REEL", 54, 3)
+    }
 }
