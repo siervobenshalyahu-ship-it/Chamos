@@ -183,6 +183,9 @@ jobs:
       - name: Pantalla principal con Estados
         run: python3 chamos-repo/patches/home_estados.py chamos chamos-repo/patches/ChamosEstados.kt
 
+      - name: Reels (videos verticales)
+        run: python3 chamos-repo/patches/reels.py chamos chamos-repo/patches
+
       - name: Estilos (colores y fondos de chat)
         run: python3 chamos-repo/patches/estilos.py chamos chamos-repo/patches chamos-repo/assets/fondos
 

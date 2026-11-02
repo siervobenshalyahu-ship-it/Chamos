@@ -1231,10 +1231,11 @@ private fun VisorEstados(
  * Un error NUNCA salta al siguiente de golpe: muestra un aviso y avanza a los 3 segundos.
  */
 @Composable
-private fun VideoTextura(
+internal fun VideoTextura(
     ruta: String,
     activo: Boolean,
     pausa: Boolean = false,
+    repetir: Boolean = false,
     onProgreso: (Float) -> Unit,
     onFin: () -> Unit,
 ) {
@@ -1279,6 +1280,7 @@ private fun VideoTextura(
             try {
                 val listo = kotlinx.coroutines.CompletableDeferred<Boolean>()
                 mp.setDataSource(ruta)
+                mp.isLooping = repetir
                 mp.setSurface(pantalla)
                 mp.setOnVideoSizeChangedListener { _, vw, vh ->
                     val tv = vista.value
