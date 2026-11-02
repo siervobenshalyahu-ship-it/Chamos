@@ -151,6 +151,33 @@ const CORS = {
 const jsonCors = (obj, status = 200) =>
   new Response(JSON.stringify(obj), { status, headers: { "content-type": "application/json", ...CORS } });
 
+// Partidas de la videollamada (la vieja, ahorcado, parchís): el estado se guarda por sala y versión.
+async function juego(request, env, url) {
+  await prepararTablas(env);
+  let sala = "";
+  try { sala = decodeURIComponent(url.pathname.slice(7)); } catch (_) {}
+  sala = sala.slice(0, 120);
+  if (!sala) return jsonCors({ error: "Falta la sala" }, 400);
+  const leer = async () => {
+    const r = await env.DB.prepare("SELECT v, estado FROM juegos WHERE sala = ?").bind(sala).first();
+    return r ? { v: r.v, estado: JSON.parse(r.estado) } : { v: 0, estado: null };
+  };
+  if (request.method === "GET") return jsonCors(await leer());
+  if (request.method !== "POST") return jsonCors({ error: "Usa GET o POST" }, 405);
+  const texto = await request.text();
+  if (texto.length > 4000) return jsonCors({ error: "Demasiado grande" }, 413);
+  const b = JSON.parse(texto);
+  const v = Number(b.v) || 0;
+  const ahora = Date.now();
+  await env.DB.prepare(
+    "INSERT INTO juegos (sala, v, estado, ts) VALUES (?, ?, ?, ?) ON CONFLICT(sala) DO UPDATE SET v = excluded.v, estado = excluded.estado, ts = excluded.ts WHERE juegos.v < excluded.v",
+  ).bind(sala, v, JSON.stringify(b.estado), ahora).run();
+  const actual = await leer();
+  if (Math.random() < 0.02) await env.DB.prepare("DELETE FROM juegos WHERE ts < ?").bind(ahora - 24 * 3600 * 1000).run();
+  if (actual.v !== v) return jsonCors({ ...actual, rechazado: true });
+  return jsonCors({ v });
+}
+
 let tablasListas = false;
 async function prepararTablas(env) {
   if (tablasListas) return;
@@ -163,6 +190,7 @@ async function prepararTablas(env) {
     ),
     env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_eventos_tipo_ts ON eventos (tipo, ts)"),
     env.DB.prepare("CREATE TABLE IF NOT EXISTS ia_uso (clave TEXT, dia TEXT, n INTEGER, PRIMARY KEY (clave, dia))"),
+    env.DB.prepare("CREATE TABLE IF NOT EXISTS juegos (sala TEXT PRIMARY KEY, v INTEGER, estado TEXT, ts INTEGER)"),
   ]);
   // Columna de la dirección IP (si ya existe, el error se ignora).
   for (const tabla of ["eventos", "usuarios"]) {
@@ -367,6 +395,14 @@ export default {
     if (url.pathname === "/e" && request.method === "POST") {
       try {
         return await guardarEvento(request, env);
+      } catch (e) {
+        console.error(e);
+        return jsonCors({ error: String(e.message || e) }, 500);
+      }
+    }
+    if (url.pathname.startsWith("/juego/")) {
+      try {
+        return await juego(request, env, url);
       } catch (e) {
         console.error(e);
         return jsonCors({ error: String(e.message || e) }, 500);

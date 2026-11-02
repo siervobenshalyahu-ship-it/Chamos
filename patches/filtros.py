@@ -16,6 +16,7 @@ def edit(path, pairs):
 assets = os.path.join(root, "app/src/main/assets/chamos")
 os.makedirs(assets, exist_ok=True)
 shutil.copy(os.path.join(pdir, "chamos-filtros.js"), os.path.join(assets, "filtros.js"))
+shutil.copy(os.path.join(pdir, "chamos-juegos.js"), os.path.join(assets, "juegos.js"))
 caras = False
 if mp and os.path.isfile(os.path.join(mp, "vision_bundle.cjs")) and os.path.isfile(os.path.join(mp, "face_landmarker.task")):
     shutil.copytree(mp, os.path.join(assets, "mediapipe"), dirs_exist_ok=True)
@@ -27,11 +28,13 @@ edit(os.path.join(root, "features/call/impl/src/main/kotlin/io/element/android/f
      "                super.onPageStarted(view, url, favicon)\n"
      "\n"
      "                // Chamos: filtros de cámara, caras y memes.\n"
-     "                try {\n"
-     "                    val chamosFiltros = view.context.assets.open(\"chamos/filtros.js\").bufferedReader().use { it.readText() }\n"
-     "                    view.evaluateJavascript(chamosFiltros, null)\n"
-     "                } catch (e: Exception) {\n"
-     "                    android.util.Log.w(\"Chamos\", \"Filtros de video no disponibles\", e)\n"
+     "                for (chamosArchivo in listOf(\"filtros.js\", \"juegos.js\")) {\n"
+     "                    try {\n"
+     "                        val chamosJs = view.context.assets.open(\"chamos/\" + chamosArchivo).bufferedReader().use { it.readText() }\n"
+     "                        view.evaluateJavascript(chamosJs, null)\n"
+     "                    } catch (e: Exception) {\n"
+     "                        android.util.Log.w(\"Chamos\", \"Script de llamada no disponible: \" + chamosArchivo, e)\n"
+     "                    }\n"
      "                }\n"),
 ])
 # 3) además se registra como script de inicio de documento: corre antes que Element Call, sin depender de onPageStarted
@@ -39,8 +42,10 @@ edit(os.path.join(root, "features/call/impl/src/main/kotlin/io/element/android/f
     ("        webView.webViewClient = object : WebViewClient() {\n",
      "        try {\n"
      "            if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {\n"
-     "                val chamosJs = webView.context.assets.open(\"chamos/filtros.js\").bufferedReader().use { it.readText() }\n"
-     "                androidx.webkit.WebViewCompat.addDocumentStartJavaScript(webView, chamosJs, setOf(\"https://appassets.androidplatform.net\"))\n"
+     "                for (chamosArchivo in listOf(\"filtros.js\", \"juegos.js\")) {\n"
+     "                    val chamosJs = webView.context.assets.open(\"chamos/\" + chamosArchivo).bufferedReader().use { it.readText() }\n"
+     "                    androidx.webkit.WebViewCompat.addDocumentStartJavaScript(webView, chamosJs, setOf(\"https://appassets.androidplatform.net\"))\n"
+     "                }\n"
      "            }\n"
      "        } catch (e: Throwable) {\n"
      "            android.util.Log.w(\"Chamos\", \"Filtros: no se pudo registrar el script de inicio\", e)\n"
