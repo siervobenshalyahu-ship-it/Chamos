@@ -29,6 +29,8 @@ edit(os.path.join(d, "HomePresenter.kt"), [
 edit(os.path.join(d, "datasource/RoomListDataSource.kt"), [
     ("        .map { list -> list.filterNot { it.isChamosEstado() }.toImmutableList() }\n",
      "        .map { list -> list.filterNot { it.isChamosEstado() || it.isChamosReels() }.toImmutableList() }\n"),
+    ("import io.element.android.features.home.impl.isChamosEstado\n",
+     "import io.element.android.features.home.impl.isChamosEstado\nimport io.element.android.features.home.impl.isChamosReels\n"),
 ])
 # pantalla principal: botón en la barra de abajo + pantalla de Reels
 edit(os.path.join(d, "HomeView.kt"), [
