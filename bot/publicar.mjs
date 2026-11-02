@@ -1,6 +1,6 @@
 // Bot de Chamos: publica videos en los Reels (sala #chamos-reels:matrix.org) desde una cola.
-// Uso: node publicar.mjs            -> publica los próximos videos de cola.json
-//      node publicar.mjs perfil "Nombre"  -> cambia el nombre público de la cuenta
+// Uso: CUENTA=raul node publicar.mjs            -> publica los próximos videos de cuentas/raul/cola.json
+//      node publicar.mjs perfil "Nombre"        -> cambia el nombre público de la cuenta
 // Variables: MATRIX_TOKEN (obligatoria), MATRIX_USER (para "perfil"), MATRIX_HS (por defecto https://matrix.org),
 //            POR_CORRIDA (cuántos videos por corrida, por defecto 1)
 import { readFileSync, writeFileSync, statSync, existsSync, mkdtempSync } from "node:fs";
@@ -9,7 +9,8 @@ import { tmpdir } from "node:os";
 import { join, basename, dirname, extname } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const AQUI = dirname(fileURLToPath(import.meta.url));
+const CUENTA = (process.env.CUENTA || "raul").replace(/[^a-z0-9_-]/gi, "");
+const AQUI = join(dirname(fileURLToPath(import.meta.url)), "cuentas", CUENTA);
 const HS = (process.env.MATRIX_HS || "https://matrix.org").replace(/\/$/, "");
 const TOKEN = process.env.MATRIX_TOKEN;
 const POR_CORRIDA = Math.max(1, parseInt(process.env.POR_CORRIDA || "1", 10));

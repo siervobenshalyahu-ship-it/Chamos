@@ -1,7 +1,7 @@
 name: Bot de Reels de Chamos
 
 # Publica videos de bot/cola.json en los Reels. Corre dos veces al día (12:00 y 19:00 hora de Venezuela)
-# o a mano desde Actions. Necesita el secreto MATRIX_TOKEN (token de la cuenta del bot).
+# o a mano desde Actions. Tres cuentas (raul, nery, maria), cada una con su secreto MATRIX_TOKEN_*.
 on:
   schedule:
     - cron: "0 16 * * *"
@@ -18,24 +18,33 @@ permissions:
 jobs:
   publicar:
     runs-on: ubuntu-latest
+    strategy:
+      max-parallel: 1
+      fail-fast: false
+      matrix:
+        cuenta: [raul, nery, maria]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - name: Publicar en los Reels
+      - name: Publicar en los Reels (${{ matrix.cuenta }})
         env:
-          MATRIX_TOKEN: ${{ secrets.MATRIX_TOKEN }}
+          CUENTA: ${{ matrix.cuenta }}
+          MATRIX_TOKEN: ${{ matrix.cuenta == 'raul' && secrets.MATRIX_TOKEN_RAUL || matrix.cuenta == 'nery' && secrets.MATRIX_TOKEN_NERY || secrets.MATRIX_TOKEN_MARIA }}
           POR_CORRIDA: ${{ github.event.inputs.cuantos || '1' }}
-        run: node bot/publicar.mjs
+        run: |
+          if [ -z "$MATRIX_TOKEN" ]; then echo "Sin token para ${{ matrix.cuenta }}: se omite."; exit 0; fi
+          node bot/publicar.mjs
+          sleep 45
       - name: Guardar qué videos ya se publicaron
         if: always()
         run: |
-          if ! git diff --quiet bot/cola.json; then
+          if ! git diff --quiet bot/cuentas; then
             git config user.name "Chamos bot"
             git config user.email "bot@users.noreply.github.com"
-            git add bot/cola.json
-            git commit -m "Bot: videos publicados"
+            git add bot/cuentas
+            git commit -m "Bot: videos publicados (${{ matrix.cuenta }})"
             git pull --rebase -q origin main || true
             git push -q origin HEAD:main || true
           fi
