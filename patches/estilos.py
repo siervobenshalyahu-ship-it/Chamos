@@ -35,7 +35,7 @@ hdir = os.path.join(root, "features/home/impl/src/main/kotlin/io/element/android
 shutil.copy(os.path.join(pdir, "ChamosEstilosDialog.kt"), os.path.join(hdir, "ChamosEstilosDialog.kt"))
 edit(os.path.join(hdir, "HomeView.kt"), [
     ("                onSettingsClick = onOpenSettings,\n", "                onSettingsClick = onOpenSettings,\n                onStylesClick = { mostrarEstilos = true },\n"),
-    ("    onSettingsClick: () -> Unit,\n    modifier", "    onSettingsClick: () -> Unit,\n    onStylesClick: () -> Unit,\n    modifier"),
+    ("    onReelsClick: () -> Unit,\n    modifier", "    onReelsClick: () -> Unit,\n    onStylesClick: () -> Unit,\n    modifier"),
     ("""            onClick = onSettingsClick,
         )
 """, """            onClick = onSettingsClick,
