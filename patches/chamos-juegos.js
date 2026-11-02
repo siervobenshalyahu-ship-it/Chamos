@@ -90,7 +90,14 @@
   }
 
   var S = { v: 0, e: null };
-  var abierto = false, errRed = "", avisados = {};
+  var abierto = false, errRed = "", avisados = {}, hayAviso = false, ultimoAviso = "";
+  // Avisa al carrusel de la videollamada (que tiene el botón 🎮) cuando cambia el panel o llega una invitación.
+  function avisarCambio() {
+    var clave = abierto + "|" + hayAviso;
+    if (clave === ultimoAviso) return;
+    ultimoAviso = clave;
+    try { window.dispatchEvent(new Event("chamos-juegos-estado")); } catch (e) { /* nada */ }
+  }
 
   function copia(o) { return JSON.parse(JSON.stringify(o)); }
 
@@ -346,9 +353,7 @@
   var CSS = [
     ":host{all:initial}",
     "*{box-sizing:border-box;font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif}",
-    "#fab{position:fixed;right:12px;bottom:110px;width:52px;height:52px;border-radius:50%;border:2px solid #4ac8f4;background:rgba(12,16,32,.88);color:#fff;font-size:26px;line-height:1;box-shadow:0 0 14px rgba(74,200,244,.6);touch-action:manipulation}",
-    "#fab.av{animation:p 1s infinite}@keyframes p{50%{transform:scale(1.18)}}",
-    "#panel{position:fixed;left:8px;right:8px;bottom:172px;max-width:430px;margin-left:auto;max-height:64vh;overflow:auto;background:rgba(12,16,32,.96);color:#fff;border:1px solid #2a3558;border-radius:16px;padding:10px;box-shadow:0 14px 40px rgba(0,0,0,.55)}",
+    "#panel{position:fixed;left:8px;right:8px;bottom:290px;max-width:430px;margin-left:auto;max-height:64vh;overflow:auto;background:rgba(12,16,32,.96);color:#fff;border:1px solid #2a3558;border-radius:16px;padding:10px;box-shadow:0 14px 40px rgba(0,0,0,.55)}",
     "#panel[hidden]{display:none}",
     ".cab{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}",
     ".cab b{font-size:15px;color:#4ac8f4}",
@@ -413,8 +418,9 @@
     var pal = raiz.getElementById("pal"), cod = raiz.getElementById("cod");
     var vp = pal ? pal.value : null, vc = cod ? cod.value : null;
     var e = S.e;
-    var aviso = e && e.j && e.jug && e.jug.indexOf(yo) < 0 && !abierto;
-    raiz.innerHTML = "<style>" + CSS + '</style><button id="fab" class="' + (aviso ? "av" : "") + '" aria-label="Juegos">🎮</button><div id="panel"' + (abierto ? "" : " hidden") + ">" + cuerpo() + "</div>";
+    hayAviso = !!(e && e.j && e.jug && e.jug.indexOf(yo) < 0 && !abierto);
+    raiz.innerHTML = "<style>" + CSS + '</style><div id="panel"' + (abierto ? "" : " hidden") + ">" + cuerpo() + "</div>";
+    avisarCambio();
     if (vp !== null && raiz.getElementById("pal")) raiz.getElementById("pal").value = vp;
     if (vc !== null && raiz.getElementById("cod")) raiz.getElementById("cod").value = vc;
     if (raiz.getElementById("panel")) raiz.getElementById("panel").scrollTop = arriba;
@@ -424,7 +430,6 @@
     ev.stopPropagation();
     var t = ev.target.closest ? ev.target.closest("button") : null;
     if (!t) return;
-    if (t.id === "fab") { abierto = !abierto; pintar(); if (abierto) traer(); return; }
     var a = t.dataset.a, d = t.dataset;
     if (a === "x") { abierto = false; pintar(); }
     else if (a === "menu") salirJuego();
@@ -458,6 +463,16 @@
     traer();
   }
 
-  window.__chamosJuegos = { version: 1 };
-  if (document.documentElement) montar(); else document.addEventListener("DOMContentLoaded", montar);
+  window.__chamosJuegos = {
+    version: 2,
+    abierto: function () { return abierto; },
+    aviso: function () { return hayAviso; },
+    alternar: function () { abierto = !abierto; pintar(); if (abierto) traer(); }
+  };
+  // Los juegos solo existen en videollamadas: se activan cuando la llamada enciende la cámara.
+  function arrancar() {
+    if (document.documentElement) montar(); else document.addEventListener("DOMContentLoaded", montar);
+  }
+  if (window.__chamosVideoActivo) arrancar();
+  else window.addEventListener("chamos-video", function once() { window.removeEventListener("chamos-video", once); arrancar(); });
 })();
