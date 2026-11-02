@@ -1,0 +1,41 @@
+name: Bot de Reels de Chamos
+
+# Publica videos de bot/cola.json en los Reels. Corre dos veces al día (12:00 y 19:00 hora de Venezuela)
+# o a mano desde Actions. Necesita el secreto MATRIX_TOKEN (token de la cuenta del bot).
+on:
+  schedule:
+    - cron: "0 16 * * *"
+    - cron: "0 23 * * *"
+  workflow_dispatch:
+    inputs:
+      cuantos:
+        description: "Cuántos videos publicar ahora"
+        default: "1"
+
+permissions:
+  contents: write
+
+jobs:
+  publicar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Publicar en los Reels
+        env:
+          MATRIX_TOKEN: ${{ secrets.MATRIX_TOKEN }}
+          POR_CORRIDA: ${{ github.event.inputs.cuantos || '1' }}
+        run: node bot/publicar.mjs
+      - name: Guardar qué videos ya se publicaron
+        if: always()
+        run: |
+          if ! git diff --quiet bot/cola.json; then
+            git config user.name "Chamos bot"
+            git config user.email "bot@users.noreply.github.com"
+            git add bot/cola.json
+            git commit -m "Bot: videos publicados"
+            git pull --rebase -q origin main || true
+            git push -q origin HEAD:main || true
+          fi
