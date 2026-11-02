@@ -26,6 +26,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -428,10 +429,17 @@ fun ChamosReelsPantalla(state: ChamosReelsState, onCerrar: () -> Unit) {
     val scope = rememberCoroutineScope()
     var subiendo by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { state.activar() }
+    // La pantalla de neón se queda hasta que los Reels terminan de cargar (mínimo 2 segundos).
     var intro by remember { mutableStateOf(true) }
+    var terminado by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
         kotlinx.coroutines.delay(2200)
         intro = false
+        kotlinx.coroutines.delay(8000)
+        if (state.reels.isNotEmpty()) terminado = true
+    }
+    LaunchedEffect(intro, state.cargando, state.reels.size) {
+        if (!intro && !state.cargando && state.reels.isNotEmpty()) terminado = true
     }
 
     Dialog(
@@ -439,7 +447,7 @@ fun ChamosReelsPantalla(state: ChamosReelsState, onCerrar: () -> Unit) {
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
     ) {
         Box(Modifier.fillMaxSize().background(Color.Black)) {
-            if (state.reels.isEmpty() || intro) {
+            if (!terminado) {
                 Column(
                     modifier = Modifier.fillMaxSize().padding(32.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
@@ -483,7 +491,7 @@ fun ChamosReelsPantalla(state: ChamosReelsState, onCerrar: () -> Unit) {
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text("✕", color = Color.White, fontSize = 26.sp, modifier = Modifier.clickable { onCerrar() }.padding(8.dp))
-                if (state.reels.isEmpty() || intro) Text("", fontSize = 18.sp) else Text("Reels", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                if (!terminado) Text("", fontSize = 18.sp) else Text("Reels", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
                 Text("＋", color = Color.White, fontSize = 30.sp, modifier = Modifier.clickable { subiendo = true }.padding(8.dp))
             }
         }
@@ -790,45 +798,61 @@ private fun CompartirDialogo(reel: ReelItem, state: ChamosReelsState, onCerrar: 
     )
 }
 
-private val NEON_REEL = listOf(
-    Color(0xFF00E5FF), Color(0xFFFF2D95), Color(0xFFB6FF00), Color(0xFFFF9100),
-    Color(0xFFB388FF), Color(0xFFFFEA00), Color(0xFF00FF9C), Color(0xFFFF4D4D),
-)
+private val NEON_AZUL = Color(0xFF1E90FF)
+private val NEON_VIOLETA = Color(0xFFB026FF)
 
-/** "CHAMOS REEL" en letras de neón: cada letra va cambiando de color, con brillo, sobre fondo negro. */
+/** "CHAMOS REELS" en luz de neón azul y violeta que parpadea, sobre fondo negro. */
 @Composable
 private fun ChamosReelNeon() {
-    var paso by remember { mutableStateOf(0) }
-    LaunchedEffect(Unit) {
-        while (true) {
-            kotlinx.coroutines.delay(650)
-            paso++
-        }
-    }
+    val transicion = androidx.compose.animation.core.rememberInfiniteTransition(label = "neon")
     @Composable
-    fun Linea(texto: String, tam: Int, desfase: Int) {
-        Row(horizontalArrangement = Arrangement.Center) {
-            texto.forEachIndexed { i, letra ->
-                val objetivo = NEON_REEL[(i + desfase + paso) % NEON_REEL.size]
-                val color by androidx.compose.animation.animateColorAsState(objetivo, androidx.compose.animation.core.tween(600), label = "neon")
-                Text(
-                    text = letra.toString(),
-                    color = color,
-                    fontSize = tam.sp,
-                    fontWeight = FontWeight.Black,
-                    style = androidx.compose.ui.text.TextStyle(
-                        color = color,
-                        fontSize = tam.sp,
-                        fontWeight = FontWeight.Black,
-                        shadow = androidx.compose.ui.graphics.Shadow(color = color, offset = androidx.compose.ui.geometry.Offset.Zero, blurRadius = 34f),
-                    ),
-                    modifier = Modifier.padding(horizontal = 2.dp),
-                )
-            }
-        }
+    fun parpadeo(retraso: Int) = transicion.animateFloat(
+        initialValue = 1f,
+        targetValue = 1f,
+        animationSpec = androidx.compose.animation.core.infiniteRepeatable(
+            animation = androidx.compose.animation.core.keyframes {
+                durationMillis = 2600
+                1f at 0
+                1f at 700
+                0.25f at 760
+                1f at 820
+                0.45f at 900
+                1f at 960
+                1f at 1900
+                0.2f at 1960
+                1f at 2040
+                0.6f at 2120
+                1f at 2200
+            },
+            initialStartOffset = androidx.compose.animation.core.StartOffset(retraso),
+        ),
+        label = "parpadeo",
+    )
+    val brilloAzul by parpadeo(0)
+    val brilloVioleta by parpadeo(900)
+    @Composable
+    fun Linea(texto: String, color: Color, brillo: Float) {
+        Text(
+            text = texto,
+            color = color.copy(alpha = brillo),
+            fontSize = 52.sp,
+            fontWeight = FontWeight.Black,
+            letterSpacing = 4.sp,
+            style = androidx.compose.ui.text.TextStyle(
+                color = color.copy(alpha = brillo),
+                fontSize = 52.sp,
+                fontWeight = FontWeight.Black,
+                letterSpacing = 4.sp,
+                shadow = androidx.compose.ui.graphics.Shadow(
+                    color = color.copy(alpha = brillo),
+                    offset = androidx.compose.ui.geometry.Offset.Zero,
+                    blurRadius = 40f * brillo,
+                ),
+            ),
+        )
     }
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Linea("CHAMOS", 54, 0)
-        Linea("REEL", 54, 3)
+        Linea("CHAMOS", NEON_AZUL, brilloAzul)
+        Linea("REELS", NEON_VIOLETA, brilloVioleta)
     }
 }
