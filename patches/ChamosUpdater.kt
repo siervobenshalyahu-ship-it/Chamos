@@ -3,10 +3,12 @@ package io.element.android.x
 import android.app.Activity
 import android.app.AlertDialog
 import android.app.DownloadManager
+import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.pm.PackageInstaller
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
@@ -14,6 +16,7 @@ import android.provider.Settings
 import android.widget.Toast
 import androidx.core.content.ContextCompat
 import org.json.JSONObject
+import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
 import kotlin.concurrent.thread
@@ -29,6 +32,21 @@ object ChamosUpdater {
     private const val KEY_LAST_CHECK = "last_check"
     private const val CHECK_EVERY_MS = 60L * 60L * 1000L
     private const val APK_MIME = "application/vnd.android.package-archive"
+    private const val KEY_AUTO = "auto"
+    private const val ACCION_INSTALAR = "io.element.android.x.CHAMOS_INSTALAR_RESULTADO"
+
+    /** ¿Se actualiza sola? Por defecto sí: descarga e instala sin preguntar. */
+    @JvmStatic
+    fun autoActivo(context: Context): Boolean =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_AUTO, true)
+
+    /** Prende o apaga la actualización automática y devuelve cómo quedó. */
+    @JvmStatic
+    fun alternarAuto(context: Context): Boolean {
+        val nuevo = !autoActivo(context)
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean(KEY_AUTO, nuevo).apply()
+        return nuevo
+    }
 
     /** Botón «Buscar actualización»: ignora el intervalo y avisa del resultado. */
     @JvmStatic
@@ -71,7 +89,14 @@ object ChamosUpdater {
                 // Solo se descarga desde los releases del propio repositorio de Chamos.
                 if (!apkUrl.startsWith("https://github.com/$REPO/")) return@thread
                 activity.runOnUiThread {
-                    if (!activity.isFinishing) askToUpdate(activity, tag, apkUrl)
+                    if (activity.isFinishing) return@runOnUiThread
+                    val permitido = Build.VERSION.SDK_INT < Build.VERSION_CODES.O || activity.packageManager.canRequestPackageInstalls()
+                    if (autoActivo(activity) && permitido) {
+                        Toast.makeText(activity, "Descargando la actualización de Chamos ($tag)…", Toast.LENGTH_LONG).show()
+                        startDownload(activity, tag, apkUrl)
+                    } else {
+                        askToUpdate(activity, tag, apkUrl)
+                    }
                 }
             } catch (_: Exception) {
                 aviso("No se pudo buscar la actualización. Revisa tu internet.")
@@ -101,6 +126,72 @@ object ChamosUpdater {
             .show()
     }
 
+    private fun abrirInstalador(app: Context, uri: Uri) {
+        val install = Intent(Intent.ACTION_VIEW)
+            .setDataAndType(uri, APK_MIME)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        app.startActivity(install)
+    }
+
+    /**
+     * Instala el APK descargado con el instalador de Android pidiéndole que NO muestre la pantalla de
+     * confirmación (Android 12 o más nuevo, y solo cuando Chamos ya fue instalada por Chamos). Si el
+     * teléfono igual pide confirmar, se abre esa pantalla; si falla, se usa el instalador de siempre.
+     */
+    private fun instalarSinPreguntar(app: Context, archivo: File, respaldo: Uri): Boolean {
+        if (!archivo.exists() || archivo.length() == 0L) return false
+        return try {
+            val instalador = app.packageManager.packageInstaller
+            val params = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL)
+            params.setAppPackageName(app.packageName)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                params.setRequireUserAction(PackageInstaller.SessionParams.USER_ACTION_NOT_REQUIRED)
+            }
+            val sesionId = instalador.createSession(params)
+
+            val resultado = object : BroadcastReceiver() {
+                override fun onReceive(context: Context, intent: Intent) {
+                    when (intent.getIntExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE)) {
+                        PackageInstaller.STATUS_PENDING_USER_ACTION -> {
+                            // El teléfono pidió confirmar (pasa la primera vez): se muestra su pantalla.
+                            @Suppress("DEPRECATION")
+                            val confirmar = intent.getParcelableExtra<Intent>(Intent.EXTRA_INTENT)
+                            confirmar?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            if (confirmar != null) context.startActivity(confirmar)
+                        }
+                        PackageInstaller.STATUS_SUCCESS -> {
+                            runCatching { app.unregisterReceiver(this) }
+                            archivo.delete()
+                        }
+                        else -> {
+                            runCatching { app.unregisterReceiver(this) }
+                            Toast.makeText(app, "No se pudo instalar sola. Se abre el instalador.", Toast.LENGTH_LONG).show()
+                            abrirInstalador(app, respaldo)
+                        }
+                    }
+                }
+            }
+            ContextCompat.registerReceiver(app, resultado, IntentFilter(ACCION_INSTALAR), ContextCompat.RECEIVER_NOT_EXPORTED)
+
+            instalador.openSession(sesionId).use { sesion ->
+                archivo.inputStream().use { entrada ->
+                    sesion.openWrite("chamos.apk", 0, archivo.length()).use { salida ->
+                        entrada.copyTo(salida)
+                        sesion.fsync(salida)
+                    }
+                }
+                val aviso = Intent(ACCION_INSTALAR).setPackage(app.packageName)
+                val banderas = PendingIntent.FLAG_UPDATE_CURRENT or
+                    (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) PendingIntent.FLAG_MUTABLE else 0)
+                sesion.commit(PendingIntent.getBroadcast(app, sesionId, aviso, banderas).intentSender)
+            }
+            Toast.makeText(app, "Instalando la actualización de Chamos…", Toast.LENGTH_LONG).show()
+            true
+        } catch (e: Exception) {
+            false
+        }
+    }
+
     private fun startDownload(activity: Activity, tag: String, url: String) {
         val app = activity.applicationContext
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !app.packageManager.canRequestPackageInstalls()) {
@@ -108,6 +199,9 @@ object ChamosUpdater {
             activity.startActivity(Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:" + app.packageName)))
             return
         }
+        val carpeta = app.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
+        // Se borran los APK de actualizaciones anteriores para no llenar el teléfono.
+        carpeta?.listFiles()?.forEach { if (it.name.startsWith("Chamos-") && it.name.endsWith(".apk")) it.delete() }
         val manager = app.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
         val request = DownloadManager.Request(Uri.parse(url))
             .setTitle("Chamos $tag")
@@ -125,10 +219,8 @@ object ChamosUpdater {
                     Toast.makeText(app, "No se pudo descargar la actualización. Intenta de nuevo más tarde.", Toast.LENGTH_LONG).show()
                     return
                 }
-                val install = Intent(Intent.ACTION_VIEW)
-                    .setDataAndType(uri, APK_MIME)
-                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                app.startActivity(install)
+                val archivo = File(carpeta, "Chamos-$tag.apk")
+                if (!instalarSinPreguntar(app, archivo, uri)) abrirInstalador(app, uri)
             }
         }
         ContextCompat.registerReceiver(
