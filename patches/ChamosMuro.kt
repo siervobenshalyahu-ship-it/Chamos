@@ -536,12 +536,39 @@ private fun ImagenMuro(post: MuroPost, state: ChamosMuroState, modifier: Modifie
 
 @Composable
 fun ChamosMuroPantalla(state: ChamosMuroState) {
+    // Letrero de neón azul y violeta al abrir el Muro ("RED DE CHAMOS") y la Tienda ("MERCADO DE LOS CHAMOS").
+    var pestanaActual by remember { mutableStateOf(0) }
+    var neon by remember { mutableStateOf<Int?>(0) }
+    var yaVioRed by remember { mutableStateOf(false) }
+    LaunchedEffect(pestanaActual) {
+        val cual = if (pestanaActual == 1) 1 else if (!yaVioRed && pestanaActual == 0) 0 else null
+        yaVioRed = true
+        neon = cual
+        if (cual != null) {
+            delay(2300)
+            neon = null
+        }
+    }
+    Box(Modifier.fillMaxSize()) {
+        ChamosMuroContenido(state, onPestana = { pestanaActual = it })
+        val n = neon
+        if (n != null) {
+            Box(Modifier.fillMaxSize().background(Color.Black), contentAlignment = Alignment.Center) {
+                if (n == 1) ChamosReelNeon("MERCADO DE", "LOS CHAMOS") else ChamosReelNeon("RED DE", "CHAMOS")
+            }
+        }
+    }
+}
+
+@Composable
+private fun ChamosMuroContenido(state: ChamosMuroState, onPestana: (Int) -> Unit) {
     val contexto = LocalContext.current
     val scope = rememberCoroutineScope()
     var pestana by remember { mutableStateOf(0) }
     var perfilDe by remember { mutableStateOf("") }
     var nuevaVenta by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { state.activar() }
+    LaunchedEffect(pestana) { onPestana(pestana) }
 
     val verPerfilDe = if (perfilDe.isEmpty()) state.yoId else perfilDe
 

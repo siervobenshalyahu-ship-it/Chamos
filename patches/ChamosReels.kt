@@ -815,9 +815,9 @@ private fun CompartirDialogo(reel: ReelItem, state: ChamosReelsState, onCerrar: 
 private val NEON_AZUL = Color(0xFF1E90FF)
 private val NEON_VIOLETA = Color(0xFFB026FF)
 
-/** "CHAMOS REELS" en luz de neón azul y violeta que parpadea, sobre fondo negro. */
+/** Dos líneas (por defecto "CHAMOS REELS") en luz de neón azul y violeta que parpadea, sobre fondo negro. */
 @Composable
-private fun ChamosReelNeon() {
+internal fun ChamosReelNeon(linea1: String = "CHAMOS", linea2: String = "REELS") {
     val transicion = androidx.compose.animation.core.rememberInfiniteTransition(label = "neon")
     @Composable
     fun parpadeo(retraso: Int) = transicion.animateFloat(
@@ -866,7 +866,7 @@ private fun ChamosReelNeon() {
         )
     }
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Linea("CHAMOS", NEON_AZUL, brilloAzul)
-        Linea("REELS", NEON_VIOLETA, brilloVioleta)
+        Linea(linea1, NEON_AZUL, brilloAzul)
+        Linea(linea2, NEON_VIOLETA, brilloVioleta)
     }
 }
