@@ -198,7 +198,43 @@ async function prepararTablas(env) {
       await env.DB.prepare("ALTER TABLE " + tabla + " ADD COLUMN ip TEXT").run();
     } catch (_) {}
   }
+  // Dispositivo: modelo del teléfono, o sistema y navegador si entró desde una PC.
+  try {
+    await env.DB.prepare("ALTER TABLE eventos ADD COLUMN disp TEXT").run();
+  } catch (_) {}
   tablasListas = true;
+}
+
+// Resume "SM-A135M · Android 13 · Chrome 120" o "PC · Windows · Firefox 119".
+function dispositivo(ua, d) {
+  ua = ua || "";
+  let nav = "Otro";
+  let m;
+  if ((m = ua.match(/(Edg|EdgA|EdgiOS)\/(\d+)/))) nav = "Edge " + m[2];
+  else if ((m = ua.match(/OPR\/(\d+)/))) nav = "Opera " + m[1];
+  else if ((m = ua.match(/SamsungBrowser\/(\d+)/))) nav = "Samsung Internet " + m[1];
+  else if ((m = ua.match(/(Firefox|FxiOS)\/(\d+)/))) nav = "Firefox " + m[2];
+  else if ((m = ua.match(/(Chrome|CriOS)\/(\d+)/))) nav = "Chrome " + m[2];
+  else if ((m = ua.match(/Version\/(\d+).*Safari/))) nav = "Safari " + m[1];
+  const app = ua.match(/Instagram|FBAN|FBAV|TikTok|WhatsApp/i);
+  if (app) nav += " (dentro de " + app[0] + ")";
+  let so = "";
+  let modelo = corto(d && d.m, 60);
+  if ((m = ua.match(/Android ([\d.]+)/))) {
+    so = "Android " + m[1];
+    if (!modelo || modelo === "K") {
+      const mm = ua.match(/Android [\d.]+; ([^;)]+)/);
+      modelo = mm && mm[1] !== "K" ? mm[1].replace(/ Build.*/, "") : "";
+    }
+  } else if (/iPhone|iPad/.test(ua)) {
+    so = "iOS";
+    modelo = (ua.match(/iPhone|iPad/) || [""])[0];
+  } else if (/Windows/.test(ua)) so = "Windows";
+  else if (/Mac OS X/.test(ua)) so = "Mac";
+  else if (/CrOS/.test(ua)) so = "ChromeOS";
+  else if (/Linux/.test(ua)) so = "Linux";
+  const movil = /Android|iPhone|iPad|Mobile/.test(ua);
+  return [movil ? modelo || "Teléfono" : "PC", so, nav].filter(Boolean).join(" · ").slice(0, 160);
 }
 
 const corto = (v, n) => (v === undefined || v === null ? "" : String(v).slice(0, n));
@@ -220,6 +256,7 @@ async function guardarEvento(request, env) {
   const pais = corto(request.cf && request.cf.country, 4);
   const anon = corto(d.id, 64);
   const ip = corto(request.headers.get("cf-connecting-ip"), 64);
+  const disp = dispositivo(request.headers.get("user-agent"), d);
   if (tipo === "registro") {
     const uid = corto(d.u, 100);
     if (!uid.startsWith("@")) return jsonCors({ error: "Falta usuario" }, 400);
@@ -231,8 +268,8 @@ async function guardarEvento(request, env) {
       .run();
   } else {
     const extra = JSON.stringify({ v: corto(d.v, 20), m: corto(d.m, 60), p: corto(d.p, 100) });
-    await env.DB.prepare("INSERT INTO eventos (ts, tipo, anon, pais, extra, ip) VALUES (?1,?2,?3,?4,?5,?6)")
-      .bind(ahora, tipo, anon, pais, extra, ip)
+    await env.DB.prepare("INSERT INTO eventos (ts, tipo, anon, pais, extra, ip, disp) VALUES (?1,?2,?3,?4,?5,?6,?7)")
+      .bind(ahora, tipo, anon, pais, extra, ip, disp)
       .run();
   }
   return jsonCors({ ok: true });
@@ -254,7 +291,7 @@ async function resumen(request, env) {
     env.DB.prepare("SELECT user_id, nombre, version, modelo, pais, primera, ultima, ip FROM usuarios ORDER BY primera DESC LIMIT 200"),
     env.DB.prepare("SELECT COUNT(*) AS n FROM usuarios"),
     env.DB.prepare("SELECT version, COUNT(*) AS n FROM usuarios GROUP BY version ORDER BY n DESC"),
-    env.DB.prepare("SELECT ts, tipo, pais, ip FROM eventos WHERE tipo IN ('visita','descarga','instalacion') ORDER BY ts DESC LIMIT 200"),
+    env.DB.prepare("SELECT ts, tipo, pais, ip, disp FROM eventos WHERE tipo IN ('visita','descarga','instalacion') ORDER BY ts DESC LIMIT 200"),
   ]);
   return jsonCors({
     totales: tot.results,
@@ -381,8 +418,8 @@ async function go(){
    '<h2>Versiones de la app</h2><div>'+d.versiones.map(v=>(v.version||'?')+': '+v.n).join(' · ')+'</div>'+
    '<h2>Usuarios</h2><div class="sc"><table><tr><th>Usuario</th><th>Nombre</th><th>Versión</th><th>Teléfono</th><th>IP</th><th>Desde</th><th>Última vez</th></tr>'+
    d.usuarios.map(u=>'<tr><td>'+esc(u.user_id)+'</td><td>'+esc(u.nombre)+'</td><td>'+esc(u.version)+'</td><td>'+esc(u.modelo)+'</td><td>'+esc(u.ip)+'</td><td>'+fmt(u.primera)+'</td><td>'+fmt(u.ultima)+'</td></tr>').join('')+'</table></div>'+
-   '<h2>Últimas visitas, descargas e instalaciones</h2><div class="sc"><table><tr><th>Cuándo</th><th>Qué</th><th>País</th><th>IP</th></tr>'+
-   (d.recientes||[]).map(r=>'<tr><td>'+fmt(r.ts)+'</td><td>'+esc(r.tipo)+'</td><td>'+esc(r.pais)+'</td><td>'+esc(r.ip)+'</td></tr>').join('')+'</table></div>';
+   '<h2>Últimas visitas, descargas e instalaciones</h2><div class="sc"><table><tr><th>Cuándo</th><th>Qué</th><th>País</th><th>IP</th><th>Dispositivo</th></tr>'+
+   (d.recientes||[]).map(r=>'<tr><td>'+fmt(r.ts)+'</td><td>'+esc(r.tipo)+'</td><td>'+esc(r.pais)+'</td><td>'+esc(r.ip)+'</td><td>'+esc(r.disp)+'</td></tr>').join('')+'</table></div>';
 }
 function esc(s){return String(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
 if(sessionStorage.getItem('k'))go();
