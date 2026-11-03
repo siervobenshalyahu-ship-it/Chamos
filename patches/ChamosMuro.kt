@@ -604,6 +604,14 @@ private fun ChamosMuroContenido(state: ChamosMuroState, onPestana: (Int) -> Unit
                 item(key = "nuevo") { CompositorMuro(state, onVender = { nuevaVenta = true }) }
             }
             if (pestana == 1) {
+                item(key = "banner_mercado") {
+                    Image(
+                        painter = painterResource(io.element.android.features.home.impl.R.drawable.chamos_mercado_banner),
+                        contentDescription = null,
+                        contentScale = ContentScale.FillWidth,
+                        modifier = Modifier.fillMaxWidth().clip(androidx.compose.foundation.shape.RoundedCornerShape(14.dp)),
+                    )
+                }
                 item(key = "vender") {
                     Text(
                         "🛒  Vender algo",
