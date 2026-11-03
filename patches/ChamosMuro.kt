@@ -45,6 +45,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -921,8 +922,24 @@ private fun CompositorMuro(state: ChamosMuroState, onVender: () -> Unit) {
     }
     val selImagen = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { elegir(it, "image/jpeg") }
     val selVideo = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { elegir(it, "video/mp4") }
-    Column(Modifier.fillMaxWidth().background(TARJETA, androidx.compose.foundation.shape.RoundedCornerShape(14.dp)).padding(12.dp)) {
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.Top) {
+    Column(Modifier.fillMaxWidth().background(TARJETA, androidx.compose.foundation.shape.RoundedCornerShape(14.dp))) {
+        // Letrero de la Red de Chamos detrás de la palabra "Publicar".
+        Box(Modifier.fillMaxWidth().clip(androidx.compose.foundation.shape.RoundedCornerShape(topStart = 14.dp, topEnd = 14.dp))) {
+            Image(
+                painter = painterResource(io.element.android.features.home.impl.R.drawable.chamos_muro_banner),
+                contentDescription = null,
+                contentScale = ContentScale.FillWidth,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Text(
+                "Publicar",
+                color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp,
+                modifier = Modifier.align(Alignment.BottomStart).padding(10.dp)
+                    .background(Color(0x99000000), androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
+                    .padding(horizontal = 12.dp, vertical = 4.dp),
+            )
+        }
+        Row(Modifier.padding(start = 12.dp, end = 12.dp, top = 12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.Top) {
             Avatar(avatarData = AvatarData(state.yoId, state.yoNombre, state.yoAvatar, AvatarSize.UserListItem), avatarType = AvatarType.User, forcedAvatarSize = 40.dp)
             OutlinedTextField(
                 value = texto,
@@ -934,16 +951,15 @@ private fun CompositorMuro(state: ChamosMuroState, onVender: () -> Unit) {
             )
         }
         if (uri != null) {
-            Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(Modifier.padding(start = 12.dp, top = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(if (mime?.startsWith("video") == true) "🎬 Video listo" else "🖼 Imagen lista", color = DORADO, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                 Text("✕ Quitar", color = Color(0xFFCFD6E6), fontSize = 13.sp, modifier = Modifier.clickable { uri = null; mime = null }.padding(6.dp))
             }
         }
-        Row(Modifier.fillMaxWidth().padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, top = 10.dp, bottom = 12.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
             listOf(
                 "🖼 Imagen" to { selImagen.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
                 "🎬 Video" to { selVideo.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.VideoOnly)) },
-                "🛒 Vender" to onVender,
             ).forEach { (nombre, accion) ->
                 Text(
                     nombre, color = Color.White, fontSize = 13.sp,

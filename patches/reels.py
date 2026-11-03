@@ -5,6 +5,10 @@ root, pdir = sys.argv[1], sys.argv[2]
 d = os.path.join(root, "features/home/impl/src/main/kotlin/io/element/android/features/home/impl")
 shutil.copy(os.path.join(pdir, "ChamosReels.kt"), os.path.join(d, "ChamosReels.kt"))
 shutil.copy(os.path.join(pdir, "ChamosMuro.kt"), os.path.join(d, "ChamosMuro.kt"))
+# letrero de la Red de Chamos (fondo del cuadro para publicar)
+res = os.path.join(root, "features/home/impl/src/main/res/drawable-nodpi")
+os.makedirs(res, exist_ok=True)
+shutil.copy(os.path.join(pdir, "..", "assets", "muro_banner.jpg"), os.path.join(res, "chamos_muro_banner.jpg"))
 
 def edit(path, pairs):
     s = open(path, encoding="utf-8").read()
