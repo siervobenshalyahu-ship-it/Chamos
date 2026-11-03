@@ -215,6 +215,9 @@ jobs:
       - name: Ajustes de pantalla (stickers pequeños, barra de abajo)
         run: python3 chamos-repo/patches/ajustes_ui.py chamos
 
+      - name: Barra de abajo con Chamo Muro (el lápiz pasa arriba)
+        run: python3 chamos-repo/patches/barra_muro.py chamos
+
       - name: Notificaciones push (Firebase) si ya están configuradas
         run: |
           if [ -f chamos-repo/firebase/google-services.json ] && [ -s chamos-repo/firebase/gateway-url.txt ]; then
