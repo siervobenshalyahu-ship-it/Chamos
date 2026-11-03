@@ -74,6 +74,7 @@ import io.element.android.libraries.matrix.api.timeline.item.event.InReplyTo
 import io.element.android.libraries.matrix.api.timeline.item.event.MessageContent
 import io.element.android.libraries.matrix.api.timeline.item.event.ProfileDetails
 import io.element.android.libraries.matrix.api.timeline.item.event.TextMessageType
+import io.element.android.libraries.matrix.api.timeline.item.event.VideoMessageType
 import io.element.android.libraries.mediaupload.api.MediaOptimizationConfigProviderFactory
 import io.element.android.libraries.mediaupload.api.MediaSenderRoomFactory
 import java.util.Optional
@@ -113,6 +114,11 @@ data class MuroPost(
     val yoLike: Boolean,
     val comentarios: Int,
     val propio: Boolean,
+    val esVideo: Boolean = false,
+    val repostDe: String = "",
+    val noMeGusta: Int = 0,
+    val yoNoMeGusta: Boolean = false,
+    val reposts: Int = 0,
 )
 
 data class MuroComentario(
@@ -141,6 +147,8 @@ data class ChamosMuroState(
     val cambiarFoto: suspend (Uri, String) -> String? = { _, _ -> "No disponible" },
     val borrar: suspend (MuroPost) -> Boolean = { false },
     val meGusta: suspend (MuroPost) -> Unit = {},
+    val noMeGusta: suspend (MuroPost) -> Unit = {},
+    val repostear: suspend (MuroPost, String) -> Boolean = { _, _ -> false },
     val comentar: suspend (MuroPost, String) -> Boolean = { _, _ -> false },
     val borrarComentario: suspend (MuroComentario) -> Boolean = { false },
     val reportar: suspend (MuroPost, String) -> Boolean = { _, _ -> false },
@@ -280,6 +288,9 @@ fun rememberChamosMuro(
                     val corazon = ev.reactions.firstOrNull { it.key.startsWith("❤") }
                     val likes = corazon?.senders?.size ?: 0
                     val yoLike = corazon?.senders?.any { it.senderId == yo } == true
+                    val pulgar = ev.reactions.firstOrNull { it.key.startsWith("👎") }
+                    val nogustas = pulgar?.senders?.size ?: 0
+                    val yoNoGusta = pulgar?.senders?.any { it.senderId == yo } == true
                     val resp = c.inReplyTo?.idDeRespuesta()
                     when (val t = c.type) {
                         is ImageMessageType -> {
@@ -295,6 +306,24 @@ fun rememberChamosMuro(
                                     contacto = if (tipo == 'V') campos.getOrElse(3) { "" } else "",
                                     fuente = t.source, mime = t.info?.mimetype, nombreArchivo = t.filename,
                                     likes = likes, yoLike = yoLike, comentarios = 0, propio = ev.isOwn,
+                                    noMeGusta = nogustas, yoNoMeGusta = yoNoGusta, repostDe = if (tipo == 'R') campos.getOrElse(1) { "" } else "",
+                                )
+                            )
+                        }
+                        is VideoMessageType -> {
+                            val (tipo, campos) = leerCuerpo(t.caption ?: "")
+                            lista.add(
+                                MuroPost(
+                                    id = eid, timestamp = ev.timestamp, autorId = ev.sender.value, autor = nombre, autorAvatar = pf?.avatarUrl,
+                                    tipo = tipo,
+                                    texto = if (tipo == 'V') campos.getOrElse(4) { "" } else campos.firstOrNull() ?: "",
+                                    titulo = if (tipo == 'V') campos.getOrElse(0) { "" } else "",
+                                    precio = if (tipo == 'V') campos.getOrElse(1) { "" } else "",
+                                    ciudad = if (tipo == 'V') campos.getOrElse(2) { "" } else "",
+                                    contacto = if (tipo == 'V') campos.getOrElse(3) { "" } else "",
+                                    esVideo = true, fuente = t.source, mime = t.info?.mimetype, nombreArchivo = t.filename,
+                                    likes = likes, yoLike = yoLike, comentarios = 0, propio = ev.isOwn,
+                                    noMeGusta = nogustas, yoNoMeGusta = yoNoGusta, repostDe = if (tipo == 'R') campos.getOrElse(1) { "" } else "",
                                 )
                             )
                         }
@@ -315,6 +344,7 @@ fun rememberChamosMuro(
                                         contacto = if (tipo == 'V') campos.getOrElse(3) { "" } else "",
                                         fuente = null, mime = null, nombreArchivo = "",
                                         likes = likes, yoLike = yoLike, comentarios = 0, propio = ev.isOwn,
+                                    noMeGusta = nogustas, yoNoMeGusta = yoNoGusta, repostDe = if (tipo == 'R') campos.getOrElse(1) { "" } else "",
                                     )
                                 )
                             }
@@ -324,7 +354,7 @@ fun rememberChamosMuro(
                 }
                 val ordenados = coment.mapValues { e -> e.value.sortedBy { it.timestamp } }
                 comentarios = ordenados
-                todos = lista.map { it.copy(comentarios = ordenados[it.id]?.size ?: 0) }.sortedByDescending { it.timestamp }
+                todos = lista.map { it.copy(comentarios = ordenados[it.id]?.size ?: 0, reposts = lista.count { x -> x.repostDe == it.id }) }.sortedByDescending { it.timestamp }
                 cargando = false
             }
         } catch (e: kotlinx.coroutines.CancellationException) {
@@ -381,7 +411,17 @@ fun rememberChamosMuro(
     }
     val meGusta: suspend (MuroPost) -> Unit = gusta@{ p ->
         val sala = salaId?.let { client.getJoinedRoom(it) } ?: return@gusta
+        if (p.yoNoMeGusta) runCatching { sala.liveTimeline.toggleReaction("👎", evento(p.id)) }
         runCatching { sala.liveTimeline.toggleReaction("❤️", evento(p.id)) }
+    }
+    val noMeGusta: suspend (MuroPost) -> Unit = nogusta@{ p ->
+        val sala = salaId?.let { client.getJoinedRoom(it) } ?: return@nogusta
+        if (p.yoLike) runCatching { sala.liveTimeline.toggleReaction("❤️", evento(p.id)) }
+        runCatching { sala.liveTimeline.toggleReaction("👎", evento(p.id)) }
+    }
+    val repostear: suspend (MuroPost, String) -> Boolean = { p, comentario ->
+        val original = if (p.tipo == 'R') p.repostDe else p.id
+        enviar(null, null, MARCA_POST + "R|" + limpiarCampo(comentario) + "|" + original) == null
     }
     val comentar: suspend (MuroPost, String) -> Boolean = comenta@{ p, texto ->
         val sala = salaId?.let { client.getJoinedRoom(it) } ?: return@comenta false
@@ -451,6 +491,8 @@ fun rememberChamosMuro(
         cambiarFoto = cambiarFoto,
         borrar = borrar,
         meGusta = meGusta,
+        noMeGusta = noMeGusta,
+        repostear = repostear,
         comentar = comentar,
         borrarComentario = borrarComentario,
         reportar = reportar,
@@ -498,7 +540,6 @@ fun ChamosMuroPantalla(state: ChamosMuroState) {
     val scope = rememberCoroutineScope()
     var pestana by remember { mutableStateOf(0) }
     var perfilDe by remember { mutableStateOf("") }
-    var nuevaPublicacion by remember { mutableStateOf(false) }
     var nuevaVenta by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { state.activar() }
 
@@ -532,17 +573,7 @@ fun ChamosMuroPantalla(state: ChamosMuroState) {
                 item(key = "perfil") { CabeceraPerfil(state, verPerfilDe, lista.size) }
             }
             if (pestana == 0) {
-                item(key = "nuevo") {
-                    Row(
-                        Modifier.fillMaxWidth().background(TARJETA, androidx.compose.foundation.shape.RoundedCornerShape(14.dp)).padding(12.dp),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Avatar(avatarData = AvatarData(state.yoId, state.yoNombre, state.yoAvatar, AvatarSize.UserListItem), avatarType = AvatarType.User, forcedAvatarSize = 40.dp)
-                        Text("¿Qué cuentas, chamo?", color = Color(0xFFCFD6E6), modifier = Modifier.weight(1f).clickable { nuevaPublicacion = true }.padding(vertical = 8.dp))
-                        Text("🛒", fontSize = 24.sp, modifier = Modifier.clickable { nuevaVenta = true }.padding(6.dp))
-                    }
-                }
+                item(key = "nuevo") { CompositorMuro(state, onVender = { nuevaVenta = true }) }
             }
             if (pestana == 1) {
                 item(key = "vender") {
@@ -571,35 +602,6 @@ fun ChamosMuroPantalla(state: ChamosMuroState) {
         }
     }
 
-    if (nuevaPublicacion) {
-        var texto by remember { mutableStateOf("") }
-        var uri by remember { mutableStateOf<Uri?>(null) }
-        var mime by remember { mutableStateOf<String?>(null) }
-        val selector = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { u ->
-            if (u != null) { uri = u; mime = contexto.contentResolver.getType(u) ?: "image/jpeg" }
-        }
-        AlertDialog(
-            onDismissRequest = { nuevaPublicacion = false },
-            title = { Text("Nueva publicación") },
-            text = {
-                Column {
-                    OutlinedTextField(value = texto, onValueChange = { texto = it.take(500) }, placeholder = { Text("¿Qué cuentas, chamo?") }, modifier = Modifier.fillMaxWidth())
-                    TextButton(onClick = { selector.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }) {
-                        Text(if (uri == null) "📷 Agregar foto" else "📷 Foto lista (tocar para cambiar)")
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(enabled = texto.isNotBlank() || uri != null, onClick = {
-                    val u = uri; val m = mime; val t = texto
-                    nuevaPublicacion = false
-                    Toast.makeText(contexto, "Publicando…", Toast.LENGTH_SHORT).show()
-                    scope.launch { Toast.makeText(contexto, state.publicar(u, m, t) ?: "Publicado", Toast.LENGTH_LONG).show() }
-                }) { Text("Publicar") }
-            },
-            dismissButton = { TextButton(onClick = { nuevaPublicacion = false }) { Text("Cancelar") } },
-        )
-    }
     if (nuevaVenta) {
         var titulo by remember { mutableStateOf("") }
         var precio by remember { mutableStateOf("") }
@@ -821,6 +823,130 @@ private fun EditorFoto(uri: Uri, redonda: Boolean, onListo: (Uri) -> Unit, onCan
 }
 
 @Composable
+private fun CuerpoPost(post: MuroPost, state: ChamosMuroState) {
+    Column {
+            if (post.tipo == 'V') {
+                Text(post.titulo, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp, modifier = Modifier.padding(top = 10.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.padding(top = 2.dp)) {
+                    Text(post.precio, color = DORADO, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                    if (post.ciudad.isNotBlank()) Text("📍 " + post.ciudad, color = Color(0xFFCFD6E6), fontSize = 14.sp)
+                }
+            }
+            if (post.texto.isNotBlank()) Text(post.texto, color = Color.White, fontSize = 15.sp, modifier = Modifier.padding(top = 8.dp))
+            if (post.fuente != null) {
+                if (post.esVideo) VideoMuro(post, state)
+                else ImagenMuro(post, state, Modifier.fillMaxWidth().heightIn(min = 160.dp, max = 460.dp).padding(top = 8.dp), ContentScale.FillWidth)
+            }
+            if (post.tipo == 'V' && post.contacto.isNotBlank()) {
+                Text("📞 " + post.contacto, color = DORADO, fontWeight = FontWeight.Bold, fontSize = 14.sp, modifier = Modifier.padding(top = 8.dp))
+            }
+    }
+}
+
+@Composable
+private fun VideoMuro(post: MuroPost, state: ChamosMuroState) {
+    var ruta by remember(post.id) { mutableStateOf<String?>(null) }
+    var cargando by remember(post.id) { mutableStateOf(false) }
+    var jugar by remember(post.id) { mutableStateOf(false) }
+    LaunchedEffect(jugar) {
+        if (jugar && ruta == null) {
+            cargando = true
+            ruta = state.cargarImagen(post)
+            cargando = false
+            if (ruta == null) jugar = false
+        }
+    }
+    Box(
+        Modifier.fillMaxWidth().padding(top = 8.dp).height(320.dp).background(Color.Black, androidx.compose.foundation.shape.RoundedCornerShape(10.dp)),
+        contentAlignment = Alignment.Center,
+    ) {
+        val r = ruta
+        if (jugar && r != null) {
+            VideoTextura(ruta = r, activo = true, repetir = true, onProgreso = {}, onFin = {})
+        } else {
+            Text(
+                if (cargando) "Cargando video…" else "▶  Toca para ver el video",
+                color = Color.White, fontSize = 16.sp,
+                modifier = Modifier.clickable { jugar = true }.padding(24.dp),
+            )
+        }
+    }
+}
+
+/** El rectángulo para publicar: escribir, agregar imagen o video, o poner algo en venta. */
+@Composable
+private fun CompositorMuro(state: ChamosMuroState, onVender: () -> Unit) {
+    val contexto = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var texto by remember { mutableStateOf("") }
+    var uri by remember { mutableStateOf<Uri?>(null) }
+    var mime by remember { mutableStateOf<String?>(null) }
+    var publicando by remember { mutableStateOf(false) }
+    fun elegir(u: Uri?, porDefecto: String) {
+        if (u == null) return
+        val peso = runCatching { contexto.contentResolver.openFileDescriptor(u, "r")?.use { it.statSize } }.getOrNull() ?: 0L
+        if (peso > 50L * 1024 * 1024) {
+            Toast.makeText(contexto, "El archivo pesa más de 50 MB", Toast.LENGTH_LONG).show()
+            return
+        }
+        uri = u
+        mime = contexto.contentResolver.getType(u) ?: porDefecto
+    }
+    val selImagen = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { elegir(it, "image/jpeg") }
+    val selVideo = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { elegir(it, "video/mp4") }
+    Column(Modifier.fillMaxWidth().background(TARJETA, androidx.compose.foundation.shape.RoundedCornerShape(14.dp)).padding(12.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.Top) {
+            Avatar(avatarData = AvatarData(state.yoId, state.yoNombre, state.yoAvatar, AvatarSize.UserListItem), avatarType = AvatarType.User, forcedAvatarSize = 40.dp)
+            OutlinedTextField(
+                value = texto,
+                onValueChange = { texto = it.take(500) },
+                placeholder = { Text("¿Qué cuentas, chamo?", color = Color(0xFFCFD6E6)) },
+                textStyle = androidx.compose.ui.text.TextStyle(color = Color.White, fontSize = 15.sp),
+                minLines = 2,
+                modifier = Modifier.weight(1f),
+            )
+        }
+        if (uri != null) {
+            Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(if (mime?.startsWith("video") == true) "🎬 Video listo" else "🖼 Imagen lista", color = DORADO, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                Text("✕ Quitar", color = Color(0xFFCFD6E6), fontSize = 13.sp, modifier = Modifier.clickable { uri = null; mime = null }.padding(6.dp))
+            }
+        }
+        Row(Modifier.fillMaxWidth().padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+            listOf(
+                "🖼 Imagen" to { selImagen.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
+                "🎬 Video" to { selVideo.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.VideoOnly)) },
+                "🛒 Vender" to onVender,
+            ).forEach { (nombre, accion) ->
+                Text(
+                    nombre, color = Color.White, fontSize = 13.sp,
+                    modifier = Modifier.background(Color(0x33FFFFFF), androidx.compose.foundation.shape.RoundedCornerShape(16.dp)).clickable { accion() }.padding(horizontal = 10.dp, vertical = 7.dp),
+                )
+            }
+            Box(Modifier.weight(1f))
+            val puede = (texto.isNotBlank() || uri != null) && !publicando
+            Text(
+                if (publicando) "Publicando…" else "Publicar",
+                color = Color(0xFF1A1205), fontWeight = FontWeight.Bold, fontSize = 14.sp,
+                modifier = Modifier
+                    .background(if (puede) DORADO else Color(0x66F4B54A), androidx.compose.foundation.shape.RoundedCornerShape(16.dp))
+                    .clickable(enabled = puede) {
+                        val u = uri; val m = mime; val t = texto
+                        publicando = true
+                        scope.launch {
+                            val resultado = state.publicar(u, m, t)
+                            publicando = false
+                            if (resultado == null) { texto = ""; uri = null; mime = null }
+                            Toast.makeText(contexto, resultado ?: "Publicado", Toast.LENGTH_LONG).show()
+                        }
+                    }
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+            )
+        }
+    }
+}
+
+@Composable
 private fun TarjetaPost(post: MuroPost, state: ChamosMuroState, onPerfil: (String) -> Unit) {
     val contexto = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -828,6 +954,7 @@ private fun TarjetaPost(post: MuroPost, state: ChamosMuroState, onPerfil: (Strin
     var comentarios by remember { mutableStateOf(false) }
     var confirmarBorrar by remember { mutableStateOf(false) }
     var reportando by remember { mutableStateOf(false) }
+    var reposteando by remember { mutableStateOf(false) }
     Column(Modifier.fillMaxWidth().background(TARJETA, androidx.compose.foundation.shape.RoundedCornerShape(14.dp)).padding(12.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Avatar(
@@ -849,24 +976,44 @@ private fun TarjetaPost(post: MuroPost, state: ChamosMuroState, onPerfil: (Strin
                 }
             }
         }
-        if (post.tipo == 'V') {
-            Text(post.titulo, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp, modifier = Modifier.padding(top = 10.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.padding(top = 2.dp)) {
-                Text(post.precio, color = DORADO, fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                if (post.ciudad.isNotBlank()) Text("📍 " + post.ciudad, color = Color(0xFFCFD6E6), fontSize = 14.sp)
+        if (post.tipo == 'R') {
+            Text("🔁 reposteó", color = Color(0xFFCFD6E6), fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
+            if (post.texto.isNotBlank()) Text(post.texto, color = Color.White, fontSize = 15.sp, modifier = Modifier.padding(top = 6.dp))
+            val orig = state.posts.firstOrNull { it.id == post.repostDe }
+            Column(Modifier.fillMaxWidth().padding(top = 8.dp).background(Color(0x22FFFFFF), androidx.compose.foundation.shape.RoundedCornerShape(10.dp)).padding(10.dp)) {
+                if (orig == null) {
+                    Text("La publicación original ya no está disponible.", color = Color(0xFFCFD6E6), fontSize = 13.sp)
+                } else {
+                    Text(orig.autor, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp, modifier = Modifier.clickable { onPerfil(orig.autorId) })
+                    CuerpoPost(orig, state)
+                }
             }
-        }
-        if (post.texto.isNotBlank()) Text(post.texto, color = Color.White, fontSize = 15.sp, modifier = Modifier.padding(top = 8.dp))
-        if (post.fuente != null) {
-            ImagenMuro(post, state, Modifier.fillMaxWidth().heightIn(min = 160.dp, max = 460.dp).padding(top = 8.dp), ContentScale.FillWidth)
-        }
-        if (post.tipo == 'V' && post.contacto.isNotBlank()) {
-            Text("📞 " + post.contacto, color = DORADO, fontWeight = FontWeight.Bold, fontSize = 14.sp, modifier = Modifier.padding(top = 8.dp))
+        } else {
+            CuerpoPost(post, state)
         }
         Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(22.dp)) {
             Text((if (post.yoLike) "❤️ " else "🤍 ") + post.likes, color = Color.White, fontSize = 16.sp, modifier = Modifier.clickable { scope.launch { state.meGusta(post) } })
+            Text((if (post.yoNoMeGusta) "👎🏽 " else "👎 ") + post.noMeGusta, color = Color.White, fontSize = 16.sp, modifier = Modifier.clickable { scope.launch { state.noMeGusta(post) } })
             Text("💬 " + post.comentarios, color = Color.White, fontSize = 16.sp, modifier = Modifier.clickable { comentarios = true })
+            Text("🔁 " + post.reposts, color = Color.White, fontSize = 16.sp, modifier = Modifier.clickable { reposteando = true })
         }
+    }
+    if (reposteando) {
+        var comentarioRepost by remember { mutableStateOf("") }
+        AlertDialog(
+            onDismissRequest = { reposteando = false },
+            title = { Text("Repostear en tu muro") },
+            text = {
+                OutlinedTextField(value = comentarioRepost, onValueChange = { comentarioRepost = it.take(300) }, placeholder = { Text("Agrega algo (opcional)") }, modifier = Modifier.fillMaxWidth())
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    reposteando = false
+                    scope.launch { Toast.makeText(contexto, if (state.repostear(post, comentarioRepost)) "Reposteado" else "No se pudo repostear", Toast.LENGTH_SHORT).show() }
+                }) { Text("Repostear") }
+            },
+            dismissButton = { TextButton(onClick = { reposteando = false }) { Text("Cancelar") } },
+        )
     }
     if (confirmarBorrar) {
         AlertDialog(
