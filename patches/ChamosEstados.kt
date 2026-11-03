@@ -617,27 +617,6 @@ fun ChamosEstadosRow(
                 color = MaterialTheme.colorScheme.onSurface,
             )
             Row(verticalAlignment = Alignment.CenterVertically) {
-            var autoAct by remember {
-                mutableStateOf(
-                    runCatching {
-                        Class.forName("io.element.android.x.ChamosUpdater")
-                            .getMethod("autoActivo", android.content.Context::class.java)
-                            .invoke(null, contexto) as Boolean
-                    }.getOrDefault(true),
-                )
-            }
-            TextButton(onClick = {
-                runCatching {
-                    autoAct = Class.forName("io.element.android.x.ChamosUpdater")
-                        .getMethod("alternarAuto", android.content.Context::class.java)
-                        .invoke(null, contexto) as Boolean
-                    Toast.makeText(
-                        contexto,
-                        if (autoAct) "Chamos se actualizará sola." else "Chamos te preguntará antes de actualizar.",
-                        Toast.LENGTH_SHORT,
-                    ).show()
-                }
-            }) { Text(if (autoAct) "Auto: sí" else "Auto: no") }
             TextButton(onClick = {
                 var a: android.content.Context? = contexto
                 while (a is android.content.ContextWrapper && a !is android.app.Activity) a = a.baseContext

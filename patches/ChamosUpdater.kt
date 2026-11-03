@@ -35,18 +35,12 @@ object ChamosUpdater {
     private const val KEY_AUTO = "auto"
     private const val ACCION_INSTALAR = "io.element.android.x.CHAMOS_INSTALAR_RESULTADO"
 
-    /** ¿Se actualiza sola? Por defecto sí: descarga e instala sin preguntar. */
+    /** Siempre se actualiza sola: descarga e instala sin preguntar. */
     @JvmStatic
-    fun autoActivo(context: Context): Boolean =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_AUTO, true)
+    fun autoActivo(@Suppress("UNUSED_PARAMETER") context: Context): Boolean = true
 
-    /** Prende o apaga la actualización automática y devuelve cómo quedó. */
     @JvmStatic
-    fun alternarAuto(context: Context): Boolean {
-        val nuevo = !autoActivo(context)
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean(KEY_AUTO, nuevo).apply()
-        return nuevo
-    }
+    fun alternarAuto(@Suppress("UNUSED_PARAMETER") context: Context): Boolean = true
 
     /** Botón «Buscar actualización»: ignora el intervalo y avisa del resultado. */
     @JvmStatic
@@ -90,13 +84,7 @@ object ChamosUpdater {
                 if (!apkUrl.startsWith("https://github.com/$REPO/")) return@thread
                 activity.runOnUiThread {
                     if (activity.isFinishing) return@runOnUiThread
-                    val permitido = Build.VERSION.SDK_INT < Build.VERSION_CODES.O || activity.packageManager.canRequestPackageInstalls()
-                    if (autoActivo(activity) && permitido) {
-                        Toast.makeText(activity, "Descargando la actualización de Chamos ($tag)…", Toast.LENGTH_LONG).show()
-                        startDownload(activity, tag, apkUrl)
-                    } else {
-                        askToUpdate(activity, tag, apkUrl)
-                    }
+                    startDownload(activity, tag, apkUrl)
                 }
             } catch (_: Exception) {
                 aviso("No se pudo buscar la actualización. Revisa tu internet.")
