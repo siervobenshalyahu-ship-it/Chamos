@@ -16,6 +16,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -642,19 +648,27 @@ private fun CabeceraPerfil(state: ChamosMuroState, autorId: String, nPosts: Int)
     val ejemplo = state.posts.firstOrNull { it.autorId == autorId }
     val nombre = if (esMio) state.yoNombre else (ejemplo?.autor ?: autorId.substringBefore(":").removePrefix("@"))
     val avatar = if (esMio) state.yoAvatar else ejemplo?.autorAvatar
+    var pendiente by remember { mutableStateOf<Pair<Uri, Boolean>?>(null) }
     val selPortada = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { u ->
-        if (u != null) {
-            val m = contexto.contentResolver.getType(u) ?: "image/jpeg"
-            Toast.makeText(contexto, "Subiendo portada…", Toast.LENGTH_SHORT).show()
-            scope.launch { Toast.makeText(contexto, state.cambiarPortada(u, m) ?: "Portada cambiada", Toast.LENGTH_LONG).show() }
-        }
+        if (u != null) pendiente = Pair(u, false)
     }
     val selFoto = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { u ->
-        if (u != null) {
-            val m = contexto.contentResolver.getType(u) ?: "image/jpeg"
-            Toast.makeText(contexto, "Cambiando tu foto…", Toast.LENGTH_SHORT).show()
-            scope.launch { Toast.makeText(contexto, state.cambiarFoto(u, m) ?: "Foto cambiada", Toast.LENGTH_LONG).show() }
-        }
+        if (u != null) pendiente = Pair(u, true)
+    }
+    pendiente?.let { (uriElegida, redonda) ->
+        EditorFoto(
+            uri = uriElegida,
+            redonda = redonda,
+            onCancelar = { pendiente = null },
+            onListo = { recortada ->
+                pendiente = null
+                Toast.makeText(contexto, if (redonda) "Cambiando tu foto…" else "Subiendo portada…", Toast.LENGTH_SHORT).show()
+                scope.launch {
+                    val r = if (redonda) state.cambiarFoto(recortada, "image/jpeg") else state.cambiarPortada(recortada, "image/jpeg")
+                    Toast.makeText(contexto, r ?: (if (redonda) "Foto cambiada" else "Portada cambiada"), Toast.LENGTH_LONG).show()
+                }
+            },
+        )
     }
     Column(Modifier.fillMaxWidth().background(TARJETA, androidx.compose.foundation.shape.RoundedCornerShape(14.dp))) {
         Box(Modifier.fillMaxWidth().height(150.dp).background(Color(0xFF2A3558), androidx.compose.foundation.shape.RoundedCornerShape(topStart = 14.dp, topEnd = 14.dp))) {
@@ -663,21 +677,147 @@ private fun CabeceraPerfil(state: ChamosMuroState, autorId: String, nPosts: Int)
             } else {
                 Text("Sin foto de portada", color = Color(0xFFCFD6E6), modifier = Modifier.align(Alignment.Center))
             }
+            if (esMio) {
+                Text(
+                    "✏️ Editar",
+                    color = Color.White,
+                    fontSize = 13.sp,
+                    modifier = Modifier.align(Alignment.TopEnd).padding(8.dp)
+                        .background(Color(0x99000000), CircleShape)
+                        .clickable { selPortada.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }
+                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                )
+            }
         }
         Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Avatar(avatarData = AvatarData(autorId, nombre, avatar, AvatarSize.UserListItem), avatarType = AvatarType.User, forcedAvatarSize = 72.dp)
+            Box {
+                Avatar(avatarData = AvatarData(autorId, nombre, avatar, AvatarSize.UserListItem), avatarType = AvatarType.User, forcedAvatarSize = 72.dp)
+                if (esMio) {
+                    Text(
+                        "✏️",
+                        fontSize = 13.sp,
+                        modifier = Modifier.align(Alignment.BottomEnd)
+                            .background(Color(0xFF2A3558), CircleShape)
+                            .clickable { selFoto.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }
+                            .padding(6.dp),
+                    )
+                }
+            }
             Column(Modifier.weight(1f)) {
                 Text(nombre, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 20.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text("$nPosts publicaciones", color = Color(0xFFCFD6E6), fontSize = 13.sp)
             }
         }
-        if (esMio) {
-            Row(Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, bottom = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                TextButton(onClick = { selFoto.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }) { Text("📷 Cambiar mi foto") }
-                TextButton(onClick = { selPortada.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }) { Text("🖼 Cambiar portada") }
-            }
-        }
     }
+}
+
+private fun cargarBitmap(contexto: android.content.Context, uri: Uri): android.graphics.Bitmap? = runCatching {
+    val opt = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    contexto.contentResolver.openInputStream(uri)?.use { android.graphics.BitmapFactory.decodeStream(it, null, opt) }
+    var muestra = 1
+    while (maxOf(opt.outWidth, opt.outHeight) / muestra > 2048) muestra *= 2
+    val opt2 = android.graphics.BitmapFactory.Options().apply { inSampleSize = muestra }
+    val bmp = contexto.contentResolver.openInputStream(uri)?.use { android.graphics.BitmapFactory.decodeStream(it, null, opt2) }
+        ?: return@runCatching null
+    val giro = runCatching {
+        contexto.contentResolver.openInputStream(uri)?.use {
+            when (android.media.ExifInterface(it).getAttributeInt(android.media.ExifInterface.TAG_ORIENTATION, 1)) {
+                6 -> 90f
+                3 -> 180f
+                8 -> 270f
+                else -> 0f
+            }
+        } ?: 0f
+    }.getOrDefault(0f)
+    if (giro == 0f) bmp else android.graphics.Bitmap.createBitmap(bmp, 0, 0, bmp.width, bmp.height, android.graphics.Matrix().apply { postRotate(giro) }, true)
+}.getOrNull()
+
+private fun recortarFoto(
+    contexto: android.content.Context,
+    bmp: android.graphics.Bitmap,
+    fw: Float,
+    fh: Float,
+    zoom: Float,
+    ox: Float,
+    oy: Float,
+    ow: Int,
+    oh: Int,
+): Uri? = runCatching {
+    val base = maxOf(fw / bmp.width, fh / bmp.height)
+    val esc = base * zoom
+    val k = ow / fw
+    val salida = android.graphics.Bitmap.createBitmap(ow, oh, android.graphics.Bitmap.Config.ARGB_8888)
+    val m = android.graphics.Matrix()
+    m.postScale(esc * k, esc * k)
+    m.postTranslate(ow / 2f + ox * k - bmp.width * esc * k / 2f, oh / 2f + oy * k - bmp.height * esc * k / 2f)
+    android.graphics.Canvas(salida).drawBitmap(bmp, m, android.graphics.Paint(android.graphics.Paint.FILTER_BITMAP_FLAG))
+    val dir = java.io.File(contexto.cacheDir, "muro_cache").apply { mkdirs() }
+    val f = java.io.File(dir, "recorte_" + System.currentTimeMillis() + ".jpg")
+    f.outputStream().use { salida.compress(android.graphics.Bitmap.CompressFormat.JPEG, 90, it) }
+    Uri.fromFile(f)
+}.getOrNull()
+
+/** Para acomodar la foto antes de subirla: se arrastra con un dedo y se acerca pellizcando. */
+@Composable
+private fun EditorFoto(uri: Uri, redonda: Boolean, onListo: (Uri) -> Unit, onCancelar: () -> Unit) {
+    val contexto = LocalContext.current
+    val densidad = androidx.compose.ui.platform.LocalDensity.current
+    val bmp = remember(uri) { cargarBitmap(contexto, uri) }
+    val anchoMarco = 270.dp
+    val altoMarco = if (redonda) 270.dp else 130.dp
+    val fw = with(densidad) { anchoMarco.toPx() }
+    val fh = with(densidad) { altoMarco.toPx() }
+    var zoom by remember { mutableStateOf(1f) }
+    var ox by remember { mutableStateOf(0f) }
+    var oy by remember { mutableStateOf(0f) }
+    AlertDialog(
+        onDismissRequest = onCancelar,
+        title = { Text(if (redonda) "Acomoda tu foto" else "Acomoda tu portada") },
+        text = {
+            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+                Text("Arrástrala para moverla y pellizca para acercar o alejar", fontSize = 13.sp)
+                Box(
+                    Modifier.padding(top = 14.dp)
+                        .size(anchoMarco, altoMarco)
+                        .clip(if (redonda) CircleShape else androidx.compose.foundation.shape.RoundedCornerShape(10.dp))
+                        .background(Color.Black)
+                        .pointerInput(bmp) {
+                            detectTransformGestures { _, pan, z, _ ->
+                                val b = bmp
+                                if (b != null) {
+                                    val nz = (zoom * z).coerceIn(1f, 5f)
+                                    val base = maxOf(fw / b.width, fh / b.height)
+                                    val mx = maxOf(0f, (b.width * base * nz - fw) / 2f)
+                                    val my = maxOf(0f, (b.height * base * nz - fh) / 2f)
+                                    zoom = nz
+                                    ox = (ox + pan.x).coerceIn(-mx, mx)
+                                    oy = (oy + pan.y).coerceIn(-my, my)
+                                }
+                            }
+                        },
+                ) {
+                    if (bmp != null) {
+                        Image(
+                            bitmap = bmp.asImageBitmap(),
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize().graphicsLayer(scaleX = zoom, scaleY = zoom, translationX = ox, translationY = oy),
+                        )
+                    } else {
+                        Text("No pude abrir la foto", color = Color.White, modifier = Modifier.align(Alignment.Center))
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(enabled = bmp != null, onClick = {
+                val b = bmp
+                val u = if (b == null) null else recortarFoto(contexto, b, fw, fh, zoom, ox, oy, if (redonda) 800 else 1280, if (redonda) 800 else (1280 * 130 / 270))
+                if (u != null) onListo(u) else Toast.makeText(contexto, "No pude preparar la foto", Toast.LENGTH_LONG).show()
+            }) { Text("Listo") }
+        },
+        dismissButton = { TextButton(onClick = onCancelar) { Text("Cancelar") } },
+    )
 }
 
 @Composable
