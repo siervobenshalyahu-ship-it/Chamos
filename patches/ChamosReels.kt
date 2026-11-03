@@ -119,6 +119,7 @@ data class ChamosReelsState(
     val cargando: Boolean = false,
     val reels: List<ReelItem> = emptyList(),
     val comentarios: Map<String, List<ReelComentario>> = emptyMap(),
+    val muro: ChamosMuroState = ChamosMuroState(),
     val soyAdmin: Boolean = false,
     val chats: List<Pair<RoomId, String>> = emptyList(),
     val activar: () -> Unit = {},
@@ -207,6 +208,7 @@ fun rememberChamosReels(
     val chats by dataSource.roomSummariesFlow.collectAsState(initial = emptyList())
     val yo = client.sessionId
     val scopeReels = rememberCoroutineScope()
+    val muro = rememberChamosMuro(client, dataSource, mediaSenderFactory, mediaConfigFactory)
 
     // 1) Encontrar o crear la sala (solo cuando la persona abre los Reels).
     LaunchedEffect(activo) {
@@ -402,8 +404,9 @@ fun rememberChamosReels(
         cargando = cargando,
         reels = reels,
         comentarios = comentarios,
+        muro = muro,
         soyAdmin = soyAdmin,
-        chats = chats.filter { it.displayType == io.element.android.features.home.impl.model.RoomSummaryDisplayType.ROOM && !it.isChamosEstado() && !it.isChamosReels() && !it.isSpace }
+        chats = chats.filter { it.displayType == io.element.android.features.home.impl.model.RoomSummaryDisplayType.ROOM && !it.isChamosEstado() && !it.isChamosReels() && !it.isChamosMuro() && !it.isSpace }
             .map { Pair(it.roomId, it.name ?: "Chat") },
         activar = { activo = true },
         masAntiguos = masAntiguos,
@@ -428,6 +431,7 @@ fun ChamosReelsPantalla(state: ChamosReelsState, onCerrar: () -> Unit) {
     val contexto = LocalContext.current
     val scope = rememberCoroutineScope()
     var subiendo by remember { mutableStateOf(false) }
+    var verMuro by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { state.activar() }
     // La pantalla de neón se queda hasta que los Reels terminan de cargar (mínimo 2 segundos).
     var intro by remember { mutableStateOf(true) }
@@ -441,6 +445,7 @@ fun ChamosReelsPantalla(state: ChamosReelsState, onCerrar: () -> Unit) {
     LaunchedEffect(intro, state.cargando, state.reels.size) {
         if (!intro && !state.cargando && state.reels.isNotEmpty()) terminado = true
     }
+    LaunchedEffect(verMuro) { if (verMuro) state.muro.activar() }
 
     Dialog(
         onDismissRequest = onCerrar,
@@ -491,8 +496,17 @@ fun ChamosReelsPantalla(state: ChamosReelsState, onCerrar: () -> Unit) {
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text("✕", color = Color.White, fontSize = 26.sp, modifier = Modifier.clickable { onCerrar() }.padding(8.dp))
-                if (!terminado) Text("", fontSize = 18.sp) else Text("Reels", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                Text("＋", color = Color.White, fontSize = 30.sp, modifier = Modifier.clickable { subiendo = true }.padding(8.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(if (!terminado) "" else "Reels", color = Color.White.copy(alpha = if (verMuro) 0.5f else 1f), fontSize = 18.sp, fontWeight = FontWeight.Bold,
+                        modifier = Modifier.clickable { verMuro = false }.padding(8.dp))
+                    Text("Muro", color = Color.White.copy(alpha = if (verMuro) 1f else 0.5f), fontSize = 18.sp, fontWeight = FontWeight.Bold,
+                        modifier = Modifier.clickable { verMuro = true }.padding(8.dp))
+                }
+                if (verMuro) Text("   ", fontSize = 30.sp, modifier = Modifier.padding(8.dp))
+                else Text("＋", color = Color.White, fontSize = 30.sp, modifier = Modifier.clickable { subiendo = true }.padding(8.dp))
+            }
+            if (verMuro) {
+                Box(Modifier.fillMaxSize().background(Color(0xFF101114)).padding(top = 84.dp)) { ChamosMuroPantalla(state.muro) }
             }
         }
     }

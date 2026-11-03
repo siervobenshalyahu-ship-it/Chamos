@@ -4,6 +4,7 @@ import sys, os, shutil
 root, pdir = sys.argv[1], sys.argv[2]
 d = os.path.join(root, "features/home/impl/src/main/kotlin/io/element/android/features/home/impl")
 shutil.copy(os.path.join(pdir, "ChamosReels.kt"), os.path.join(d, "ChamosReels.kt"))
+shutil.copy(os.path.join(pdir, "ChamosMuro.kt"), os.path.join(d, "ChamosMuro.kt"))
 
 def edit(path, pairs):
     s = open(path, encoding="utf-8").read()
@@ -28,9 +29,9 @@ edit(os.path.join(d, "HomePresenter.kt"), [
 # la sala de Reels no sale en la lista de chats
 edit(os.path.join(d, "datasource/RoomListDataSource.kt"), [
     ("        .map { list -> list.filterNot { it.isChamosEstado() }.toImmutableList() }\n",
-     "        .map { list -> list.filterNot { it.isChamosEstado() || it.isChamosReels() }.toImmutableList() }\n"),
+     "        .map { list -> list.filterNot { it.isChamosEstado() || it.isChamosReels() || it.isChamosMuro() }.toImmutableList() }\n"),
     ("import io.element.android.features.home.impl.isChamosEstado\n",
-     "import io.element.android.features.home.impl.isChamosEstado\nimport io.element.android.features.home.impl.isChamosReels\n"),
+     "import io.element.android.features.home.impl.isChamosEstado\nimport io.element.android.features.home.impl.isChamosReels\nimport io.element.android.features.home.impl.isChamosMuro\n"),
 ])
 # pantalla principal: botón en la barra de abajo + pantalla de Reels
 edit(os.path.join(d, "HomeView.kt"), [
