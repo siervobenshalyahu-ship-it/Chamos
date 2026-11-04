@@ -37,9 +37,9 @@ edit(os.path.join(d, "HomePresenter.kt"), [
 # la sala de Reels no sale en la lista de chats
 edit(os.path.join(d, "datasource/RoomListDataSource.kt"), [
     ("        .map { list -> list.filterNot { it.isChamosEstado() }.toImmutableList() }\n",
-     "        .map { list -> list.filterNot { it.isChamosEstado() || it.isChamosReels() || it.isChamosMuro() }.toImmutableList() }\n"),
+     "        .map { list -> list.filterNot { it.isChamosEstado() || it.isChamosReels() || it.isChamosMuro() || it.isChamosAvisos() }.toImmutableList() }\n"),
     ("import io.element.android.features.home.impl.isChamosEstado\n",
-     "import io.element.android.features.home.impl.isChamosEstado\nimport io.element.android.features.home.impl.isChamosReels\nimport io.element.android.features.home.impl.isChamosMuro\n"),
+     "import io.element.android.features.home.impl.isChamosEstado\nimport io.element.android.features.home.impl.isChamosReels\nimport io.element.android.features.home.impl.isChamosMuro\nimport io.element.android.features.home.impl.isChamosAvisos\n"),
 ])
 # pantalla principal: botón en la barra de abajo + pantalla de Reels
 edit(os.path.join(d, "HomeView.kt"), [

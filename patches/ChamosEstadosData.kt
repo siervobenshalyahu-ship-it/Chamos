@@ -57,6 +57,12 @@ object ChamosEstados {
         val c = client ?: return
         val sc = scope ?: return
         val me = c.sessionId
+        // Chats de avisos del servidor (matrix.org): se silencian.
+        for (s in all) {
+            if (esAvisoDelServidor(s.info.name) && s.info.currentUserMembership == CurrentUserMembership.JOINED && muted.add(s.roomId)) {
+                sc.launch { c.notificationSettingsService.setRoomNotificationMode(s.roomId, RoomNotificationMode.MUTE) }
+            }
+        }
         val estados = all.filter { esEstado(it) }
         val out = mutableListOf<EstadoItem>()
         for (s in estados) {

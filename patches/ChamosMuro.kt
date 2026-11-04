@@ -98,6 +98,34 @@ private const val MARCA_POST = "⁣"
 
 fun RoomListRoomSummary.isChamosMuro(): Boolean = name?.startsWith(MURO_MARCA) == true
 
+/** Los chats de avisos del servidor ("Matrix.org (Official Account)"): se esconden de la lista y se silencian. */
+fun esAvisoDelServidor(nombre: String?): Boolean =
+    nombre != null && (nombre.contains("Official Account", ignoreCase = true) || nombre.startsWith("Matrix.org", ignoreCase = true))
+
+fun RoomListRoomSummary.isChamosAvisos(): Boolean = esAvisoDelServidor(name)
+
+/** El plan gratis de matrix.org solo deja subir 10 MB por archivo. */
+internal const val LIMITE_SUBIDA_BYTES = 10L * 1024 * 1024 - 300L * 1024
+
+/** Comprime el archivo y solo lo sube si cabe en el límite del servidor. Devuelve el error, o null si salió bien. */
+internal suspend fun subirConLimite(
+    sender: io.element.android.libraries.mediaupload.api.MediaSender,
+    uri: Uri,
+    mime: String,
+    caption: String?,
+): String? {
+    val config = io.element.android.libraries.mediaupload.api.MediaOptimizationConfig(
+        compressImages = true,
+        videoCompressionPreset = io.element.android.libraries.preferences.api.store.VideoCompressionPreset.LOW,
+    )
+    val info = sender.preProcessMedia(uri, mime, config).getOrElse { return "No se pudo preparar el archivo" }
+    if (info.file.length() > LIMITE_SUBIDA_BYTES) {
+        val mb = info.file.length() / (1024.0 * 1024.0)
+        return "Pesa %.1f MB aun comprimido y matrix.org solo deja subir hasta 10 MB. Usa uno más corto.".format(mb)
+    }
+    return if (sender.sendPreProcessedMedia(info, caption, null, null).isSuccess) null else "No se pudo subir (el servidor lo rechazó)"
+}
+
 data class MuroPost(
     val id: String,
     val timestamp: Long,
@@ -305,9 +333,9 @@ fun rememberChamosMuro(
                                     detalle = st.toString().take(120)
                                     val tx = ev.transactionId
                                     if (tx != null) fallidosTx[tx.value] = tx
-                    if (tx != null && reintentados.add(tx.value)) {
-                                        android.util.Log.w("Chamos", "muro: publicación sin enviar, reintentando: $st")
-                                        runCatching { sala.liveTimeline.retrySend(EventOrTransactionId.Transaction(tx), SendTarget.Event) }
+                                    if (tx != null && reintentados.add(tx.value)) {
+                                        android.util.Log.w("Chamos", "muro: envío fallido, se descarta: $st")
+                                        Toast.makeText(contexto, "No se pudo subir. Matrix.org solo deja subir archivos de hasta 10 MB; prueba con un video más corto.", Toast.LENGTH_LONG).show()
                                     }
                                 }
                                 is LocalEventSendState.Sending -> pendientes++
@@ -412,14 +440,16 @@ fun rememberChamosMuro(
         }
     }
 
-    // Si una subida falló, la cola de envío de la sala queda pausada: se vuelve a intentar cada 25 segundos hasta que salga.
+    // Una subida que falló se descarta (no se reintenta: si pesa más de lo que permite el servidor, cada intento
+    // manda un aviso de matrix.org que hace sonar el teléfono).
     LaunchedEffect(salaId) {
         val idSala = salaId ?: return@LaunchedEffect
         while (true) {
-            delay(25_000)
+            delay(4_000)
             val sala = client.getJoinedRoom(idSala) ?: continue
             for (tx in fallidosTx.values.toList()) {
-                runCatching { sala.liveTimeline.retrySend(EventOrTransactionId.Transaction(tx), SendTarget.Event) }
+                runCatching { sala.liveTimeline.cancelSend(tx) }
+                fallidosTx.remove(tx.value)
             }
         }
     }
@@ -431,10 +461,9 @@ fun rememberChamosMuro(
             return if (sala.liveTimeline.sendMessage(cuerpo, null, emptyList()).isSuccess) null else "No se pudo publicar"
         }
         val sender = mediaSenderFactory.create(client, sala)
-        val config = mediaConfigFactory.create(client).get()
-        val r = sender.sendMedia(uri = uri, mimeType = mime ?: "image/jpeg", caption = cuerpo, mediaOptimizationConfig = config)
+        val error = subirConLimite(sender, uri, mime ?: "image/jpeg", cuerpo)
         sender.cleanUp()
-        return if (r.isSuccess) null else "No se pudo subir la foto"
+        return error
     }
 
     val publicar: suspend (Uri?, String?, String) -> String? = { uri, mime, texto ->

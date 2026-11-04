@@ -278,9 +278,9 @@ fun rememberChamosReels(
                                     detalle = st.toString().take(120)
                                     val tx = ev.transactionId
                                     if (tx != null) fallidosTx[tx.value] = tx
-                    if (tx != null && reintentados.add(tx.value)) {
-                                        android.util.Log.w("Chamos", "reels: video sin enviar, reintentando: $st")
-                                        runCatching { sala.liveTimeline.retrySend(EventOrTransactionId.Transaction(tx), SendTarget.Event) }
+                                    if (tx != null && reintentados.add(tx.value)) {
+                                        android.util.Log.w("Chamos", "reels: envío fallido, se descarta: $st")
+                                        Toast.makeText(contexto, "No se pudo subir. Matrix.org solo deja subir archivos de hasta 10 MB; prueba con un video más corto.", Toast.LENGTH_LONG).show()
                                     }
                                 }
                                 is LocalEventSendState.Sending -> pendientes++
@@ -346,14 +346,16 @@ fun rememberChamosReels(
         }
     }
 
-    // Si una subida falló, la cola de envío de la sala queda pausada: se vuelve a intentar cada 25 segundos hasta que salga.
+    // Una subida que falló se descarta (no se reintenta: si pesa más de lo que permite el servidor, cada intento
+    // manda un aviso de matrix.org que hace sonar el teléfono).
     LaunchedEffect(salaId) {
         val idSala = salaId ?: return@LaunchedEffect
         while (true) {
-            delay(25_000)
+            delay(4_000)
             val sala = client.getJoinedRoom(idSala) ?: continue
             for (tx in fallidosTx.values.toList()) {
-                runCatching { sala.liveTimeline.retrySend(EventOrTransactionId.Transaction(tx), SendTarget.Event) }
+                runCatching { sala.liveTimeline.cancelSend(tx) }
+                fallidosTx.remove(tx.value)
             }
         }
     }
@@ -406,17 +408,15 @@ fun rememberChamosReels(
         // La subida corre aparte (no se corta si cierras los Reels).
         scopeReels.launch {
             val sender = mediaSenderFactory.create(client, sala)
-            val config = mediaConfigFactory.create(client).get()
             val origen = if (copia != null) Uri.fromFile(copia) else uri
-            val r = runCatching { sender.sendMedia(uri = origen, mimeType = mime, caption = desc.ifBlank { null }, mediaOptimizationConfig = config) }
-                .getOrElse { Result.failure(it) }
+            val error = runCatching { subirConLimite(sender, origen, mime, desc.ifBlank { null }) }.getOrElse { "No se pudo subir el video" }
             sender.cleanUp()
-            if (r.isSuccess) {
+            if (error == null) {
                 Toast.makeText(contexto, "Video publicado", Toast.LENGTH_LONG).show()
                 delay(10_000)
             } else {
-                android.util.Log.e("Chamos", "reels: no se pudo subir el video", r.exceptionOrNull())
-                Toast.makeText(contexto, "No se pudo subir el video", Toast.LENGTH_LONG).show()
+                android.util.Log.e("Chamos", "reels: no se pudo subir el video: $error")
+                Toast.makeText(contexto, error, Toast.LENGTH_LONG).show()
             }
             locales = locales.filter { it.id != idLocal }
             baseLocal.remove(idLocal)
@@ -497,7 +497,7 @@ fun rememberChamosReels(
         muro = muro,
         envio = envio,
         soyAdmin = soyAdmin,
-        chats = chats.filter { it.displayType == io.element.android.features.home.impl.model.RoomSummaryDisplayType.ROOM && !it.isChamosEstado() && !it.isChamosReels() && !it.isChamosMuro() && !it.isSpace }
+        chats = chats.filter { it.displayType == io.element.android.features.home.impl.model.RoomSummaryDisplayType.ROOM && !it.isChamosEstado() && !it.isChamosReels() && !it.isChamosMuro() && !it.isChamosAvisos() && !it.isSpace }
             .map { Pair(it.roomId, it.name ?: "Chat") },
         activar = { activo = true },
         masAntiguos = masAntiguos,
