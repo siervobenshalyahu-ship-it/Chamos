@@ -977,7 +977,7 @@ private fun CabeceraRobot(pestanas: @Composable () -> Unit, imagen: Int) {
                 val p = medida.measure(c.copy(minWidth = c.maxWidth + extra, maxWidth = c.maxWidth + extra))
                 layout(c.maxWidth, p.height) { p.place(-extra / 2, 0) }
             }
-            .height(290.dp)
+            .height(232.dp)
             .clip(androidx.compose.foundation.shape.RoundedCornerShape(bottomStart = 22.dp, bottomEnd = 22.dp)),
     ) {
         Image(
