@@ -212,6 +212,7 @@ fun rememberChamosReels(
     var locales by remember { mutableStateOf<List<ReelItem>>(emptyList()) }
     val baseLocal = remember { mutableMapOf<String, Int>() }
     val reintentados = remember { mutableSetOf<String>() }
+    val fallidosTx = remember { mutableMapOf<String, io.element.android.libraries.matrix.api.core.TransactionId>() }
     var comentarios by remember { mutableStateOf<Map<String, List<ReelComentario>>>(emptyMap()) }
     val cacheArchivos = remember { mutableMapOf<String, String>() }
     val chats by dataSource.roomSummariesFlow.collectAsState(initial = emptyList())
@@ -260,6 +261,7 @@ fun rememberChamosReels(
             sala.liveTimeline.timelineItems.collect { items ->
                 val lista = mutableListOf<ReelItem>()
                 var pendientes = 0
+                fallidosTx.clear()
                 var fallos = 0
                 var detalle = ""
                 val coment = mutableMapOf<String, MutableList<ReelComentario>>()
@@ -275,7 +277,8 @@ fun rememberChamosReels(
                                     fallos++
                                     detalle = st.toString().take(120)
                                     val tx = ev.transactionId
-                                    if (tx != null && reintentados.add(tx.value)) {
+                                    if (tx != null) fallidosTx[tx.value] = tx
+                    if (tx != null && reintentados.add(tx.value)) {
                                         android.util.Log.w("Chamos", "reels: video sin enviar, reintentando: $st")
                                         runCatching { sala.liveTimeline.retrySend(EventOrTransactionId.Transaction(tx), SendTarget.Event) }
                                     }
@@ -340,6 +343,18 @@ fun rememberChamosReels(
             android.util.Log.e("Chamos", "reels", e)
             mensaje = "No se pudieron cargar los videos"
             cargando = false
+        }
+    }
+
+    // Si una subida falló, la cola de envío de la sala queda pausada: se vuelve a intentar cada 25 segundos hasta que salga.
+    LaunchedEffect(salaId) {
+        val idSala = salaId ?: return@LaunchedEffect
+        while (true) {
+            delay(25_000)
+            val sala = client.getJoinedRoom(idSala) ?: continue
+            for (tx in fallidosTx.values.toList()) {
+                runCatching { sala.liveTimeline.retrySend(EventOrTransactionId.Transaction(tx), SendTarget.Event) }
+            }
         }
     }
 
@@ -535,18 +550,6 @@ fun ChamosReelsPantalla(state: ChamosReelsState, inicioMuro: Boolean = false, on
                     verticalArrangement = Arrangement.Center,
                 ) {
                     ChamosReelNeon()
-                    if (state.reels.isEmpty()) {
-                        Text(
-                            text = when {
-                                state.mensaje.isNotEmpty() -> state.mensaje
-                                state.cargando -> "Cargando videos…"
-                                else -> "Todavía no hay videos. ¡Sube el primero!"
-                            },
-                            color = Color.White,
-                            fontSize = 16.sp,
-                            modifier = Modifier.padding(top = 32.dp),
-                        )
-                    }
                 }
             } else {
                 val pager = rememberPagerState { state.reels.size }

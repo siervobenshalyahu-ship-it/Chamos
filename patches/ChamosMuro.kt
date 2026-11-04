@@ -243,6 +243,7 @@ fun rememberChamosMuro(
     var todos by remember { mutableStateOf<List<MuroPost>>(emptyList()) }
     var envio by remember { mutableStateOf("") }
     val reintentados = remember { mutableSetOf<String>() }
+    val fallidosTx = remember { mutableMapOf<String, io.element.android.libraries.matrix.api.core.TransactionId>() }
     var comentarios by remember { mutableStateOf<Map<String, List<MuroComentario>>>(emptyMap()) }
     var reportados by remember { mutableStateOf(prefs.getStringSet("reportados", emptySet()) ?: emptySet()) }
     val cacheArchivos = remember { mutableMapOf<String, String>() }
@@ -288,6 +289,7 @@ fun rememberChamosMuro(
             sala.liveTimeline.timelineItems.collect { items ->
                 val lista = mutableListOf<MuroPost>()
                 var pendientes = 0
+                fallidosTx.clear()
                 var fallos = 0
                 var detalle = ""
                 val coment = mutableMapOf<String, MutableList<MuroComentario>>()
@@ -302,7 +304,8 @@ fun rememberChamosMuro(
                                     fallos++
                                     detalle = st.toString().take(120)
                                     val tx = ev.transactionId
-                                    if (tx != null && reintentados.add(tx.value)) {
+                                    if (tx != null) fallidosTx[tx.value] = tx
+                    if (tx != null && reintentados.add(tx.value)) {
                                         android.util.Log.w("Chamos", "muro: publicación sin enviar, reintentando: $st")
                                         runCatching { sala.liveTimeline.retrySend(EventOrTransactionId.Transaction(tx), SendTarget.Event) }
                                     }
@@ -406,6 +409,18 @@ fun rememberChamosMuro(
         val id = salaId
         if (id != null) {
             scopeMuro.launch { runCatching { client.getJoinedRoom(id)?.liveTimeline?.paginate(Timeline.PaginationDirection.BACKWARDS) } }
+        }
+    }
+
+    // Si una subida falló, la cola de envío de la sala queda pausada: se vuelve a intentar cada 25 segundos hasta que salga.
+    LaunchedEffect(salaId) {
+        val idSala = salaId ?: return@LaunchedEffect
+        while (true) {
+            delay(25_000)
+            val sala = client.getJoinedRoom(idSala) ?: continue
+            for (tx in fallidosTx.values.toList()) {
+                runCatching { sala.liveTimeline.retrySend(EventOrTransactionId.Transaction(tx), SendTarget.Event) }
+            }
         }
     }
 
