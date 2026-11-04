@@ -106,6 +106,8 @@ data class ReelItem(
     val comentarios: Int,
     val propio: Boolean,
     val reportes: Int = 0,
+    val rutaLocal: String? = null,
+    val subiendo: Boolean = false,
 )
 
 data class ReelComentario(
@@ -207,6 +209,8 @@ fun rememberChamosReels(
     var soyAdmin by remember { mutableStateOf(false) }
     var reels by remember { mutableStateOf<List<ReelItem>>(emptyList()) }
     var envio by remember { mutableStateOf("") }
+    var locales by remember { mutableStateOf<List<ReelItem>>(emptyList()) }
+    val baseLocal = remember { mutableMapOf<String, Int>() }
     val reintentados = remember { mutableSetOf<String>() }
     var comentarios by remember { mutableStateOf<Map<String, List<ReelComentario>>>(emptyMap()) }
     val cacheArchivos = remember { mutableMapOf<String, String>() }
@@ -339,6 +343,12 @@ fun rememberChamosReels(
         }
     }
 
+    // Cuando el video propio ya llegó de verdad, se quita la copia local.
+    val propiosRemotos = reels.count { it.propio }
+    LaunchedEffect(propiosRemotos) {
+        locales = locales.filter { l -> (baseLocal[l.id] ?: Int.MAX_VALUE) >= propiosRemotos }
+    }
+
     val masAntiguos: () -> Unit = {
         val id = salaId
         if (id != null) {
@@ -356,11 +366,47 @@ fun rememberChamosReels(
             contexto.contentResolver.openAssetFileDescriptor(uri, "r")?.use { it.length } ?: -1L
         }.getOrDefault(-1L)
         if (tam > REELS_LIMITE_MB * 1024 * 1024) return@publicar "El video pesa más de $REELS_LIMITE_MB MB"
-        val sender = mediaSenderFactory.create(client, sala)
-        val config = mediaConfigFactory.create(client).get()
-        val r = sender.sendMedia(uri = uri, mimeType = mime, caption = desc.ifBlank { null }, mediaOptimizationConfig = config)
-        sender.cleanUp()
-        if (r.isSuccess) null else "No se pudo subir el video"
+        // Copia del video en el teléfono: se muestra de inmediato en los Reels (con "Subiendo…") y de ahí se sube.
+        val marca = System.currentTimeMillis()
+        val idLocal = "local_$marca"
+        val carpeta = java.io.File(contexto.filesDir, "reels_cache")
+        val copia = runCatching {
+            withContext(Dispatchers.IO) {
+                carpeta.mkdirs()
+                val f = java.io.File(carpeta, "$idLocal.mp4")
+                contexto.contentResolver.openInputStream(uri)?.use { entrada -> f.outputStream().use { salida -> entrada.copyTo(salida) } }
+                if (f.length() > 0) f else null
+            }
+        }.getOrNull()
+        if (copia != null) {
+            baseLocal[idLocal] = reels.count { it.propio } + locales.size
+            locales = listOf(
+                ReelItem(
+                    id = idLocal, timestamp = marca, autorId = yo.value, autor = "Tú", autorAvatar = null, descripcion = desc,
+                    fuente = MediaSource("local"), mime = mime, nombreArchivo = "$idLocal.mp4",
+                    likes = 0, yoLike = false, comentarios = 0, propio = false, rutaLocal = copia.absolutePath, subiendo = true,
+                ),
+            ) + locales
+        }
+        // La subida corre aparte (no se corta si cierras los Reels).
+        scopeReels.launch {
+            val sender = mediaSenderFactory.create(client, sala)
+            val config = mediaConfigFactory.create(client).get()
+            val origen = if (copia != null) Uri.fromFile(copia) else uri
+            val r = runCatching { sender.sendMedia(uri = origen, mimeType = mime, caption = desc.ifBlank { null }, mediaOptimizationConfig = config) }
+                .getOrElse { Result.failure(it) }
+            sender.cleanUp()
+            if (r.isSuccess) {
+                Toast.makeText(contexto, "Video publicado", Toast.LENGTH_LONG).show()
+                delay(10_000)
+            } else {
+                android.util.Log.e("Chamos", "reels: no se pudo subir el video", r.exceptionOrNull())
+                Toast.makeText(contexto, "No se pudo subir el video", Toast.LENGTH_LONG).show()
+            }
+            locales = locales.filter { it.id != idLocal }
+            baseLocal.remove(idLocal)
+        }
+        null
     }
 
     val evento: (String) -> EventOrTransactionId = { EventOrTransactionId.Event(EventId(it)) }
@@ -396,6 +442,7 @@ fun rememberChamosReels(
     }
 
     val cargarArchivo: suspend (ReelItem) -> String? = cargar@{ r ->
+        r.rutaLocal?.let { if (java.io.File(it).exists()) return@cargar it }
         cacheArchivos[r.id]?.let { if (java.io.File(it).exists()) return@cargar it }
         val carpeta = java.io.File(contexto.filesDir, "reels_cache")
         val local = java.io.File(carpeta, r.id.replace(Regex("[^A-Za-z0-9]"), "_").takeLast(80) + ".mp4")
@@ -430,7 +477,7 @@ fun rememberChamosReels(
     return ChamosReelsState(
         mensaje = mensaje,
         cargando = cargando,
-        reels = reels,
+        reels = locales + reels,
         comentarios = comentarios,
         muro = muro,
         envio = envio,
@@ -503,6 +550,9 @@ fun ChamosReelsPantalla(state: ChamosReelsState, inicioMuro: Boolean = false, on
                 }
             } else {
                 val pager = rememberPagerState { state.reels.size }
+                LaunchedEffect(state.reels.firstOrNull()?.id) {
+                    if (state.reels.firstOrNull()?.subiendo == true) pager.scrollToPage(0)
+                }
                 LaunchedEffect(pager.currentPage, state.reels.size) {
                     if (pager.currentPage >= state.reels.size - 3) state.masAntiguos()
                 }
@@ -553,7 +603,7 @@ fun ChamosReelsPantalla(state: ChamosReelsState, inicioMuro: Boolean = false, on
                 Toast.makeText(contexto, "Subiendo tu video…", Toast.LENGTH_SHORT).show()
                 scope.launch {
                     val error = state.publicar(uri, mime, descripcion)
-                    Toast.makeText(contexto, error ?: "Video publicado", Toast.LENGTH_LONG).show()
+                    if (error != null) Toast.makeText(contexto, error, Toast.LENGTH_LONG).show()
                 }
             }
         }
@@ -616,6 +666,13 @@ private fun PaginaReel(reel: ReelItem, state: ChamosReelsState, activo: Boolean,
             VideoTextura(ruta = r, activo = activo, pausa = pausa, onProgreso = {}, onFin = {}, repetir = true)
         } else {
             Text("Cargando…", color = Color.White, modifier = Modifier.align(Alignment.Center))
+        }
+        if (reel.subiendo) {
+            Text(
+                "⏳ Subiendo tu video…", color = Color.White, fontSize = 13.sp,
+                modifier = Modifier.align(Alignment.TopCenter).padding(top = 96.dp)
+                    .background(Color(0xCC2A3558), androidx.compose.foundation.shape.RoundedCornerShape(12.dp)).padding(horizontal = 14.dp, vertical = 8.dp),
+            )
         }
         if (pausa) Text("⏸", fontSize = 64.sp, color = Color.White.copy(alpha = 0.8f), modifier = Modifier.align(Alignment.Center))
 
