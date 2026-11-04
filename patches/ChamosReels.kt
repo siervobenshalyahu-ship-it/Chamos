@@ -543,7 +543,9 @@ fun ChamosReelsPantalla(state: ChamosReelsState, inicioMuro: Boolean = false, on
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
     ) {
         Box(Modifier.fillMaxSize().background(Color.Black)) {
-            if (!terminado) {
+            if (verMuro) {
+                // Los Reels no se dibujan mientras se ve el Muro: así no suena su audio dentro del Muro.
+            } else if (!terminado) {
                 Column(
                     modifier = Modifier.fillMaxSize().padding(32.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,

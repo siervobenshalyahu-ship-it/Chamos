@@ -645,7 +645,7 @@ private fun ChamosMuroContenido(state: ChamosMuroState, onPestana: (Int) -> Unit
     }
     }
     Column(Modifier.fillMaxSize().background(FONDO)) {
-        if (pestana != 0) Box(Modifier.padding(top = 84.dp)) { pestanas() }
+        if (pestana == 2) Box(Modifier.padding(top = 84.dp)) { pestanas() }
         if (state.mensaje.isNotEmpty() && state.posts.isEmpty()) {
             Text(state.mensaje, color = Color.White, modifier = Modifier.padding(24.dp))
         }
@@ -654,9 +654,9 @@ private fun ChamosMuroContenido(state: ChamosMuroState, onPestana: (Int) -> Unit
             2 -> state.posts.filter { it.autorId == verPerfilDe }
             else -> state.posts
         }
-        LazyColumn(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(10.dp), contentPadding = androidx.compose.foundation.layout.PaddingValues(start = 12.dp, end = 12.dp, top = if (pestana == 0) 0.dp else 12.dp, bottom = 12.dp)) {
+        LazyColumn(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(10.dp), contentPadding = androidx.compose.foundation.layout.PaddingValues(start = 12.dp, end = 12.dp, top = if (pestana == 2) 12.dp else 0.dp, bottom = 12.dp)) {
             if (pestana == 0) {
-                item(key = "cabecera") { CabeceraRobot(pestanas) }
+                item(key = "cabecera") { CabeceraRobot(pestanas, io.element.android.features.home.impl.R.drawable.chamos_red_portada) }
             }
             if (state.envio.isNotEmpty()) {
                 item(key = "envio") {
@@ -673,14 +673,7 @@ private fun ChamosMuroContenido(state: ChamosMuroState, onPestana: (Int) -> Unit
                 item(key = "nuevo") { CompositorMuro(state, onVender = { nuevaVenta = true }) }
             }
             if (pestana == 1) {
-                item(key = "banner_mercado") {
-                    Image(
-                        painter = painterResource(io.element.android.features.home.impl.R.drawable.chamos_mercado_banner),
-                        contentDescription = null,
-                        contentScale = ContentScale.FillWidth,
-                        modifier = Modifier.fillMaxWidth().clip(androidx.compose.foundation.shape.RoundedCornerShape(14.dp)),
-                    )
-                }
+                item(key = "cabecera_mercado") { CabeceraRobot(pestanas, io.element.android.features.home.impl.R.drawable.chamos_mercado_portada) }
                 item(key = "vender") {
                     Text(
                         "🛒  Vender algo",
@@ -945,9 +938,9 @@ private fun EditorFoto(uri: Uri, redonda: Boolean, onListo: (Uri) -> Unit, onCan
     )
 }
 
-/** Portada grande de la Red de Chamos: el robot con la bandera, las pestañas arriba y el letrero abajo. */
+/** Portada grande (Red de Chamos y Mercado): la imagen ocupa todo el espacio, con las pestañas encima. */
 @Composable
-private fun CabeceraRobot(pestanas: @Composable () -> Unit) {
+private fun CabeceraRobot(pestanas: @Composable () -> Unit, imagen: Int) {
     Box(
         Modifier
             .layout { medida, c ->
@@ -959,7 +952,7 @@ private fun CabeceraRobot(pestanas: @Composable () -> Unit) {
             .clip(androidx.compose.foundation.shape.RoundedCornerShape(bottomStart = 22.dp, bottomEnd = 22.dp)),
     ) {
         Image(
-            painter = painterResource(io.element.android.features.home.impl.R.drawable.chamos_muro_robot),
+            painter = painterResource(imagen),
             contentDescription = null,
             contentScale = ContentScale.Crop,
             alignment = Alignment.TopCenter,
@@ -967,28 +960,11 @@ private fun CabeceraRobot(pestanas: @Composable () -> Unit) {
         )
         // Sombra arriba para que se lean las letras de la barra (Reels / Muro) y las pestañas.
         Box(
-            Modifier.fillMaxWidth().height(150.dp).background(
-                androidx.compose.ui.graphics.Brush.verticalGradient(listOf(Color(0xB3000000), Color.Transparent)),
+            Modifier.fillMaxWidth().height(120.dp).background(
+                androidx.compose.ui.graphics.Brush.verticalGradient(listOf(Color(0x99000000), Color.Transparent)),
             ),
         )
         Box(Modifier.align(Alignment.TopStart).padding(top = 84.dp, start = 12.dp)) { pestanas() }
-        Box(Modifier.align(Alignment.BottomCenter).padding(bottom = 16.dp)) {
-            val base = androidx.compose.ui.text.TextStyle(fontSize = 42.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp)
-            Text(
-                "red de chamos",
-                style = base.copy(
-                    color = Color.White,
-                    drawStyle = androidx.compose.ui.graphics.drawscope.Stroke(width = 14f, join = androidx.compose.ui.graphics.StrokeJoin.Round),
-                ),
-            )
-            Text(
-                "red de chamos",
-                style = base.copy(
-                    color = Color(0xFF1E5BFF),
-                    shadow = androidx.compose.ui.graphics.Shadow(Color(0xFF38BDF8), androidx.compose.ui.geometry.Offset.Zero, 28f),
-                ),
-            )
-        }
     }
 }
 

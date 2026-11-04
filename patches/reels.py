@@ -11,6 +11,8 @@ os.makedirs(res, exist_ok=True)
 shutil.copy(os.path.join(pdir, "..", "assets", "muro_banner.jpg"), os.path.join(res, "chamos_muro_banner.jpg"))
 shutil.copy(os.path.join(pdir, "..", "assets", "muro_robot.jpg"), os.path.join(res, "chamos_muro_robot.jpg"))
 shutil.copy(os.path.join(pdir, "..", "assets", "mercado_banner.jpg"), os.path.join(res, "chamos_mercado_banner.jpg"))
+shutil.copy(os.path.join(pdir, "..", "assets", "muro_portada.jpg"), os.path.join(res, "chamos_red_portada.jpg"))
+shutil.copy(os.path.join(pdir, "..", "assets", "mercado_portada.jpg"), os.path.join(res, "chamos_mercado_portada.jpg"))
 
 def edit(path, pairs):
     s = open(path, encoding="utf-8").read()
