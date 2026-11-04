@@ -96,6 +96,12 @@ object ChamosNumero {
         }
     }
 
+    /** Token de la sesion (para subir videos grandes al servidor de Chamos). */
+    fun tokenSesion(): String? {
+        val c = client ?: return null
+        return sesiones?.getSession(c.sessionId.value)?.accessToken
+    }
+
     /** Pide al servidor Matrix un token OpenID: sirve para demostrar quién eres sin compartir tu sesión. */
     private suspend fun openId(): JSONObject? {
         val c = client ?: return null

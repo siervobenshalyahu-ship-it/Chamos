@@ -87,7 +87,46 @@ const val REELS_MARCA = "⁢"
 private const val REELS_ALIAS_LOCAL = "chamos-reels"
 private const val REELS_SERVIDOR = "matrix.org"
 private const val REELS_ALIAS = "#$REELS_ALIAS_LOCAL:$REELS_SERVIDOR"
-private const val REELS_LIMITE_MB = 50L
+private const val REELS_LIMITE_MB = 95L
+private const val MARCA_VIDEO_EXT = "\u2065"
+private const val URL_VIDEOS = "https://chamos-push.siervodeyhwh57.workers.dev/v"
+
+/** Sube el video al servidor de Chamos (Cloudflare R2). Devuelve el enlace o null si falla. */
+private suspend fun subirVideoChamos(archivo: java.io.File): String? = withContext(Dispatchers.IO) {
+    try {
+        val token = ChamosNumero.tokenSesion() ?: return@withContext null
+        val con = java.net.URL(URL_VIDEOS).openConnection() as java.net.HttpURLConnection
+        con.requestMethod = "POST"
+        con.doOutput = true
+        con.connectTimeout = 20000
+        con.readTimeout = 120000
+        con.setRequestProperty("Authorization", "Bearer $token")
+        con.setRequestProperty("content-type", "video/mp4")
+        con.setFixedLengthStreamingMode(archivo.length())
+        archivo.inputStream().use { e -> con.outputStream.use { o -> e.copyTo(o, 64 * 1024) } }
+        if (con.responseCode !in 200..299) return@withContext null
+        val j = org.json.JSONObject(con.inputStream.bufferedReader().use { it.readText() })
+        j.optString("url").ifEmpty { null }
+    } catch (e: Exception) {
+        android.util.Log.w("Chamos", "reels: subida a R2 fallo", e)
+        null
+    }
+}
+
+private suspend fun bajarVideoChamos(url: String, destino: java.io.File): Boolean = withContext(Dispatchers.IO) {
+    try {
+        destino.parentFile?.mkdirs()
+        val tmp = java.io.File(destino.path + ".part")
+        val con = java.net.URL(url).openConnection() as java.net.HttpURLConnection
+        con.connectTimeout = 20000
+        con.readTimeout = 60000
+        if (con.responseCode !in 200..299) return@withContext false
+        con.inputStream.use { e -> tmp.outputStream().use { o -> e.copyTo(o, 64 * 1024) } }
+        tmp.renameTo(destino)
+    } catch (e: Exception) {
+        false
+    }
+}
 
 fun RoomListRoomSummary.isChamosReels(): Boolean = name?.startsWith(REELS_MARCA) == true
 
@@ -108,6 +147,7 @@ data class ReelItem(
     val reportes: Int = 0,
     val rutaLocal: String? = null,
     val subiendo: Boolean = false,
+    val urlExterna: String? = null,
 )
 
 data class ReelComentario(
@@ -315,7 +355,23 @@ fun rememberChamosReels(
                         }
                         is TextMessageType -> {
                             val resp = c.inReplyTo?.idRespondido()
-                            if (resp != null) {
+                            if (resp == null && t.body.startsWith(MARCA_VIDEO_EXT)) {
+                                val partes = t.body.removePrefix(MARCA_VIDEO_EXT).split("\n", limit = 2)
+                                val enlace = partes[0].trim()
+                                if (enlace.startsWith("https://")) {
+                                    val corazon = ev.reactions.firstOrNull { it.key.startsWith("❤") }
+                                    lista.add(
+                                        ReelItem(
+                                            id = eid, timestamp = ev.timestamp, autorId = ev.sender.value, autor = nombre,
+                                            autorAvatar = perfil?.avatarUrl, descripcion = partes.getOrElse(1) { "" }.trim(),
+                                            fuente = MediaSource(enlace), mime = "video/mp4", nombreArchivo = "reel.mp4",
+                                            likes = corazon?.senders?.size ?: 0,
+                                            yoLike = corazon?.senders?.any { it.senderId == yo } == true,
+                                            comentarios = 0, propio = ev.isOwn, urlExterna = enlace,
+                                        )
+                                    )
+                                }
+                            } else if (resp != null) {
                                 if (t.body.startsWith("\uD83D\uDEA9")) {
                                     // Un reporte (🚩) de la comunidad: no es un comentario.
                                     reportesPor.getOrPut(resp.value) { mutableSetOf() }.add(ev.sender.value)
@@ -409,7 +465,20 @@ fun rememberChamosReels(
         scopeReels.launch {
             val sender = mediaSenderFactory.create(client, sala)
             val origen = if (copia != null) Uri.fromFile(copia) else uri
-            val error = runCatching { subirConLimite(sender, origen, mime, desc.ifBlank { null }) }.getOrElse { "No se pudo subir el video" }
+            val grande = (copia?.length() ?: tam) > LIMITE_SUBIDA_BYTES
+            var error: String? = null
+            if (grande && copia != null) {
+                val enlace = subirVideoChamos(copia)
+                error = if (enlace != null) {
+                    runCatching {
+                        sala.liveTimeline.sendMessage(MARCA_VIDEO_EXT + enlace + "\n" + desc, null, emptyList()).exceptionOrNull()?.let { "No se pudo publicar el video" }
+                    }.getOrElse { "No se pudo publicar el video" }
+                } else {
+                    "No se pudo subir el video grande. Revisa tu internet e inténtalo otra vez."
+                }
+            } else {
+                error = runCatching { subirConLimite(sender, origen, mime, desc.ifBlank { null }) }.getOrElse { "No se pudo subir el video" }
+            }
             sender.cleanUp()
             if (error == null) {
                 Toast.makeText(contexto, "Video publicado", Toast.LENGTH_LONG).show()
@@ -462,6 +531,11 @@ fun rememberChamosReels(
         val carpeta = java.io.File(contexto.filesDir, "reels_cache")
         val local = java.io.File(carpeta, r.id.replace(Regex("[^A-Za-z0-9]"), "_").takeLast(80) + ".mp4")
         if (local.exists() && local.length() > 0) {
+            cacheArchivos[r.id] = local.absolutePath
+            return@cargar local.absolutePath
+        }
+        if (r.urlExterna != null) {
+            if (!bajarVideoChamos(r.urlExterna, local)) return@cargar null
             cacheArchivos[r.id] = local.absolutePath
             return@cargar local.absolutePath
         }

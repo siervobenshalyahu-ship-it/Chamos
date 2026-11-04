@@ -145,8 +145,8 @@ async function handleNotify(request, env) {
 // Necesita: una base D1 enlazada con el nombre DB y el secreto ADMIN_KEY (la clave del panel).
 const CORS = {
   "access-control-allow-origin": "*",
-  "access-control-allow-methods": "POST, GET, OPTIONS",
-  "access-control-allow-headers": "content-type, x-clave",
+  "access-control-allow-methods": "POST, GET, HEAD, OPTIONS",
+  "access-control-allow-headers": "content-type, x-clave, authorization, range",
 };
 const jsonCors = (obj, status = 200) =>
   new Response(JSON.stringify(obj), { status, headers: { "content-type": "application/json", ...CORS } });
@@ -425,10 +425,59 @@ function esc(s){return String(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt
 if(sessionStorage.getItem('k'))go();
 </script></body></html>`;
 
+// ---- Videos de Reels en R2 (sin el limite de 10 MB de matrix.org) ----
+async function videoSubir(request, env) {
+  if (!env.VIDEOS) return jsonCors({ error: "R2 no esta conectado (falta el enlace VIDEOS)" }, 503);
+  const auth = request.headers.get("authorization") || "";
+  const w = await fetch("https://matrix-client.matrix.org/_matrix/client/v3/account/whoami", { headers: { authorization: auth } });
+  if (!w.ok) return jsonCors({ error: "Sesion no valida" }, 401);
+  const quien = (await w.json()).user_id || "";
+  const len = parseInt(request.headers.get("content-length") || "0", 10);
+  if (!len) return jsonCors({ error: "Falta el tamaño" }, 411);
+  if (len > 95 * 1024 * 1024) return jsonCors({ error: "Maximo 95 MB" }, 413);
+  const id = crypto.randomUUID().replace(/-/g, "");
+  await env.VIDEOS.put(id + ".mp4", request.body, { httpMetadata: { contentType: "video/mp4" }, customMetadata: { u: quien } });
+  return jsonCors({ id, url: new URL(request.url).origin + "/v/" + id + ".mp4" });
+}
+async function videoVer(request, env, url) {
+  if (!env.VIDEOS) return jsonCors({ error: "R2 no conectado" }, 503);
+  const key = url.pathname.slice(3);
+  if (!/^[a-f0-9]{32}\.mp4$/.test(key)) return jsonCors({ error: "No encontrado" }, 404);
+  const range = request.headers.get("range");
+  let o, status = 200;
+  const h = new Headers(CORS);
+  h.set("accept-ranges", "bytes");
+  h.set("content-type", "video/mp4");
+  h.set("cache-control", "public, max-age=31536000, immutable");
+  if (range) {
+    const head = await env.VIDEOS.head(key);
+    if (!head) return jsonCors({ error: "No encontrado" }, 404);
+    const m = /bytes=(\d*)-(\d*)/.exec(range) || [];
+    let a = m[1] === "" ? Math.max(0, head.size - parseInt(m[2] || "0", 10)) : parseInt(m[1] || "0", 10);
+    let b = m[1] !== "" && m[2] ? Math.min(parseInt(m[2], 10), head.size - 1) : head.size - 1;
+    if (a > b || a >= head.size) return new Response(null, { status: 416, headers: { "content-range": "bytes */" + head.size } });
+    o = await env.VIDEOS.get(key, { range: { offset: a, length: b - a + 1 } });
+    h.set("content-range", "bytes " + a + "-" + b + "/" + head.size);
+    h.set("content-length", String(b - a + 1));
+    status = 206;
+  } else {
+    o = await env.VIDEOS.get(key);
+    if (!o) return jsonCors({ error: "No encontrado" }, 404);
+    h.set("content-length", String(o.size));
+  }
+  return new Response(request.method === "HEAD" ? null : o.body, { status, headers: h });
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS });
+    if (url.pathname === "/v" && request.method === "POST") {
+      try { return await videoSubir(request, env); } catch (e) { console.error(e); return jsonCors({ error: String(e.message || e) }, 500); }
+    }
+    if (url.pathname.startsWith("/v/") && (request.method === "GET" || request.method === "HEAD")) {
+      try { return await videoVer(request, env, url); } catch (e) { console.error(e); return jsonCors({ error: String(e.message || e) }, 500); }
+    }
     if (url.pathname === "/e" && request.method === "POST") {
       try {
         return await guardarEvento(request, env);
