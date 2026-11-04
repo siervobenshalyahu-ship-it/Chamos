@@ -65,9 +65,4 @@ edit(hv, [
      "import androidx.compose.foundation.layout.Box\nimport androidx.compose.foundation.clickable\nimport androidx.compose.foundation.layout.fillMaxWidth\nimport androidx.compose.foundation.layout.padding\nimport androidx.compose.ui.unit.dp\nimport androidx.compose.ui.unit.sp\n"),
 ])
 
-edit(os.path.join(d, "ChamosReels.kt"), [
-    ("fun ChamosReelsPantalla(state: ChamosReelsState, onCerrar: () -> Unit) {",
-     "fun ChamosReelsPantalla(state: ChamosReelsState, inicioMuro: Boolean = false, onCerrar: () -> Unit) {"),
-    ("    var verMuro by remember { mutableStateOf(false) }\n", "    var verMuro by remember { mutableStateOf(inicioMuro) }\n"),
-])
 print("barra_muro OK")

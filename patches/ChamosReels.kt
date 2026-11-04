@@ -66,7 +66,9 @@ import io.element.android.libraries.matrix.api.room.RoomNotificationMode
 import io.element.android.libraries.matrix.api.roomdirectory.RoomVisibility
 import io.element.android.libraries.matrix.api.timeline.MatrixTimelineItem
 import io.element.android.libraries.matrix.api.timeline.Timeline
+import io.element.android.libraries.matrix.api.timeline.item.SendTarget
 import io.element.android.libraries.matrix.api.timeline.item.event.EventOrTransactionId
+import io.element.android.libraries.matrix.api.timeline.item.event.LocalEventSendState
 import io.element.android.libraries.matrix.api.timeline.item.event.InReplyTo
 import io.element.android.libraries.matrix.api.timeline.item.event.MessageContent
 import io.element.android.libraries.matrix.api.timeline.item.event.ProfileDetails
@@ -120,6 +122,7 @@ data class ChamosReelsState(
     val reels: List<ReelItem> = emptyList(),
     val comentarios: Map<String, List<ReelComentario>> = emptyMap(),
     val muro: ChamosMuroState = ChamosMuroState(),
+    val envio: String = "",
     val soyAdmin: Boolean = false,
     val chats: List<Pair<RoomId, String>> = emptyList(),
     val activar: () -> Unit = {},
@@ -203,6 +206,8 @@ fun rememberChamosReels(
     var salaId by remember { mutableStateOf<RoomId?>(null) }
     var soyAdmin by remember { mutableStateOf(false) }
     var reels by remember { mutableStateOf<List<ReelItem>>(emptyList()) }
+    var envio by remember { mutableStateOf("") }
+    val reintentados = remember { mutableSetOf<String>() }
     var comentarios by remember { mutableStateOf<Map<String, List<ReelComentario>>>(emptyMap()) }
     val cacheArchivos = remember { mutableMapOf<String, String>() }
     val chats by dataSource.roomSummariesFlow.collectAsState(initial = emptyList())
@@ -250,11 +255,33 @@ fun rememberChamosReels(
             }
             sala.liveTimeline.timelineItems.collect { items ->
                 val lista = mutableListOf<ReelItem>()
+                var pendientes = 0
+                var fallos = 0
+                var detalle = ""
                 val coment = mutableMapOf<String, MutableList<ReelComentario>>()
                 val reportesPor = mutableMapOf<String, MutableSet<String>>()
                 for (item in items) {
                     val ev = (item as? MatrixTimelineItem.Event)?.event ?: continue
                     val c = ev.content as? MessageContent ?: continue
+                    if (ev.eventId == null) {
+                        // Video propio que todavía no sale (o que falló): se muestra el estado y se reintenta una vez.
+                        if (ev.isOwn) {
+                            when (val st = ev.localSendState) {
+                                is LocalEventSendState.Failed -> {
+                                    fallos++
+                                    detalle = st.toString().take(120)
+                                    val tx = ev.transactionId
+                                    if (tx != null && reintentados.add(tx.value)) {
+                                        android.util.Log.w("Chamos", "reels: video sin enviar, reintentando: $st")
+                                        runCatching { sala.liveTimeline.retrySend(EventOrTransactionId.Transaction(tx), SendTarget.Event) }
+                                    }
+                                }
+                                is LocalEventSendState.Sending -> pendientes++
+                                else -> {}
+                            }
+                        }
+                        continue
+                    }
                     val eid = ev.eventId?.value ?: continue
                     val perfil = ev.senderProfile as? ProfileDetails.Ready
                     val nombre = perfil?.displayName ?: ev.sender.value.substringBefore(":").removePrefix("@")
@@ -300,6 +327,7 @@ fun rememberChamosReels(
                     // Con 3 o más reportes distintos el video se esconde para todos (menos su dueño y el administrador).
                     .filter { it.reportes < 3 || it.propio || soyAdmin }
                     .sortedByDescending { it.timestamp }
+                envio = if (fallos > 0) "⚠️ No se pudo subir tu video ($detalle)" else if (pendientes > 0) "⏳ Subiendo tu video…" else ""
                 cargando = false
             }
         } catch (e: kotlinx.coroutines.CancellationException) {
@@ -405,6 +433,7 @@ fun rememberChamosReels(
         reels = reels,
         comentarios = comentarios,
         muro = muro,
+        envio = envio,
         soyAdmin = soyAdmin,
         chats = chats.filter { it.displayType == io.element.android.features.home.impl.model.RoomSummaryDisplayType.ROOM && !it.isChamosEstado() && !it.isChamosReels() && !it.isChamosMuro() && !it.isSpace }
             .map { Pair(it.roomId, it.name ?: "Chat") },
@@ -427,12 +456,12 @@ fun rememberChamosReels(
 /* ---------------------------------------------------------------------------------------------------- */
 
 @Composable
-fun ChamosReelsPantalla(state: ChamosReelsState, onCerrar: () -> Unit) {
+fun ChamosReelsPantalla(state: ChamosReelsState, inicioMuro: Boolean = false, onCerrar: () -> Unit) {
     val contexto = LocalContext.current
     val scope = rememberCoroutineScope()
     var subiendo by remember { mutableStateOf(false) }
-    var verMuro by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) { state.activar() }
+    val verMuro = inicioMuro
+    LaunchedEffect(Unit) { if (!inicioMuro) state.activar() }
     // La pantalla de neón se queda hasta que los Reels terminan de cargar (mínimo 2 segundos).
     var intro by remember { mutableStateOf(true) }
     var terminado by remember { mutableStateOf(false) }
@@ -492,6 +521,14 @@ fun ChamosReelsPantalla(state: ChamosReelsState, onCerrar: () -> Unit) {
             if (verMuro) {
                 Box(Modifier.fillMaxSize().background(Color(0xFF101114))) { ChamosMuroPantalla(state.muro) }
             }
+            if (!verMuro && state.envio.isNotEmpty()) {
+                Text(
+                    state.envio, color = Color.White, fontSize = 13.sp,
+                    modifier = Modifier.align(Alignment.TopCenter).padding(top = 96.dp, start = 16.dp, end = 16.dp)
+                        .background(if (state.envio.startsWith("⚠")) Color(0xFF8A2A2A) else Color(0xCC2A3558), androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
+                        .padding(12.dp),
+                )
+            }
             // Barra superior
             Row(
                 modifier = Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, top = 36.dp),
@@ -499,12 +536,7 @@ fun ChamosReelsPantalla(state: ChamosReelsState, onCerrar: () -> Unit) {
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text("✕", color = Color.White, fontSize = 26.sp, modifier = Modifier.clickable { onCerrar() }.padding(8.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(if (!terminado) "" else "Reels", color = Color.White.copy(alpha = if (verMuro) 0.5f else 1f), fontSize = 18.sp, fontWeight = FontWeight.Bold,
-                        modifier = Modifier.clickable { verMuro = false }.padding(8.dp))
-                    Text("Muro", color = Color.White.copy(alpha = if (verMuro) 1f else 0.5f), fontSize = 18.sp, fontWeight = FontWeight.Bold,
-                        modifier = Modifier.clickable { verMuro = true }.padding(8.dp))
-                }
+                Text(if (verMuro || !terminado) "" else "Reels", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
                 if (verMuro) Text("   ", fontSize = 30.sp, modifier = Modifier.padding(8.dp))
                 else Text("＋", color = Color.White, fontSize = 30.sp, modifier = Modifier.clickable { subiendo = true }.padding(8.dp))
             }

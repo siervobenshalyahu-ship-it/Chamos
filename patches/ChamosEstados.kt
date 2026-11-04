@@ -214,13 +214,14 @@ fun rememberChamosEstados(
         }
     }
 
-    // Las salas del Muro y de los Reels se silencian desde que arranca la app (sin esperar a que se abran).
+    // La sala de la Red de Chamos (Muro) se silencia desde que arranca la app; se verifica el modo real y se repite si hace falta.
     LaunchedEffect(latido) {
-        for (nombre in listOf("chamos_muro", "chamos_reels")) {
-            val guardada = contexto.getSharedPreferences(nombre, android.content.Context.MODE_PRIVATE).getString("sala", null) ?: continue
+        val guardada = contexto.getSharedPreferences("chamos_muro", android.content.Context.MODE_PRIVATE).getString("sala", null)
+        if (guardada != null) {
             runCatching {
                 val id = RoomId(guardada)
-                if (client.getJoinedRoom(id) != null && silenciadas.add(id)) {
+                val info = client.getRoomInfo(id).getOrNull()
+                if (info != null && info.userDefinedNotificationMode != RoomNotificationMode.MUTE) {
                     client.notificationSettingsService.setRoomNotificationMode(id, RoomNotificationMode.MUTE)
                 }
             }

@@ -70,7 +70,9 @@ import io.element.android.libraries.matrix.api.room.RoomNotificationMode
 import io.element.android.libraries.matrix.api.roomdirectory.RoomVisibility
 import io.element.android.libraries.matrix.api.timeline.MatrixTimelineItem
 import io.element.android.libraries.matrix.api.timeline.Timeline
+import io.element.android.libraries.matrix.api.timeline.item.SendTarget
 import io.element.android.libraries.matrix.api.timeline.item.event.EventOrTransactionId
+import io.element.android.libraries.matrix.api.timeline.item.event.LocalEventSendState
 import io.element.android.libraries.matrix.api.timeline.item.event.ImageMessageType
 import io.element.android.libraries.matrix.api.timeline.item.event.InReplyTo
 import io.element.android.libraries.matrix.api.timeline.item.event.MessageContent
@@ -156,6 +158,7 @@ data class ChamosMuroState(
     val reportar: suspend (MuroPost, String) -> Boolean = { _, _ -> false },
     val cargarImagen: suspend (MuroPost) -> String? = { null },
     val cargarAvatar: suspend (String) -> String? = { null },
+    val envio: String = "",
 )
 
 private fun InReplyTo.idDeRespuesta(): EventId = when (this) {
@@ -187,6 +190,7 @@ private suspend fun asegurarSalaMuro(client: MatrixClient, prefs: android.conten
     val id: RoomId
     if (resuelto != null) {
         id = resuelto.roomId
+        runCatching { client.notificationSettingsService.setRoomNotificationMode(id, RoomNotificationMode.MUTE) }
         if (client.getJoinedRoom(id) == null) {
             val r = client.joinRoomByIdOrAlias(RoomIdOrAlias.Alias(alias), listOf(MURO_SERVIDOR))
             if (r.isFailure) return Pair(null, "No pude entrar al Muro: " + (r.exceptionOrNull()?.message ?: "error"))
@@ -237,6 +241,8 @@ fun rememberChamosMuro(
     var salaId by remember { mutableStateOf<RoomId?>(null) }
     var soyAdmin by remember { mutableStateOf(false) }
     var todos by remember { mutableStateOf<List<MuroPost>>(emptyList()) }
+    var envio by remember { mutableStateOf("") }
+    val reintentados = remember { mutableSetOf<String>() }
     var comentarios by remember { mutableStateOf<Map<String, List<MuroComentario>>>(emptyMap()) }
     var reportados by remember { mutableStateOf(prefs.getStringSet("reportados", emptySet()) ?: emptySet()) }
     val cacheArchivos = remember { mutableMapOf<String, String>() }
@@ -281,10 +287,32 @@ fun rememberChamosMuro(
             }
             sala.liveTimeline.timelineItems.collect { items ->
                 val lista = mutableListOf<MuroPost>()
+                var pendientes = 0
+                var fallos = 0
+                var detalle = ""
                 val coment = mutableMapOf<String, MutableList<MuroComentario>>()
                 for (item in items) {
                     val ev = (item as? MatrixTimelineItem.Event)?.event ?: continue
                     val c = ev.content as? MessageContent ?: continue
+                    if (ev.eventId == null) {
+                        // Publicación propia que todavía no sale (o que falló): se muestra el estado y se reintenta una vez.
+                        if (ev.isOwn) {
+                            when (val st = ev.localSendState) {
+                                is LocalEventSendState.Failed -> {
+                                    fallos++
+                                    detalle = st.toString().take(120)
+                                    val tx = ev.transactionId
+                                    if (tx != null && reintentados.add(tx.value)) {
+                                        android.util.Log.w("Chamos", "muro: publicación sin enviar, reintentando: $st")
+                                        runCatching { sala.liveTimeline.retrySend(EventOrTransactionId.Transaction(tx), SendTarget.Event) }
+                                    }
+                                }
+                                is LocalEventSendState.Sending -> pendientes++
+                                else -> {}
+                            }
+                        }
+                        continue
+                    }
                     val eid = ev.eventId?.value ?: continue
                     val pf = ev.senderProfile as? ProfileDetails.Ready
                     val nombre = pf?.displayName ?: ev.sender.value.substringBefore(":").removePrefix("@")
@@ -358,6 +386,7 @@ fun rememberChamosMuro(
                 val ordenados = coment.mapValues { e -> e.value.sortedBy { it.timestamp } }
                 comentarios = ordenados
                 todos = lista.map { it.copy(comentarios = ordenados[it.id]?.size ?: 0, reposts = lista.count { x -> x.repostDe == it.id }) }.sortedByDescending { it.timestamp }
+                envio = if (fallos > 0) "⚠️ No se pudo subir tu publicación ($detalle)" else if (pendientes > 0) "⏳ Subiendo tu publicación…" else ""
                 cargando = false
             }
         } catch (e: kotlinx.coroutines.CancellationException) {
@@ -508,6 +537,7 @@ fun rememberChamosMuro(
         reportar = reportar,
         cargarImagen = cargarImagen,
         cargarAvatar = cargarAvatar,
+        envio = envio,
     )
 }
 
@@ -612,6 +642,14 @@ private fun ChamosMuroContenido(state: ChamosMuroState, onPestana: (Int) -> Unit
         LazyColumn(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(10.dp), contentPadding = androidx.compose.foundation.layout.PaddingValues(start = 12.dp, end = 12.dp, top = if (pestana == 0) 0.dp else 12.dp, bottom = 12.dp)) {
             if (pestana == 0) {
                 item(key = "cabecera") { CabeceraRobot(pestanas) }
+            }
+            if (state.envio.isNotEmpty()) {
+                item(key = "envio") {
+                    Text(
+                        state.envio, color = Color.White, fontSize = 13.sp,
+                        modifier = Modifier.fillMaxWidth().background(if (state.envio.startsWith("⚠")) Color(0xFF8A2A2A) else Color(0xFF2A3558), androidx.compose.foundation.shape.RoundedCornerShape(12.dp)).padding(12.dp),
+                    )
+                }
             }
             if (pestana == 2) {
                 item(key = "perfil") { CabeceraPerfil(state, verPerfilDe, lista.size) }
