@@ -70,9 +70,9 @@ import kotlinx.coroutines.withContext
 import java.io.File
 
 /** Letras para los stickers de texto. */
-private val TIPOS_STICKER = listOf("Gruesa", "Casual", "Manuscrita", "Máquina", "Elegante")
+internal val TIPOS_STICKER = listOf("Gruesa", "Casual", "Manuscrita", "Máquina", "Elegante")
 
-private fun tipoSticker(i: Int): ATypeface = when (i) {
+internal fun tipoSticker(i: Int): ATypeface = when (i) {
     1 -> ATypeface.create("casual", ATypeface.BOLD)
     2 -> ATypeface.create("cursive", ATypeface.BOLD)
     3 -> ATypeface.create("monospace", ATypeface.BOLD)
@@ -80,7 +80,7 @@ private fun tipoSticker(i: Int): ATypeface = when (i) {
     else -> ATypeface.create("sans-serif-black", ATypeface.NORMAL)
 }
 
-private val COLORES_STICKER = listOf(
+internal val COLORES_STICKER = listOf(
     0xFFFFFFFF.toInt(), 0xFFFFD60A.toInt(), 0xFFFF2D95.toInt(), 0xFF00E5FF.toInt(),
     0xFF7CFF4D.toInt(), 0xFFFF7A00.toInt(), 0xFFE63946.toInt(), 0xFF111111.toInt(),
 )
@@ -157,9 +157,8 @@ object ChamosStickersStore {
     }
 
     /** Dibuja un texto (o emoji) grande y centrado sobre fondo transparente. */
-    fun bitmapTexto(texto: String, color: Int, tipo: ATypeface, contorno: Boolean): Bitmap {
-        val lado = 512
-        val ancho = 460
+    fun bitmapTexto(texto: String, color: Int, tipo: ATypeface, contorno: Boolean, lado: Int = 512): Bitmap {
+        val ancho = (lado * 0.9f).toInt()
         val bmp = Bitmap.createBitmap(lado, lado, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bmp)
         fun pintura(tam: Float, trazo: Boolean) = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -178,10 +177,10 @@ object ChamosStickersStore {
             .obtain(texto, 0, texto.length, p, ancho)
             .setAlignment(Layout.Alignment.ALIGN_CENTER)
             .build()
-        var tam = 300f
+        var tam = lado * 0.59f
         var capa = disposicion(pintura(tam, false))
-        while (capa.height > ancho && tam > 24f) {
-            tam -= 8f
+        while (capa.height > ancho && tam > lado * 0.047f) {
+            tam -= lado * 0.016f
             capa = disposicion(pintura(tam, false))
         }
         canvas.save()
@@ -192,8 +191,8 @@ object ChamosStickersStore {
         return bmp
     }
 
-    /** Convierte una foto en sticker: cuadrada, con esquinas redondeadas y borde blanco. */
-    fun bitmapFoto(c: Context, uri: Uri): Bitmap? {
+    /** Lee la foto elegida (reducida y enderezada). */
+    fun cargarFoto(c: Context, uri: Uri): Bitmap? {
         return try {
             val cr = c.contentResolver
             val medidas = BitmapFactory.Options().apply { inJustDecodeBounds = true }
@@ -220,21 +219,26 @@ object ChamosStickersStore {
             } else {
                 original
             }
-            val lado = minOf(recto.width, recto.height)
-            val cuadrada = Bitmap.createBitmap(recto, (recto.width - lado) / 2, (recto.height - lado) / 2, lado, lado)
-            val salida = Bitmap.createBitmap(512, 512, Bitmap.Config.ARGB_8888)
-            val canvas = Canvas(salida)
-            val borde = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = AColor.WHITE }
-            canvas.drawRoundRect(RectF(0f, 0f, 512f, 512f), 80f, 80f, borde)
-            val recorte = Path().apply { addRoundRect(RectF(12f, 12f, 500f, 500f), 68f, 68f, Path.Direction.CW) }
-            canvas.save()
-            canvas.clipPath(recorte)
-            canvas.drawBitmap(cuadrada, null, RectF(12f, 12f, 500f, 500f), Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG))
-            canvas.restore()
-            salida
+            recto
         } catch (_: Throwable) {
             null
         }
+    }
+
+    /** Foto en sticker cuadrado: esquinas redondeadas y borde blanco (cuando no se puede recortar a la persona). */
+    fun cuadrado(recto: Bitmap): Bitmap {
+        val lado = minOf(recto.width, recto.height)
+        val cuadrada = Bitmap.createBitmap(recto, (recto.width - lado) / 2, (recto.height - lado) / 2, lado, lado)
+        val salida = Bitmap.createBitmap(512, 512, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(salida)
+        val borde = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = AColor.WHITE }
+        canvas.drawRoundRect(RectF(0f, 0f, 512f, 512f), 80f, 80f, borde)
+        val recorte = Path().apply { addRoundRect(RectF(12f, 12f, 500f, 500f), 68f, 68f, Path.Direction.CW) }
+        canvas.save()
+        canvas.clipPath(recorte)
+        canvas.drawBitmap(cuadrada, null, RectF(12f, 12f, 500f, 500f), Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG))
+        canvas.restore()
+        return salida
     }
 }
 
@@ -261,16 +265,19 @@ fun ChamosStickersPanel(onEnviar: (Uri) -> Unit, onCerrar: () -> Unit) {
     val scope = rememberCoroutineScope()
     var creandoTexto by remember { mutableStateOf(false) }
     var porBorrar by remember { mutableStateOf<String?>(null) }
+    var editor by remember { mutableStateOf<Pair<Bitmap?, Bitmap>?>(null) }
 
     LaunchedEffect(Unit) { withContext(Dispatchers.IO) { ChamosStickersStore.cargar(contexto) } }
 
     val elegirFoto = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         if (uri != null) {
             scope.launch {
-                val bmp = withContext(Dispatchers.IO) { ChamosStickersStore.bitmapFoto(contexto, uri) }
-                if (bmp != null) {
-                    withContext(Dispatchers.IO) { ChamosStickersStore.guardar(contexto, bmp) }
-                    Toast.makeText(contexto, "Sticker creado", Toast.LENGTH_SHORT).show()
+                Toast.makeText(contexto, "Recortando a la persona…", Toast.LENGTH_SHORT).show()
+                val foto = withContext(Dispatchers.IO) { ChamosStickersStore.cargarFoto(contexto, uri) }
+                if (foto != null) {
+                    val cuadro = withContext(Dispatchers.Default) { ChamosStickersStore.cuadrado(foto) }
+                    val recorte = ChamosRecorte.recortarPersona(foto)
+                    editor = Pair(recorte, cuadro)
                 } else {
                     Toast.makeText(contexto, "No se pudo usar esa imagen", Toast.LENGTH_SHORT).show()
                 }
@@ -324,16 +331,10 @@ fun ChamosStickersPanel(onEnviar: (Uri) -> Unit, onCerrar: () -> Unit) {
                 }
             }
         }
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-            Text(
-                "Toca para enviar. Mantén presionado para borrar.",
-                color = ElementTheme.colors.textSecondary,
-                fontSize = 11.sp,
-                modifier = Modifier.weight(1f),
-            )
+        if (ChamosStickersStore.lista.isEmpty()) {
             TextButton(onClick = {
                 scope.launch { withContext(Dispatchers.IO) { ChamosStickersStore.crearBasicos(contexto) } }
-            }) { Text("Restaurar básicos", fontSize = 12.sp) }
+            }) { Text("Restaurar básicos") }
         }
     }
 
@@ -354,57 +355,28 @@ fun ChamosStickersPanel(onEnviar: (Uri) -> Unit, onCerrar: () -> Unit) {
     }
 
     if (creandoTexto) {
-        var texto by remember { mutableStateOf("") }
-        var tipo by remember { mutableStateOf(0) }
-        var color by remember { mutableStateOf(COLORES_STICKER[1]) }
-        val vista = remember(texto, tipo, color) {
-            ChamosStickersStore.bitmapTexto(texto.ifBlank { "Tu texto" }, color, tipoSticker(tipo), true).asImageBitmap()
-        }
-        AlertDialog(
-            onDismissRequest = { creandoTexto = false },
-            title = { Text("Sticker de texto") },
-            text = {
-                Column {
-                    TextField(value = texto, onValueChange = { if (it.length <= 40) texto = it }, placeholder = { Text("Escribe algo o un emoji") })
-                    Row(
-                        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(vertical = 6.dp),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    ) {
-                        TIPOS_STICKER.forEachIndexed { i, n ->
-                            TextButton(onClick = { tipo = i }) {
-                                Text(n, fontWeight = if (tipo == i) FontWeight.Bold else FontWeight.Normal)
-                            }
-                        }
-                    }
-                    Row(
-                        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(bottom = 6.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        COLORES_STICKER.forEach { col ->
-                            Box(
-                                modifier = Modifier
-                                    .size(30.dp)
-                                    .clip(CircleShape)
-                                    .background(Color(col))
-                                    .border(if (color == col) 3.dp else 1.dp, ElementTheme.colors.textPrimary, CircleShape)
-                                    .clickable { color = col },
-                            )
-                        }
-                    }
-                    Image(bitmap = vista, contentDescription = "Vista previa", modifier = Modifier.size(140.dp))
+        ChamosTextoDialogo(
+            titulo = "Sticker de texto",
+            onListo = { bmp ->
+                scope.launch { withContext(Dispatchers.IO) { ChamosStickersStore.guardar(contexto, bmp) } }
+                creandoTexto = false
+            },
+            onCancelar = { creandoTexto = false },
+        )
+    }
+
+    editor?.let { par ->
+        ChamosStickerEditor(
+            recorte = par.first,
+            cuadro = par.second,
+            onGuardar = { bmp ->
+                scope.launch {
+                    withContext(Dispatchers.IO) { ChamosStickersStore.guardar(contexto, bmp) }
+                    Toast.makeText(contexto, "Sticker creado", Toast.LENGTH_SHORT).show()
                 }
+                editor = null
             },
-            confirmButton = {
-                TextButton(
-                    enabled = texto.isNotBlank(),
-                    onClick = {
-                        val bmp = ChamosStickersStore.bitmapTexto(texto, color, tipoSticker(tipo), true)
-                        scope.launch { withContext(Dispatchers.IO) { ChamosStickersStore.guardar(contexto, bmp) } }
-                        creandoTexto = false
-                    },
-                ) { Text("Guardar") }
-            },
-            dismissButton = { TextButton(onClick = { creandoTexto = false }) { Text("Cancelar") } },
+            onCancelar = { editor = null },
         )
     }
 }

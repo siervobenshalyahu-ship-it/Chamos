@@ -24,6 +24,14 @@ edit(os.path.join(root, "libraries/compound/src/main/kotlin/io/element/android/c
 # 2) stickers en el chat
 md = os.path.join(root, "features/messages/impl/src/main/kotlin/io/element/android/features/messages/impl/messagecomposer")
 shutil.copy(os.path.join(pdir, "ChamosStickers.kt"), os.path.join(md, "ChamosStickers.kt"))
+shutil.copy(os.path.join(pdir, "ChamosStickersEditor.kt"), os.path.join(md, "ChamosStickersEditor.kt"))
+# recorte de la persona (ML Kit, el modelo viene dentro de la app) para los stickers de foto
+edit(os.path.join(root, "features/messages/impl/build.gradle.kts"), [
+    ("    implementation(libs.coil.compose)\n", "    implementation(libs.coil.compose)\n    implementation(\"com.google.mlkit:segmentation-selfie:16.0.0-beta6\")\n"),
+])
+edit(os.path.join(root, "settings.gradle.kts"), [
+    (r'includeGroupByRegex("com\\.google\\.android.*")' + "\n", r'includeGroupByRegex("com\\.google\\.android.*")' + "\n" + r'                includeGroupByRegex("com\\.google\\.mlkit.*")' + "\n"),
+])
 edit(os.path.join(md, "MessageComposerView.kt"), [
     ("    TextComposer(\n        modifier = modifier,\n        state = state.textEditorState,",
      "    val chamosStickersAbierto = androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }\n"
