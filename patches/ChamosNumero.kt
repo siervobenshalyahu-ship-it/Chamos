@@ -97,7 +97,7 @@ object ChamosNumero {
     }
 
     /** Token de la sesion (para subir videos grandes al servidor de Chamos). */
-    fun tokenSesion(): String? {
+    suspend fun tokenSesion(): String? {
         val c = client ?: return null
         return sesiones?.getSession(c.sessionId.value)?.accessToken
     }
