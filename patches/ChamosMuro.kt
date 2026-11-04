@@ -154,6 +154,7 @@ data class ChamosMuroState(
     val borrarComentario: suspend (MuroComentario) -> Boolean = { false },
     val reportar: suspend (MuroPost, String) -> Boolean = { _, _ -> false },
     val cargarImagen: suspend (MuroPost) -> String? = { null },
+    val cargarAvatar: suspend (String) -> String? = { null },
 )
 
 private fun InReplyTo.idDeRespuesta(): EventId = when (this) {
@@ -442,6 +443,13 @@ fun rememberChamosMuro(
         }
         ok
     }
+    val cargarAvatar: suspend (String) -> String? = avatar@{ url ->
+        val archivo = runCatching {
+            client.matrixMediaLoader.downloadMediaFile(MediaSource(url), "image/jpeg", "avatar.jpg").getOrNull()?.toFile()
+        }.getOrNull() ?: return@avatar null
+        val copia = java.io.File(contexto.cacheDir, "avatar_actual_" + System.currentTimeMillis() + ".jpg")
+        runCatching { withContext(Dispatchers.IO) { archivo.copyTo(copia, overwrite = true) } }.getOrNull()?.absolutePath
+    }
     val cargarImagen: suspend (MuroPost) -> String? = cargar@{ p ->
         val fuente = p.fuente ?: return@cargar null
         cacheArchivos[p.id]?.let { if (java.io.File(it).exists()) return@cargar it }
@@ -498,6 +506,7 @@ fun rememberChamosMuro(
         borrarComentario = borrarComentario,
         reportar = reportar,
         cargarImagen = cargarImagen,
+        cargarAvatar = cargarAvatar,
     )
 }
 
@@ -687,6 +696,16 @@ private fun CabeceraPerfil(state: ChamosMuroState, autorId: String, nPosts: Int)
     val nombre = if (esMio) state.yoNombre else (ejemplo?.autor ?: autorId.substringBefore(":").removePrefix("@"))
     val avatar = if (esMio) state.yoAvatar else ejemplo?.autorAvatar
     var pendiente by remember { mutableStateOf<Pair<Uri, Boolean>?>(null) }
+    var menuAvatar by remember { mutableStateOf(false) }
+    var menuPortada by remember { mutableStateOf(false) }
+    fun acomodarActual(redonda: Boolean) {
+        scope.launch {
+            Toast.makeText(contexto, "Abriendo tu foto…", Toast.LENGTH_SHORT).show()
+            val ruta = if (redonda) (avatar?.let { state.cargarAvatar(it) }) else (portada?.let { state.cargarImagen(it) })
+            if (ruta == null) Toast.makeText(contexto, "No pude abrir la foto actual. Elige otra.", Toast.LENGTH_LONG).show()
+            else pendiente = Pair(Uri.fromFile(java.io.File(ruta)), redonda)
+        }
+    }
     val selPortada = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { u ->
         if (u != null) pendiente = Pair(u, false)
     }
@@ -722,9 +741,13 @@ private fun CabeceraPerfil(state: ChamosMuroState, autorId: String, nPosts: Int)
                     fontSize = 13.sp,
                     modifier = Modifier.align(Alignment.TopEnd).padding(8.dp)
                         .background(Color(0x99000000), CircleShape)
-                        .clickable { selPortada.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }
+                        .clickable { if (portada != null) menuPortada = true else selPortada.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }
                         .padding(horizontal = 12.dp, vertical = 6.dp),
                 )
+                DropdownMenu(expanded = menuPortada, onDismissRequest = { menuPortada = false }) {
+                    DropdownMenuItem(text = { Text("Mover mi portada actual") }, onClick = { menuPortada = false; acomodarActual(false) })
+                    DropdownMenuItem(text = { Text("Elegir otra imagen") }, onClick = { menuPortada = false; selPortada.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) })
+                }
             }
         }
         Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -736,9 +759,13 @@ private fun CabeceraPerfil(state: ChamosMuroState, autorId: String, nPosts: Int)
                         fontSize = 13.sp,
                         modifier = Modifier.align(Alignment.BottomEnd)
                             .background(Color(0xFF2A3558), CircleShape)
-                            .clickable { selFoto.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }
+                            .clickable { if (avatar != null) menuAvatar = true else selFoto.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }
                             .padding(6.dp),
                     )
+                    DropdownMenu(expanded = menuAvatar, onDismissRequest = { menuAvatar = false }) {
+                        DropdownMenuItem(text = { Text("Mover mi foto actual") }, onClick = { menuAvatar = false; acomodarActual(true) })
+                        DropdownMenuItem(text = { Text("Elegir otra foto") }, onClick = { menuAvatar = false; selFoto.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) })
+                    }
                 }
             }
             Column(Modifier.weight(1f)) {
