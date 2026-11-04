@@ -29,6 +29,9 @@ shutil.copy(os.path.join(pdir, "ChamosStickersEditor.kt"), os.path.join(md, "Cha
 edit(os.path.join(root, "features/messages/impl/build.gradle.kts"), [
     ("    implementation(libs.coil.compose)\n", "    implementation(libs.coil.compose)\n    implementation(\"com.google.mlkit:segmentation-selfie:16.0.0-beta6\")\n"),
 ])
+edit(os.path.join(root, "app/build.gradle.kts"), [
+    ('    allowUrl("https://jsoup.org/license")\n', '    allowUrl("https://jsoup.org/license")\n    allowUrl("https://developers.google.com/ml-kit/terms")\n'),
+])
 edit(os.path.join(root, "settings.gradle.kts"), [
     (r'includeGroupByRegex("com\\.google\\.android.*")' + "\n", r'includeGroupByRegex("com\\.google\\.android.*")' + "\n" + r'                includeGroupByRegex("com\\.google\\.mlkit.*")' + "\n"),
 ])
