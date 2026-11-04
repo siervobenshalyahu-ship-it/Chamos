@@ -489,6 +489,9 @@ fun ChamosReelsPantalla(state: ChamosReelsState, onCerrar: () -> Unit) {
                     }
                 }
             }
+            if (verMuro) {
+                Box(Modifier.fillMaxSize().background(Color(0xFF101114))) { ChamosMuroPantalla(state.muro) }
+            }
             // Barra superior
             Row(
                 modifier = Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, top = 36.dp),
@@ -504,9 +507,6 @@ fun ChamosReelsPantalla(state: ChamosReelsState, onCerrar: () -> Unit) {
                 }
                 if (verMuro) Text("   ", fontSize = 30.sp, modifier = Modifier.padding(8.dp))
                 else Text("＋", color = Color.White, fontSize = 30.sp, modifier = Modifier.clickable { subiendo = true }.padding(8.dp))
-            }
-            if (verMuro) {
-                Box(Modifier.fillMaxSize().background(Color(0xFF101114)).padding(top = 84.dp)) { ChamosMuroPantalla(state.muro) }
             }
         }
     }

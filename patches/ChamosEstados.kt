@@ -214,6 +214,19 @@ fun rememberChamosEstados(
         }
     }
 
+    // Las salas del Muro y de los Reels se silencian desde que arranca la app (sin esperar a que se abran).
+    LaunchedEffect(latido) {
+        for (nombre in listOf("chamos_muro", "chamos_reels")) {
+            val guardada = contexto.getSharedPreferences(nombre, android.content.Context.MODE_PRIVATE).getString("sala", null) ?: continue
+            runCatching {
+                val id = RoomId(guardada)
+                if (client.getJoinedRoom(id) != null && silenciadas.add(id)) {
+                    client.notificationSettingsService.setRoomNotificationMode(id, RoomNotificationMode.MUTE)
+                }
+            }
+        }
+    }
+
     // Saber cuáles son mías (soy la creadora) y entrar solo a las invitaciones de otras personas.
     LaunchedEffect(salas.map { it.roomId to it.displayType }, latido) {
         try {

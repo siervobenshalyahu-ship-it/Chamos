@@ -9,6 +9,7 @@ shutil.copy(os.path.join(pdir, "ChamosMuro.kt"), os.path.join(d, "ChamosMuro.kt"
 res = os.path.join(root, "features/home/impl/src/main/res/drawable-nodpi")
 os.makedirs(res, exist_ok=True)
 shutil.copy(os.path.join(pdir, "..", "assets", "muro_banner.jpg"), os.path.join(res, "chamos_muro_banner.jpg"))
+shutil.copy(os.path.join(pdir, "..", "assets", "muro_robot.jpg"), os.path.join(res, "chamos_muro_robot.jpg"))
 shutil.copy(os.path.join(pdir, "..", "assets", "mercado_banner.jpg"), os.path.join(res, "chamos_mercado_banner.jpg"))
 
 def edit(path, pairs):

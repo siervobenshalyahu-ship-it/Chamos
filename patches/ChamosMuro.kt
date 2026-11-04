@@ -45,6 +45,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -582,21 +583,24 @@ private fun ChamosMuroContenido(state: ChamosMuroState, onPestana: (Int) -> Unit
 
     val verPerfilDe = if (perfilDe.isEmpty()) state.yoId else perfilDe
 
-    Column(Modifier.fillMaxSize().background(FONDO).padding(top = 84.dp)) {
-        Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            listOf("Inicio", "Tienda", "Perfil").forEachIndexed { i, nombre ->
-                Text(
-                    nombre,
-                    color = if (pestana == i) Color(0xFF1A1205) else Color.White,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 14.sp,
-                    modifier = Modifier
-                        .background(if (pestana == i) DORADO else TARJETA, androidx.compose.foundation.shape.RoundedCornerShape(20.dp))
-                        .clickable { pestana = i; if (i == 2) perfilDe = "" }
-                        .padding(horizontal = 18.dp, vertical = 8.dp),
-                )
-            }
+    val pestanas: @Composable () -> Unit = {
+    Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        listOf("Inicio", "Tienda", "Perfil").forEachIndexed { i, nombre ->
+            Text(
+                nombre,
+                color = if (pestana == i) Color(0xFF1A1205) else Color.White,
+                fontWeight = FontWeight.Bold,
+                fontSize = 14.sp,
+                modifier = Modifier
+                    .background(if (pestana == i) DORADO else TARJETA, androidx.compose.foundation.shape.RoundedCornerShape(20.dp))
+                    .clickable { pestana = i; if (i == 2) perfilDe = "" }
+                    .padding(horizontal = 18.dp, vertical = 8.dp),
+            )
         }
+    }
+    }
+    Column(Modifier.fillMaxSize().background(FONDO)) {
+        if (pestana != 0) Box(Modifier.padding(top = 84.dp)) { pestanas() }
         if (state.mensaje.isNotEmpty() && state.posts.isEmpty()) {
             Text(state.mensaje, color = Color.White, modifier = Modifier.padding(24.dp))
         }
@@ -605,7 +609,10 @@ private fun ChamosMuroContenido(state: ChamosMuroState, onPestana: (Int) -> Unit
             2 -> state.posts.filter { it.autorId == verPerfilDe }
             else -> state.posts
         }
-        LazyColumn(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(10.dp), contentPadding = androidx.compose.foundation.layout.PaddingValues(12.dp)) {
+        LazyColumn(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(10.dp), contentPadding = androidx.compose.foundation.layout.PaddingValues(start = 12.dp, end = 12.dp, top = if (pestana == 0) 0.dp else 12.dp, bottom = 12.dp)) {
+            if (pestana == 0) {
+                item(key = "cabecera") { CabeceraRobot(pestanas) }
+            }
             if (pestana == 2) {
                 item(key = "perfil") { CabeceraPerfil(state, verPerfilDe, lista.size) }
             }
@@ -885,6 +892,53 @@ private fun EditorFoto(uri: Uri, redonda: Boolean, onListo: (Uri) -> Unit, onCan
     )
 }
 
+/** Portada grande de la Red de Chamos: el robot con la bandera, las pestañas arriba y el letrero abajo. */
+@Composable
+private fun CabeceraRobot(pestanas: @Composable () -> Unit) {
+    Box(
+        Modifier
+            .layout { medida, c ->
+                val extra = 24.dp.roundToPx()
+                val p = medida.measure(c.copy(minWidth = c.maxWidth + extra, maxWidth = c.maxWidth + extra))
+                layout(c.maxWidth, p.height) { p.place(-extra / 2, 0) }
+            }
+            .height(290.dp)
+            .clip(androidx.compose.foundation.shape.RoundedCornerShape(bottomStart = 22.dp, bottomEnd = 22.dp)),
+    ) {
+        Image(
+            painter = painterResource(io.element.android.features.home.impl.R.drawable.chamos_muro_robot),
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            alignment = Alignment.TopCenter,
+            modifier = Modifier.fillMaxSize(),
+        )
+        // Sombra arriba para que se lean las letras de la barra (Reels / Muro) y las pestañas.
+        Box(
+            Modifier.fillMaxWidth().height(150.dp).background(
+                androidx.compose.ui.graphics.Brush.verticalGradient(listOf(Color(0xB3000000), Color.Transparent)),
+            ),
+        )
+        Box(Modifier.align(Alignment.TopStart).padding(top = 84.dp, start = 12.dp)) { pestanas() }
+        Box(Modifier.align(Alignment.BottomCenter).padding(bottom = 16.dp)) {
+            val base = androidx.compose.ui.text.TextStyle(fontSize = 42.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp)
+            Text(
+                "red de chamos",
+                style = base.copy(
+                    color = Color.White,
+                    drawStyle = androidx.compose.ui.graphics.drawscope.Stroke(width = 14f, join = androidx.compose.ui.graphics.StrokeJoin.Round),
+                ),
+            )
+            Text(
+                "red de chamos",
+                style = base.copy(
+                    color = Color(0xFF1E5BFF),
+                    shadow = androidx.compose.ui.graphics.Shadow(Color(0xFF38BDF8), androidx.compose.ui.geometry.Offset.Zero, 28f),
+                ),
+            )
+        }
+    }
+}
+
 @Composable
 private fun CuerpoPost(post: MuroPost, state: ChamosMuroState) {
     Column {
@@ -958,22 +1012,6 @@ private fun CompositorMuro(state: ChamosMuroState, onVender: () -> Unit) {
     val selImagen = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { elegir(it, "image/jpeg") }
     val selVideo = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { elegir(it, "video/mp4") }
     Column(Modifier.fillMaxWidth().background(TARJETA, androidx.compose.foundation.shape.RoundedCornerShape(14.dp))) {
-        // Letrero de la Red de Chamos detrás de la palabra "Publicar".
-        Box(Modifier.fillMaxWidth().clip(androidx.compose.foundation.shape.RoundedCornerShape(topStart = 14.dp, topEnd = 14.dp))) {
-            Image(
-                painter = painterResource(io.element.android.features.home.impl.R.drawable.chamos_muro_banner),
-                contentDescription = null,
-                contentScale = ContentScale.FillWidth,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            Text(
-                "Publicar",
-                color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp,
-                modifier = Modifier.align(Alignment.BottomStart).padding(10.dp)
-                    .background(Color(0x99000000), androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
-                    .padding(horizontal = 12.dp, vertical = 4.dp),
-            )
-        }
         Row(Modifier.padding(start = 12.dp, end = 12.dp, top = 12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.Top) {
             Avatar(avatarData = AvatarData(state.yoId, state.yoNombre, state.yoAvatar, AvatarSize.UserListItem), avatarType = AvatarType.User, forcedAvatarSize = 40.dp)
             OutlinedTextField(
