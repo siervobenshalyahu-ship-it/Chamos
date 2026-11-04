@@ -201,12 +201,12 @@ private suspend fun asegurarSalaReels(client: MatrixClient, prefs: android.conte
         id = resuelto.roomId
         if (client.getJoinedRoom(id) == null) {
             val r = client.joinRoomByIdOrAlias(RoomIdOrAlias.Alias(alias), listOf(REELS_SERVIDOR))
-            if (r.isFailure) return Pair(null, "No pude entrar a los Reels: " + (r.exceptionOrNull()?.message ?: "error"))
+            if (r.isFailure) return Pair(null, "No pude entrar a los Videos: " + (r.exceptionOrNull()?.message ?: "error"))
         }
     } else {
         val dominio = client.sessionId.value.substringAfter(":")
         if (dominio != REELS_SERVIDOR) {
-            return Pair(null, "Los Reels todavía no están disponibles para tu servidor. Intenta más tarde.")
+            return Pair(null, "Los Videos todavía no están disponibles para tu servidor. Intenta más tarde.")
         }
         val creada = client.createRoom(
             CreateRoomParameters(
@@ -218,7 +218,7 @@ private suspend fun asegurarSalaReels(client: MatrixClient, prefs: android.conte
                 roomAliasName = Optional.of(REELS_ALIAS_LOCAL),
             )
         )
-        id = creada.getOrNull() ?: return Pair(null, "No pude crear los Reels: " + (creada.exceptionOrNull()?.message ?: "error"))
+        id = creada.getOrNull() ?: return Pair(null, "No pude crear los Videos: " + (creada.exceptionOrNull()?.message ?: "error"))
     }
     repeat(30) {
         if (client.getJoinedRoom(id) != null) {
@@ -227,7 +227,7 @@ private suspend fun asegurarSalaReels(client: MatrixClient, prefs: android.conte
         }
         delay(500)
     }
-    return Pair(null, "Los Reels tardan en cargar. Intenta de nuevo en un momento.")
+    return Pair(null, "Los Videos tardan en cargar. Intenta de nuevo en un momento.")
 }
 
 @Composable
@@ -280,7 +280,7 @@ fun rememberChamosReels(
             throw e
         } catch (e: Throwable) {
             android.util.Log.e("Chamos", "reels", e)
-            mensaje = "No se pudo abrir los Reels"
+            mensaje = "No se pudo abrir los Videos"
             cargando = false
         }
     }
@@ -433,8 +433,8 @@ fun rememberChamosReels(
     }
 
     val publicar: suspend (Uri, String, String) -> String? = publicar@{ uri, mime, desc ->
-        val id = salaId ?: return@publicar "Los Reels aún no están listos"
-        val sala = client.getJoinedRoom(id) ?: return@publicar "Los Reels aún no están listos"
+        val id = salaId ?: return@publicar "Los Videos aún no están listos"
+        val sala = client.getJoinedRoom(id) ?: return@publicar "Los Videos aún no están listos"
         val tam = runCatching {
             contexto.contentResolver.openAssetFileDescriptor(uri, "r")?.use { it.length } ?: -1L
         }.getOrDefault(-1L)
@@ -497,7 +497,7 @@ fun rememberChamosReels(
 
     val borrar: suspend (ReelItem) -> Boolean = borrar@{ r ->
         val sala = salaId?.let { client.getJoinedRoom(it) } ?: return@borrar false
-        runCatching { sala.liveTimeline.redactEvent(evento(r.id), "Reel borrado").isSuccess }.getOrDefault(false)
+        runCatching { sala.liveTimeline.redactEvent(evento(r.id), "Video borrado").isSuccess }.getOrDefault(false)
     }
     val editar: suspend (ReelItem, String) -> Boolean = editar@{ r, nuevo ->
         val sala = salaId?.let { client.getJoinedRoom(it) } ?: return@editar false
@@ -665,7 +665,7 @@ fun ChamosReelsPantalla(state: ChamosReelsState, inicioMuro: Boolean = false, on
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text("✕", color = Color.White, fontSize = 26.sp, modifier = Modifier.clickable { onCerrar() }.padding(8.dp))
-                Text(if (verMuro || !terminado) "" else "Reels", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                Text(if (verMuro || !terminado) "" else "Videos", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
                 if (verMuro) Text("   ", fontSize = 30.sp, modifier = Modifier.padding(8.dp))
                 else Text("＋", color = Color.White, fontSize = 30.sp, modifier = Modifier.clickable { subiendo = true }.padding(8.dp))
             }
@@ -983,9 +983,9 @@ private fun CompartirDialogo(reel: ReelItem, state: ChamosReelsState, onCerrar: 
 private val NEON_AZUL = Color(0xFF1E90FF)
 private val NEON_VIOLETA = Color(0xFFB026FF)
 
-/** Dos líneas (por defecto "CHAMOS REELS") en luz de neón azul y violeta que parpadea, sobre fondo negro. */
+/** Dos líneas (por defecto "CHAMOS VIDEOS") en luz de neón azul y violeta que parpadea, sobre fondo negro. */
 @Composable
-internal fun ChamosReelNeon(linea1: String = "CHAMOS", linea2: String = "REELS") {
+internal fun ChamosReelNeon(linea1: String = "CHAMOS", linea2: String = "VIDEOS") {
     val transicion = androidx.compose.animation.core.rememberInfiniteTransition(label = "neon")
     @Composable
     fun parpadeo(retraso: Int) = transicion.animateFloat(

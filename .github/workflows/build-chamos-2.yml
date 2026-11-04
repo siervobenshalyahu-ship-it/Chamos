@@ -160,6 +160,9 @@ jobs:
           EOF
           python3 estilo.py chamos
 
+      - name: Todo en español venezolano (sin frases en inglés)
+        run: python3 chamos-repo/patches/espanol.py chamos
+
       - name: Quitar reacciones (stickers) de las llamadas
         run: python3 chamos-repo/patches/sin_reacciones.py chamos
 

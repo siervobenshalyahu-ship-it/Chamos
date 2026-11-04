@@ -68,7 +68,7 @@ edit(os.path.join(d, "HomeView.kt"), [
      "        HorizontalFloatingToolbarSeparator()\n"
      "        HorizontalFloatingToolbarItem(\n"
      "            icon = CompoundIcons.PlaySolid(),\n"
-     "            tooltipLabel = \"Reels\",\n"
+     "            tooltipLabel = \"Videos\",\n"
      "            isSelected = false,\n"
      "            onClick = onReelsClick,\n"
      "        )\n"),
