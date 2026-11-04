@@ -1068,7 +1068,14 @@ private fun CompositorMuro(state: ChamosMuroState, onVender: () -> Unit) {
         mime = contexto.contentResolver.getType(u) ?: porDefecto
     }
     val selImagen = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { elegir(it, "image/jpeg") }
-    val selVideo = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { elegir(it, "video/mp4") }
+    var grafiti by remember { mutableStateOf(false) }
+    var esGrafiti by remember { mutableStateOf(false) }
+    if (grafiti) {
+        ChamosGrafitiEditor(
+            onListo = { u -> uri = u; mime = "image/jpeg"; esGrafiti = true; grafiti = false },
+            onCancelar = { grafiti = false },
+        )
+    }
     Column(Modifier.fillMaxWidth().background(TARJETA, androidx.compose.foundation.shape.RoundedCornerShape(14.dp))) {
         Row(Modifier.padding(start = 12.dp, end = 12.dp, top = 12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.Top) {
             Avatar(avatarData = AvatarData(state.yoId, state.yoNombre, state.yoAvatar, AvatarSize.UserListItem), avatarType = AvatarType.User, forcedAvatarSize = 40.dp)
@@ -1083,14 +1090,14 @@ private fun CompositorMuro(state: ChamosMuroState, onVender: () -> Unit) {
         }
         if (uri != null) {
             Row(Modifier.padding(start = 12.dp, top = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(if (mime?.startsWith("video") == true) "🎬 Video listo" else "🖼 Imagen lista", color = DORADO, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                Text("✕ Quitar", color = Color(0xFFCFD6E6), fontSize = 13.sp, modifier = Modifier.clickable { uri = null; mime = null }.padding(6.dp))
+                Text(if (esGrafiti) "🎨 Grafiti listo" else if (mime?.startsWith("video") == true) "🎬 Video listo" else "🖼 Imagen lista", color = DORADO, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                Text("✕ Quitar", color = Color(0xFFCFD6E6), fontSize = 13.sp, modifier = Modifier.clickable { uri = null; mime = null; esGrafiti = false }.padding(6.dp))
             }
         }
         Row(Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, top = 10.dp, bottom = 12.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
             listOf(
-                "🖼 Imagen" to { selImagen.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
-                "🎬 Video" to { selVideo.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.VideoOnly)) },
+                "🖼 Imagen" to { esGrafiti = false; selImagen.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
+                "🎨 Grafiti" to { grafiti = true },
             ).forEach { (nombre, accion) ->
                 Text(
                     nombre, color = Color.White, fontSize = 13.sp,
@@ -1110,7 +1117,7 @@ private fun CompositorMuro(state: ChamosMuroState, onVender: () -> Unit) {
                         scope.launch {
                             val resultado = state.publicar(u, m, t)
                             publicando = false
-                            if (resultado == null) { texto = ""; uri = null; mime = null }
+                            if (resultado == null) { texto = ""; uri = null; mime = null; esGrafiti = false }
                             Toast.makeText(contexto, resultado ?: "Publicado", Toast.LENGTH_LONG).show()
                         }
                     }

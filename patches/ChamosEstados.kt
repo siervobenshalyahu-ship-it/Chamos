@@ -763,13 +763,29 @@ private fun Modifier.aroNeon(color: Color, visible: Boolean, brillo: Float, carg
         animationSpec = infiniteRepeatable(tween(1100, easing = LinearEasing)),
         label = "giro",
     )
+    val giroLento by transicion.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(tween(5000, easing = LinearEasing)),
+        label = "giroLento",
+    )
     val latido by transicion.animateFloat(
         initialValue = 0.7f,
         targetValue = 1f,
         animationSpec = infiniteRepeatable(tween(1000, easing = FastOutSlowInEasing), RepeatMode.Reverse),
         label = "latido",
     )
-    val contrario = NEON_PALETA[(NEON_PALETA.indexOf(color).coerceAtLeast(0) + NEON_PALETA.size / 2) % NEON_PALETA.size]
+    // Modo del aro (Estilos): discoteca, un solo color, igual al marco o combinado con el marco.
+    val modo = io.element.android.compound.theme.ChamosEstilo.aroModo
+    val coloresNeon = io.element.android.compound.theme.ChamosEstilo.neonColores
+    val marcoIdx = io.element.android.compound.theme.ChamosEstilo.marcoColor
+    val marcoCol = if (marcoIdx >= coloresNeon.size) Color.hsv(giroLento % 360f, 0.9f, 1f) else coloresNeon[marcoIdx]
+    val c = when (modo) {
+        1 -> coloresNeon[io.element.android.compound.theme.ChamosEstilo.aroColor.coerceIn(0, coloresNeon.lastIndex)]
+        2 -> marcoCol
+        else -> color
+    }
+    val contrario = if (modo == 3) marcoCol else NEON_PALETA[(NEON_PALETA.indexOf(c).coerceAtLeast(0) + NEON_PALETA.size / 2) % NEON_PALETA.size]
     drawBehind {
         if (!visible) return@drawBehind
         val grosor = 3.dp.toPx()
@@ -777,16 +793,24 @@ private fun Modifier.aroNeon(color: Color, visible: Boolean, brillo: Float, carg
         val arcoTopLeft = Offset(center.x - radio, center.y - radio)
         val arcoSize = Size(radio * 2f, radio * 2f)
         val base = if (cargando) 0.35f else brillo * latido
+        val mezcla: Brush? = if (modo == 3) Brush.sweepGradient(listOf(c, marcoCol, c), center) else null
+        fun circulo(a: Float, ancho: Float) {
+            if (mezcla != null) {
+                rotate(giroLento, center) { drawCircle(brush = mezcla, radius = radio, alpha = a, style = Stroke(width = ancho)) }
+            } else {
+                drawCircle(c.copy(alpha = a), radius = radio, style = Stroke(width = ancho))
+            }
+        }
         // Resplandor: varias capas más anchas y más transparentes, como un tubo de neón.
         listOf(9.dp.toPx() to 0.10f, 6.dp.toPx() to 0.16f, 3.5.dp.toPx() to 0.28f).forEach { (extra, a) ->
-            drawCircle(color.copy(alpha = a * base), radius = radio, style = Stroke(width = grosor + extra))
+            circulo(a * base, grosor + extra)
         }
-        drawCircle(color.copy(alpha = 0.95f * base), radius = radio, style = Stroke(width = grosor))
+        circulo(0.95f * base, grosor)
         if (cargando) {
             rotate(giro, center) {
                 listOf(8.dp.toPx() to 0.22f, 4.dp.toPx() to 0.45f, 0f to 1f).forEach { (extra, a) ->
                     drawArc(
-                        brush = cometa(color, a, 0.5f),
+                        brush = cometa(c, a, 0.5f),
                         startAngle = 0f,
                         sweepAngle = 360f,
                         useCenter = false,

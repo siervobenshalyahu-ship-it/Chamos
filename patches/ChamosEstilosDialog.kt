@@ -70,6 +70,36 @@ fun ChamosEstilosDialog(onDismiss: () -> Unit) {
                     }
                     TextButton(onClick = { ChamosEstilo.elegirMarcoActivo(false) }) { Text("Quitar el marco") }
                 }
+                Text("Aro de los estados", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 12.dp))
+                listOf("Colores de discoteca (cada contacto el suyo)", "Un solo color", "Igual que el marco", "Combinar con el marco").forEachIndexed { i, nombre ->
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth().clickable { ChamosEstilo.elegirAroModo(i) }.padding(vertical = 2.dp),
+                    ) {
+                        RadioButton(selected = ChamosEstilo.aroModo == i, onClick = { ChamosEstilo.elegirAroModo(i) })
+                        Text(nombre, modifier = Modifier.padding(start = 6.dp))
+                    }
+                }
+                if (ChamosEstilo.aroModo == 1) {
+                    Row(modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        ChamosEstilo.neonColores.forEachIndexed { i, color ->
+                            Row(
+                                modifier = Modifier
+                                    .size(34.dp)
+                                    .clip(CircleShape)
+                                    .background(color)
+                                    .border(if (ChamosEstilo.aroColor == i) 3.dp else 1.dp, MaterialTheme.colorScheme.onSurface, CircleShape)
+                                    .clickable { ChamosEstilo.elegirAroColor(i) },
+                            ) {}
+                        }
+                    }
+                }
+                if (ChamosEstilo.aroModo >= 2) {
+                    Text(
+                        if (ChamosEstilo.aroModo == 2) "El aro de los estados usa el color del marco." else "El aro mezcla el color de cada contacto con el del marco.",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
                 Text("Dictado por voz", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 12.dp))
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
                     Text("Botón \"Dictar\" en los chats (hablas y se escribe solo)", modifier = Modifier.weight(1f))

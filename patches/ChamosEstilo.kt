@@ -96,6 +96,12 @@ object ChamosEstilo {
         private set
     var marcoMovimiento by mutableStateOf(true)
         private set
+
+    /** Aro de neón de los estados: 0 colores de discoteca, 1 un solo color, 2 igual al marco, 3 combinado con el marco. */
+    var aroModo by mutableIntStateOf(0)
+        private set
+    var aroColor by mutableIntStateOf(0)
+        private set
     var dictado by mutableStateOf(true)
         private set
 
@@ -119,6 +125,8 @@ object ChamosEstilo {
         marcoActivo = p.getBoolean("marco", true)
         marcoColor = p.getInt("marcoColor", 0).coerceIn(0, neonColores.size)
         marcoMovimiento = p.getBoolean("marcoMov", true)
+        aroModo = p.getInt("aroModo", 0).coerceIn(0, 3)
+        aroColor = p.getInt("aroColor", 0).coerceIn(0, neonColores.lastIndex)
         dictado = p.getBoolean("dictado", true)
         fondoPropio = p.getString("fondoPropio", null)
         fondosPropios.clear()
@@ -137,6 +145,16 @@ object ChamosEstilo {
     fun elegirMarcoColor(i: Int) {
         marcoColor = i.coerceIn(0, neonColores.size)
         prefs?.edit()?.putInt("marcoColor", marcoColor)?.apply()
+    }
+
+    fun elegirAroModo(i: Int) {
+        aroModo = i.coerceIn(0, 3)
+        prefs?.edit()?.putInt("aroModo", aroModo)?.apply()
+    }
+
+    fun elegirAroColor(i: Int) {
+        aroColor = i.coerceIn(0, neonColores.lastIndex)
+        prefs?.edit()?.putInt("aroColor", aroColor)?.apply()
     }
 
     fun elegirMarcoMovimiento(v: Boolean) {
