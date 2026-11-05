@@ -97,9 +97,16 @@ object ChamosEstados {
         if (nuevos.isNotEmpty()) {
             sc.launch {
                 val room = c.getJoinedRoom(miSala.roomId) ?: return@launch
-                nuevos.forEach { room.inviteUserById(it) }
+                nuevos.forEach { runCatching { room.inviteUserById(it) } }
             }
         }
+    }
+
+    /** Botón de recargar: vuelve a unirse a los estados pendientes y a invitar a los contactos. */
+    fun recargar() {
+        joining.clear()
+        invitedPeers.clear()
+        onRooms(lastAll)
     }
 
     private fun contactos(all: List<RoomSummary>): List<UserId> =

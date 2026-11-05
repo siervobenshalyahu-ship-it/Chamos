@@ -417,6 +417,7 @@ fun rememberChamosMuro(
                         else -> {}
                     }
                 }
+                lista.removeAll { it.esVideo } // el Muro ya no admite videos: solo fotos, letras y grafitis
                 val ordenados = coment.mapValues { e -> e.value.sortedBy { it.timestamp } }
                 comentarios = ordenados
                 todos = lista.map { it.copy(comentarios = ordenados[it.id]?.size ?: 0, reposts = lista.count { x -> x.repostDe == it.id }) }.sortedByDescending { it.timestamp }

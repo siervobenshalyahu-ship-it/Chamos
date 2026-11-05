@@ -60,10 +60,14 @@ edit(hv, [
      "                                    style = androidx.compose.ui.text.TextStyle(fontSize = 20.sp),\n"
      "                                    modifier = Modifier.clickable { onStartChatClick() }.padding(horizontal = 12.dp, vertical = 8.dp),\n"
      "                                )\n"
+     "                                val chamosCtx = androidx.compose.ui.platform.LocalContext.current\n"
      "                                io.element.android.libraries.designsystem.theme.components.Text(\n"
-     "                                    text = \"✏️  Nuevo chat\",\n"
-     "                                    style = androidx.compose.ui.text.TextStyle(fontSize = 15.sp),\n"
-     "                                    modifier = Modifier.clickable { onStartChatClick() }.padding(horizontal = 12.dp, vertical = 10.dp),\n"
+     "                                    text = \"🔄\",\n"
+     "                                    style = androidx.compose.ui.text.TextStyle(fontSize = 20.sp),\n"
+     "                                    modifier = Modifier.clickable {\n"
+     "                                        ChamosEstados.recargar()\n"
+     "                                        android.widget.Toast.makeText(chamosCtx, \"Actualizando estados…\", android.widget.Toast.LENGTH_SHORT).show()\n"
+     "                                    }.padding(horizontal = 12.dp, vertical = 8.dp),\n"
      "                                )\n"
      "                            }\n"
      "                        }\n"
@@ -72,4 +76,17 @@ edit(hv, [
      "import androidx.compose.foundation.layout.Box\nimport androidx.compose.foundation.clickable\nimport androidx.compose.foundation.layout.fillMaxWidth\nimport androidx.compose.foundation.layout.padding\nimport androidx.compose.ui.unit.dp\nimport androidx.compose.ui.unit.sp\n"),
 ])
 
+# El aviso de la clave de recuperación dura solo 20 segundos y desaparece solo.
+rl = os.path.join(d, "components/RoomListContentView.kt")
+edit(rl, [
+    ("    AnimatedContent(\n        targetState = banner,\n",
+     "    val chamosVisible = androidx.compose.runtime.remember(banner) { androidx.compose.runtime.mutableStateOf(true) }\n"
+     "    androidx.compose.runtime.LaunchedEffect(banner) {\n"
+     "        if (banner == RoomListBanner.SetUpRecovery || banner == RoomListBanner.RecoveryKeyConfirmation) {\n"
+     "            kotlinx.coroutines.delay(20_000)\n"
+     "            chamosVisible.value = false\n"
+     "        }\n"
+     "    }\n"
+     "    AnimatedContent(\n        targetState = if (chamosVisible.value) banner else null,\n"),
+])
 print("barra_muro OK")
