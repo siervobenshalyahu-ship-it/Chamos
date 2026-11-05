@@ -91,24 +91,54 @@ private const val REELS_LIMITE_MB = 95L
 private const val MARCA_VIDEO_EXT = "\u2065"
 private const val URL_VIDEOS = "https://chamos-push.siervodeyhwh57.workers.dev/v"
 
-/** Sube el video al servidor de Chamos (Cloudflare R2). Devuelve el enlace o null si falla. */
+/** Sube el video al servidor de Chamos (Cloudflare KV) en pedazos de 16 MiB. Devuelve el enlace o null si falla. */
 private suspend fun subirVideoChamos(archivo: java.io.File): String? = withContext(Dispatchers.IO) {
     try {
         val token = ChamosNumero.tokenSesion() ?: return@withContext null
-        val con = java.net.URL(URL_VIDEOS).openConnection() as java.net.HttpURLConnection
-        con.requestMethod = "POST"
-        con.doOutput = true
-        con.connectTimeout = 20000
-        con.readTimeout = 120000
-        con.setRequestProperty("Authorization", "Bearer $token")
-        con.setRequestProperty("content-type", "video/mp4")
-        con.setFixedLengthStreamingMode(archivo.length())
-        archivo.inputStream().use { e -> con.outputStream.use { o -> e.copyTo(o, 64 * 1024) } }
-        if (con.responseCode !in 200..299) return@withContext null
-        val j = org.json.JSONObject(con.inputStream.bufferedReader().use { it.readText() })
+        val id = java.util.UUID.randomUUID().toString().replace("-", "")
+        val tam = 16L * 1024 * 1024
+        val total = archivo.length()
+        val n = ((total + tam - 1) / tam).toInt()
+        if (n < 1 || n > 6) return@withContext null
+        archivo.inputStream().use { entrada ->
+            for (i in 0 until n) {
+                val largo = minOf(tam, total - i * tam)
+                var ok = false
+                var intento = 0
+                val buf = ByteArray(largo.toInt())
+                var leido = 0
+                while (leido < buf.size) { val r = entrada.read(buf, leido, buf.size - leido); if (r < 0) break; leido += r }
+                while (!ok && intento < 3) {
+                    intento++
+                    val con = java.net.URL("$URL_VIDEOS/$id/$i").openConnection() as java.net.HttpURLConnection
+                    try {
+                        con.requestMethod = "POST"
+                        con.doOutput = true
+                        con.connectTimeout = 20000
+                        con.readTimeout = 120000
+                        con.setRequestProperty("Authorization", "Bearer $token")
+                        con.setFixedLengthStreamingMode(buf.size)
+                        con.outputStream.use { it.write(buf) }
+                        ok = con.responseCode in 200..299
+                    } catch (e: Exception) {
+                        android.util.Log.w("Chamos", "reels: pedazo $i fallo", e)
+                    } finally {
+                        con.disconnect()
+                    }
+                }
+                if (!ok) return@withContext null
+            }
+        }
+        val fin = java.net.URL("$URL_VIDEOS/$id/fin?n=$n").openConnection() as java.net.HttpURLConnection
+        fin.requestMethod = "POST"
+        fin.setRequestProperty("Authorization", "Bearer $token")
+        fin.connectTimeout = 20000
+        fin.readTimeout = 30000
+        if (fin.responseCode !in 200..299) return@withContext null
+        val j = org.json.JSONObject(fin.inputStream.bufferedReader().use { it.readText() })
         j.optString("url").ifEmpty { null }
     } catch (e: Exception) {
-        android.util.Log.w("Chamos", "reels: subida a R2 fallo", e)
+        android.util.Log.w("Chamos", "reels: subida de video fallo", e)
         null
     }
 }

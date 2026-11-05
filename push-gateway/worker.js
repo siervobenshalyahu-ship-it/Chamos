@@ -425,55 +425,73 @@ function esc(s){return String(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt
 if(sessionStorage.getItem('k'))go();
 </script></body></html>`;
 
-// ---- Videos de Reels en R2 (sin el limite de 10 MB de matrix.org) ----
-async function videoSubir(request, env) {
-  if (!env.VIDEOS) return jsonCors({ error: "R2 no esta conectado (falta el enlace VIDEOS)" }, 503);
+// ---- Videos de Reels en Workers KV (plan gratis, sin tarjeta): la app los sube en pedazos de 20 MiB ----
+const VIDEO_DIAS = 10;
+async function videoAuth(request) {
   const auth = request.headers.get("authorization") || "";
   const w = await fetch("https://matrix-client.matrix.org/_matrix/client/v3/account/whoami", { headers: { authorization: auth } });
-  if (!w.ok) return jsonCors({ error: "Sesion no valida" }, 401);
-  const quien = (await w.json()).user_id || "";
-  const len = parseInt(request.headers.get("content-length") || "0", 10);
-  if (!len) return jsonCors({ error: "Falta el tamaño" }, 411);
-  if (len > 95 * 1024 * 1024) return jsonCors({ error: "Maximo 95 MB" }, 413);
-  const id = crypto.randomUUID().replace(/-/g, "");
-  await env.VIDEOS.put(id + ".mp4", request.body, { httpMetadata: { contentType: "video/mp4" }, customMetadata: { u: quien } });
-  return jsonCors({ id, url: new URL(request.url).origin + "/v/" + id + ".mp4" });
+  if (!w.ok) return null;
+  return (await w.json()).user_id || "";
+}
+async function videoSubir(request, env, url) {
+  if (!env.VIDEOS) return jsonCors({ error: "KV no esta conectado (falta el enlace VIDEOS)" }, 503);
+  const m = /^\/v\/([a-f0-9]{32})\/(\d+|fin)$/.exec(url.pathname);
+  if (!m) return jsonCors({ error: "Ruta no valida" }, 404);
+  const quien = await videoAuth(request);
+  if (quien === null) return jsonCors({ error: "Sesion no valida" }, 401);
+  const id = m[1], ttl = { expirationTtl: VIDEO_DIAS * 86400 };
+  if (m[2] === "fin") {
+    const n = parseInt(url.searchParams.get("n") || "0", 10);
+    if (!n || n > 6) return jsonCors({ error: "Cantidad de pedazos no valida" }, 400);
+    await env.VIDEOS.put("m:" + id, JSON.stringify({ n, u: quien }), ttl);
+    return jsonCors({ id, url: url.origin + "/v/" + id + ".mp4" });
+  }
+  const i = parseInt(m[2], 10);
+  if (i > 5) return jsonCors({ error: "Pedazo fuera de rango" }, 400);
+  const buf = await request.arrayBuffer();
+  if (!buf.byteLength || buf.byteLength > 25 * 1024 * 1024 - 1024) return jsonCors({ error: "Tamaño de pedazo no valido" }, 413);
+  await env.VIDEOS.put("c:" + id + ":" + i, buf, ttl);
+  return jsonCors({ ok: true, i });
 }
 async function videoVer(request, env, url) {
-  if (!env.VIDEOS) return jsonCors({ error: "R2 no conectado" }, 503);
-  const key = url.pathname.slice(3);
-  if (!/^[a-f0-9]{32}\.mp4$/.test(key)) return jsonCors({ error: "No encontrado" }, 404);
-  const range = request.headers.get("range");
-  let o, status = 200;
+  if (!env.VIDEOS) return jsonCors({ error: "KV no conectado" }, 503);
+  const m = /^\/v\/([a-f0-9]{32})\.mp4$/.exec(url.pathname);
+  if (!m) return jsonCors({ error: "No encontrado" }, 404);
+  const man = await env.VIDEOS.get("m:" + m[1], "json");
+  if (!man) return jsonCors({ error: "El video ya no esta disponible" }, 404);
   const h = new Headers(CORS);
-  h.set("accept-ranges", "bytes");
   h.set("content-type", "video/mp4");
-  h.set("cache-control", "public, max-age=31536000, immutable");
-  if (range) {
-    const head = await env.VIDEOS.head(key);
-    if (!head) return jsonCors({ error: "No encontrado" }, 404);
-    const m = /bytes=(\d*)-(\d*)/.exec(range) || [];
-    let a = m[1] === "" ? Math.max(0, head.size - parseInt(m[2] || "0", 10)) : parseInt(m[1] || "0", 10);
-    let b = m[1] !== "" && m[2] ? Math.min(parseInt(m[2], 10), head.size - 1) : head.size - 1;
-    if (a > b || a >= head.size) return new Response(null, { status: 416, headers: { "content-range": "bytes */" + head.size } });
-    o = await env.VIDEOS.get(key, { range: { offset: a, length: b - a + 1 } });
-    h.set("content-range", "bytes " + a + "-" + b + "/" + head.size);
-    h.set("content-length", String(b - a + 1));
-    status = 206;
-  } else {
-    o = await env.VIDEOS.get(key);
-    if (!o) return jsonCors({ error: "No encontrado" }, 404);
-    h.set("content-length", String(o.size));
-  }
-  return new Response(request.method === "HEAD" ? null : o.body, { status, headers: h });
+  h.set("cache-control", "public, max-age=3600");
+  if (request.method === "HEAD") return new Response(null, { status: 200, headers: h });
+  let i = 0, actual = null;
+  const flujo = new ReadableStream({
+    async pull(ctl) {
+      try {
+        for (;;) {
+          if (!actual) {
+            if (i >= man.n) { ctl.close(); return; }
+            const s = await env.VIDEOS.get("c:" + m[1] + ":" + i, "stream");
+            i++;
+            if (!s) { ctl.error(new Error("falta un pedazo")); return; }
+            actual = s.getReader();
+          }
+          const r = await actual.read();
+          if (r.done) { actual = null; continue; }
+          ctl.enqueue(r.value);
+          return;
+        }
+      } catch (e) { ctl.error(e); }
+    },
+  });
+  return new Response(flujo, { status: 200, headers: h });
 }
 
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS });
-    if (url.pathname === "/v" && request.method === "POST") {
-      try { return await videoSubir(request, env); } catch (e) { console.error(e); return jsonCors({ error: String(e.message || e) }, 500); }
+    if (url.pathname.startsWith("/v/") && request.method === "POST") {
+      try { return await videoSubir(request, env, url); } catch (e) { console.error(e); return jsonCors({ error: String(e.message || e) }, 500); }
     }
     if (url.pathname.startsWith("/v/") && (request.method === "GET" || request.method === "HEAD")) {
       try { return await videoVer(request, env, url); } catch (e) { console.error(e); return jsonCors({ error: String(e.message || e) }, 500); }
