@@ -88,6 +88,8 @@ private const val REELS_ALIAS_LOCAL = "chamos-reels"
 private const val REELS_SERVIDOR = "matrix.org"
 private const val REELS_ALIAS = "#$REELS_ALIAS_LOCAL:$REELS_SERVIDOR"
 private const val REELS_LIMITE_MB = 95L
+private const val REELS_ORIGINAL_MAX_MB = 500L
+private const val REELS_MAX_MS = 90_000L
 private const val MARCA_VIDEO_EXT = "\u2065"
 private const val URL_VIDEOS = "https://chamos-push.siervodeyhwh57.workers.dev/v"
 
@@ -419,6 +421,7 @@ fun rememberChamosReels(
                 reels = lista.map { it.copy(comentarios = ordenados[it.id]?.size ?: 0, reportes = reportesPor[it.id]?.size ?: 0) }
                     // Con 3 o más reportes distintos el video se esconde para todos (menos su dueño y el administrador).
                     .filter { it.reportes < 3 || it.propio || soyAdmin }
+                    .filter { it.timestamp > System.currentTimeMillis() - 12L * 3600_000L }
                     .sortedByDescending { it.timestamp }
                 envio = if (fallos > 0) "⚠️ No se pudo subir tu video ($detalle)" else if (pendientes > 0) "⏳ Subiendo tu video…" else ""
                 cargando = false
@@ -468,7 +471,7 @@ fun rememberChamosReels(
         val tam = runCatching {
             contexto.contentResolver.openAssetFileDescriptor(uri, "r")?.use { it.length } ?: -1L
         }.getOrDefault(-1L)
-        if (tam > REELS_LIMITE_MB * 1024 * 1024) return@publicar "El video pesa más de $REELS_LIMITE_MB MB"
+        if (tam > REELS_ORIGINAL_MAX_MB * 1024 * 1024) return@publicar "El video pesa más de $REELS_ORIGINAL_MAX_MB MB"
         // Copia del video en el teléfono: se muestra de inmediato en los Reels (con "Subiendo…") y de ahí se sube.
         val marca = System.currentTimeMillis()
         val idLocal = "local_$marca"
@@ -481,6 +484,19 @@ fun rememberChamosReels(
                 if (f.length() > 0) f else null
             }
         }.getOrNull()
+        if (copia != null) {
+            val duracion = runCatching {
+                val r = android.media.MediaMetadataRetriever()
+                try {
+                    r.setDataSource(copia.absolutePath)
+                    r.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 0L
+                } finally { r.release() }
+            }.getOrDefault(0L)
+            if (duracion > REELS_MAX_MS + 1500L) {
+                copia.delete()
+                return@publicar "El video dura más de 1:30 minutos. Recórtalo e inténtalo otra vez."
+            }
+        }
         if (copia != null) {
             baseLocal[idLocal] = reels.count { it.propio } + locales.size
             locales = listOf(
@@ -495,19 +511,24 @@ fun rememberChamosReels(
         scopeReels.launch {
             val sender = mediaSenderFactory.create(client, sala)
             val origen = if (copia != null) Uri.fromFile(copia) else uri
-            val grande = (copia?.length() ?: tam) > LIMITE_SUBIDA_BYTES
             var error: String? = null
-            if (grande && copia != null) {
-                val enlace = subirVideoChamos(copia)
-                error = if (enlace != null) {
-                    runCatching {
-                        sala.liveTimeline.sendMessage(MARCA_VIDEO_EXT + enlace + "\n" + desc, null, emptyList()).exceptionOrNull()?.let { "No se pudo publicar el video" }
-                    }.getOrElse { "No se pudo publicar el video" }
-                } else {
-                    "No se pudo subir el video grande. Revisa tu internet e inténtalo otra vez."
-                }
+            // Siempre se comprime a 720p y se sube al servidor de Chamos; se borra solo a las 12 horas.
+            val config = io.element.android.libraries.mediaupload.api.MediaOptimizationConfig(
+                compressImages = true,
+                videoCompressionPreset = io.element.android.libraries.preferences.api.store.VideoCompressionPreset.STANDARD,
+            )
+            val info = runCatching { sender.preProcessMedia(origen, mime, config).getOrNull() }.getOrNull()
+            val aSubir = info?.file ?: copia
+            val enlace = if (aSubir != null && aSubir.length() <= REELS_LIMITE_MB * 1024 * 1024) subirVideoChamos(aSubir) else null
+            if (enlace != null) {
+                error = runCatching {
+                    sala.liveTimeline.sendMessage(MARCA_VIDEO_EXT + enlace + "\n" + desc, null, emptyList()).exceptionOrNull()?.let { "No se pudo publicar el video" }
+                }.getOrElse { "No se pudo publicar el video" }
+            } else if (info != null && info.file.length() <= LIMITE_SUBIDA_BYTES) {
+                // Respaldo: si el servidor de Chamos no responde, un video chico va por matrix.org.
+                error = if (sender.sendPreProcessedMedia(info, desc.ifBlank { null }, null, null).isSuccess) null else "No se pudo subir (el servidor lo rechazó)"
             } else {
-                error = runCatching { subirConLimite(sender, origen, mime, desc.ifBlank { null }) }.getOrElse { "No se pudo subir el video" }
+                error = "No se pudo subir el video. Revisa tu internet e inténtalo otra vez."
             }
             sender.cleanUp()
             if (error == null) {
@@ -727,7 +748,7 @@ fun ChamosReelsPantalla(state: ChamosReelsState, inicioMuro: Boolean = false, on
                         placeholder = { Text("Cuéntales algo a los chamos (opcional)") },
                         modifier = Modifier.fillMaxWidth(),
                     )
-                    Text("Máximo $REELS_LIMITE_MB MB. Se publica para toda la comunidad Chamos.", fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp))
+                    Text("Máximo 1:30 minutos. Se guarda en 720p y se borra solo a las 12 horas. Se publica para toda la comunidad Chamos.", fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp))
                 }
             },
             confirmButton = {

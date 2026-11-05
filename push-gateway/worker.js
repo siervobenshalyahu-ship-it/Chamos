@@ -426,7 +426,7 @@ if(sessionStorage.getItem('k'))go();
 </script></body></html>`;
 
 // ---- Videos de Reels en Workers KV (plan gratis, sin tarjeta): la app los sube en pedazos de 20 MiB ----
-const VIDEO_DIAS = 10;
+const VIDEO_HORAS = 12;
 async function videoAuth(request) {
   const auth = request.headers.get("authorization") || "";
   const w = await fetch("https://matrix-client.matrix.org/_matrix/client/v3/account/whoami", { headers: { authorization: auth } });
@@ -439,7 +439,8 @@ async function videoSubir(request, env, url) {
   if (!m) return jsonCors({ error: "Ruta no valida" }, 404);
   const quien = await videoAuth(request);
   if (quien === null) return jsonCors({ error: "Sesion no valida" }, 401);
-  const id = m[1], ttl = { expirationTtl: VIDEO_DIAS * 86400 };
+  const horas = Math.min(168, Math.max(1, parseInt(url.searchParams.get("h") || String(VIDEO_HORAS), 10) || VIDEO_HORAS));
+  const id = m[1], ttl = { expirationTtl: horas * 3600 };
   if (m[2] === "fin") {
     const n = parseInt(url.searchParams.get("n") || "0", 10);
     if (!n || n > 6) return jsonCors({ error: "Cantidad de pedazos no valida" }, 400);
