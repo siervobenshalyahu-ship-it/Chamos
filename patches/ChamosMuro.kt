@@ -658,7 +658,7 @@ private fun ChamosMuroContenido(state: ChamosMuroState, onPestana: (Int) -> Unit
     val verPerfilDe = if (perfilDe.isEmpty()) state.yoId else perfilDe
 
     val pestanas: @Composable () -> Unit = {
-    Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally)) {
         listOf("Inicio", "Tienda", "Perfil").forEachIndexed { i, nombre ->
             Text(
                 nombre,
@@ -984,7 +984,7 @@ private fun CabeceraRobot(pestanas: @Composable () -> Unit, imagen: Int) {
             painter = painterResource(imagen),
             contentDescription = null,
             contentScale = ContentScale.Crop,
-            alignment = Alignment.TopCenter,
+            alignment = Alignment.Center,
             modifier = Modifier.fillMaxSize(),
         )
         // Sombra arriba para que se lean las letras de la barra (Reels / Muro) y las pestañas.
@@ -993,7 +993,13 @@ private fun CabeceraRobot(pestanas: @Composable () -> Unit, imagen: Int) {
                 androidx.compose.ui.graphics.Brush.verticalGradient(listOf(Color(0x99000000), Color.Transparent)),
             ),
         )
-        Box(Modifier.align(Alignment.TopStart).padding(top = 84.dp, start = 12.dp)) { pestanas() }
+        // Sombra abajo para que se lean las pestañas al pie del banner.
+        Box(
+            Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(72.dp).background(
+                androidx.compose.ui.graphics.Brush.verticalGradient(listOf(Color.Transparent, Color(0xAA000000))),
+            ),
+        )
+        Box(Modifier.align(Alignment.BottomCenter).padding(bottom = 12.dp)) { pestanas() }
     }
 }
 
