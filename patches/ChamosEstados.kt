@@ -1400,3 +1400,61 @@ internal fun VideoTextura(
         }
     }
 }
+
+/** Título "Chamos" de la pantalla principal: azul, rodeado de luz de neón que cambia entre azul y violeta y parpadea. */
+@Composable
+internal fun ChamosTituloNeon() {
+    val transicion = androidx.compose.animation.core.rememberInfiniteTransition(label = "tituloNeon")
+    val mezcla = transicion.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = androidx.compose.animation.core.infiniteRepeatable(
+            animation = androidx.compose.animation.core.tween(2800, easing = androidx.compose.animation.core.LinearEasing),
+            repeatMode = androidx.compose.animation.core.RepeatMode.Reverse,
+        ),
+        label = "mezcla",
+    ).value
+    val parpadeo = transicion.animateFloat(
+        initialValue = 1f,
+        targetValue = 1f,
+        animationSpec = androidx.compose.animation.core.infiniteRepeatable(
+            animation = androidx.compose.animation.core.keyframes {
+                durationMillis = 3200
+                1f at 0
+                1f at 1100
+                0.3f at 1160
+                1f at 1220
+                0.5f at 1300
+                1f at 1360
+                1f at 2400
+                0.25f at 2460
+                1f at 2540
+                0.65f at 2620
+                1f at 2700
+            },
+        ),
+        label = "parpadeo",
+    ).value
+    val azul = androidx.compose.ui.graphics.Color(0xFF2F8BFF)
+    val violeta = androidx.compose.ui.graphics.Color(0xFFB026FF)
+    val luz = androidx.compose.ui.graphics.lerp(azul, violeta, mezcla)
+    val estilo = androidx.compose.ui.text.TextStyle(fontSize = 24.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.ExtraBold, letterSpacing = 1.sp)
+    androidx.compose.foundation.layout.Box(modifier = Modifier.graphicsLayer { alpha = parpadeo }) {
+        // halo grande
+        io.element.android.libraries.designsystem.theme.components.Text(
+            text = "Chamos",
+            style = estilo.copy(
+                color = luz,
+                shadow = androidx.compose.ui.graphics.Shadow(color = luz, offset = androidx.compose.ui.geometry.Offset.Zero, blurRadius = 42f),
+            ),
+        )
+        // letras azules con brillo cerca
+        io.element.android.libraries.designsystem.theme.components.Text(
+            text = "Chamos",
+            style = estilo.copy(
+                color = androidx.compose.ui.graphics.lerp(azul, androidx.compose.ui.graphics.Color.White, 0.25f),
+                shadow = androidx.compose.ui.graphics.Shadow(color = luz, offset = androidx.compose.ui.geometry.Offset.Zero, blurRadius = 14f),
+            ),
+        )
+    }
+}
