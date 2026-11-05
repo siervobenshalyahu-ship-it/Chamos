@@ -90,11 +90,11 @@ private const val REELS_ALIAS = "#$REELS_ALIAS_LOCAL:$REELS_SERVIDOR"
 private const val REELS_LIMITE_MB = 95L
 private const val REELS_ORIGINAL_MAX_MB = 500L
 private const val REELS_MAX_MS = 90_000L
-private const val MARCA_VIDEO_EXT = "\u2065"
+internal const val MARCA_VIDEO_EXT = "\u2065"
 private const val URL_VIDEOS = "https://chamos-push.siervodeyhwh57.workers.dev/v"
 
 /** Sube el video al servidor de Chamos (Cloudflare KV) en pedazos de 16 MiB. Devuelve el enlace o null si falla. */
-private suspend fun subirVideoChamos(archivo: java.io.File): String? = withContext(Dispatchers.IO) {
+internal suspend fun subirVideoChamos(archivo: java.io.File, horas: Int = 12): String? = withContext(Dispatchers.IO) {
     try {
         val token = ChamosNumero.tokenSesion() ?: return@withContext null
         val id = java.util.UUID.randomUUID().toString().replace("-", "")
@@ -112,7 +112,7 @@ private suspend fun subirVideoChamos(archivo: java.io.File): String? = withConte
                 while (leido < buf.size) { val r = entrada.read(buf, leido, buf.size - leido); if (r < 0) break; leido += r }
                 while (!ok && intento < 3) {
                     intento++
-                    val con = java.net.URL("$URL_VIDEOS/$id/$i").openConnection() as java.net.HttpURLConnection
+                    val con = java.net.URL("$URL_VIDEOS/$id/$i?h=$horas").openConnection() as java.net.HttpURLConnection
                     try {
                         con.requestMethod = "POST"
                         con.doOutput = true
@@ -131,7 +131,7 @@ private suspend fun subirVideoChamos(archivo: java.io.File): String? = withConte
                 if (!ok) return@withContext null
             }
         }
-        val fin = java.net.URL("$URL_VIDEOS/$id/fin?n=$n").openConnection() as java.net.HttpURLConnection
+        val fin = java.net.URL("$URL_VIDEOS/$id/fin?n=$n&h=$horas").openConnection() as java.net.HttpURLConnection
         fin.requestMethod = "POST"
         fin.setRequestProperty("Authorization", "Bearer $token")
         fin.connectTimeout = 20000
@@ -145,7 +145,7 @@ private suspend fun subirVideoChamos(archivo: java.io.File): String? = withConte
     }
 }
 
-private suspend fun bajarVideoChamos(url: String, destino: java.io.File): Boolean = withContext(Dispatchers.IO) {
+internal suspend fun bajarVideoChamos(url: String, destino: java.io.File): Boolean = withContext(Dispatchers.IO) {
     try {
         destino.parentFile?.mkdirs()
         val tmp = java.io.File(destino.path + ".part")

@@ -147,6 +147,7 @@ data class MuroPost(
     val comentarios: Int,
     val propio: Boolean,
     val esVideo: Boolean = false,
+    val urlExterna: String? = null,
     val repostDe: String = "",
     val noMeGusta: Int = 0,
     val yoNoMeGusta: Boolean = false,
@@ -394,7 +395,8 @@ fun rememberChamosMuro(
                                 coment.getOrPut(resp.value) { mutableListOf() }
                                     .add(MuroComentario(eid, ev.timestamp, nombre, t.body, ev.isOwn))
                             } else {
-                                val (tipo, campos) = leerCuerpo(t.body)
+                                val urlVideo = Regex(MARCA_VIDEO_EXT + "(https://\\S+)").find(t.body)?.groupValues?.get(1)
+                                val (tipo, campos) = leerCuerpo(t.body.replace(Regex(MARCA_VIDEO_EXT + "https://\\S+"), ""))
                                 lista.add(
                                     MuroPost(
                                         id = eid, timestamp = ev.timestamp, autorId = ev.sender.value, autor = nombre, autorAvatar = pf?.avatarUrl,
@@ -404,7 +406,8 @@ fun rememberChamosMuro(
                                         precio = if (tipo == 'V') campos.getOrElse(1) { "" } else "",
                                         ciudad = if (tipo == 'V') campos.getOrElse(2) { "" } else "",
                                         contacto = if (tipo == 'V') campos.getOrElse(3) { "" } else "",
-                                        fuente = null, mime = null, nombreArchivo = "",
+                                        esVideo = urlVideo != null, urlExterna = urlVideo,
+                                        fuente = urlVideo?.let { MediaSource(it) }, mime = if (urlVideo != null) "video/mp4" else null, nombreArchivo = if (urlVideo != null) "video.mp4" else "",
                                         likes = likes, yoLike = yoLike, comentarios = 0, propio = ev.isOwn,
                                     noMeGusta = nogustas, yoNoMeGusta = yoNoGusta, repostDe = if (tipo == 'R') campos.getOrElse(1) { "" } else "",
                                     )
@@ -461,6 +464,19 @@ fun rememberChamosMuro(
             return if (sala.liveTimeline.sendMessage(cuerpo, null, emptyList()).isSuccess) null else "No se pudo publicar"
         }
         val sender = mediaSenderFactory.create(client, sala)
+        if (mime != null && mime.startsWith("video")) {
+            // Los videos del Muro se comprimen a 720p y se guardan 7 días en el servidor de Chamos.
+            val cfg = io.element.android.libraries.mediaupload.api.MediaOptimizationConfig(
+                compressImages = true,
+                videoCompressionPreset = io.element.android.libraries.preferences.api.store.VideoCompressionPreset.STANDARD,
+            )
+            val info = runCatching { sender.preProcessMedia(uri, mime, cfg).getOrNull() }.getOrNull()
+            val enlace = if (info != null && info.file.length() <= 95L * 1024 * 1024) subirVideoChamos(info.file, 168) else null
+            if (enlace != null) {
+                sender.cleanUp()
+                return if (sala.liveTimeline.sendMessage(cuerpo + MARCA_VIDEO_EXT + enlace, null, emptyList()).isSuccess) null else "No se pudo publicar"
+            }
+        }
         val error = subirConLimite(sender, uri, mime ?: "image/jpeg", cuerpo)
         sender.cleanUp()
         return error
@@ -530,6 +546,11 @@ fun rememberChamosMuro(
         val carpeta = java.io.File(contexto.filesDir, "muro_cache")
         val local = java.io.File(carpeta, p.id.replace(Regex("[^A-Za-z0-9]"), "_").takeLast(80) + ".img")
         if (local.exists() && local.length() > 0) {
+            cacheArchivos[p.id] = local.absolutePath
+            return@cargar local.absolutePath
+        }
+        if (p.urlExterna != null) {
+            if (!bajarVideoChamos(p.urlExterna, local)) return@cargar null
             cacheArchivos[p.id] = local.absolutePath
             return@cargar local.absolutePath
         }

@@ -169,7 +169,12 @@ private fun extraerEntrada(item: MatrixTimelineItem): EstadoEntrada? {
     return when (val t = contenido.type) {
         is ImageMessageType -> EstadoEntrada(id, ev.timestamp, TipoEstado.IMAGEN, t.caption ?: "", t.source, t.info?.mimetype, t.filename)
         is VideoMessageType -> EstadoEntrada(id, ev.timestamp, TipoEstado.VIDEO, t.caption ?: "", t.source, t.info?.mimetype, t.filename)
-        is TextMessageType -> EstadoEntrada(id, ev.timestamp, TipoEstado.TEXTO, t.body, null, null, "")
+        is TextMessageType -> if (t.body.startsWith(MARCA_VIDEO_EXT)) {
+            val partes = t.body.removePrefix(MARCA_VIDEO_EXT).split("\n", limit = 2)
+            EstadoEntrada(id, ev.timestamp, TipoEstado.VIDEO, partes.getOrElse(1) { "" }.trim(), MediaSource(partes[0].trim()), "video/mp4", partes[0].trim())
+        } else {
+            EstadoEntrada(id, ev.timestamp, TipoEstado.TEXTO, t.body, null, null, "")
+        }
         else -> null
     }
 }
@@ -431,6 +436,19 @@ fun rememberChamosEstados(
     val publicarMedia: suspend (Uri, String) -> Boolean = publicar@{ uri, mime ->
         val sala = salaPropia() ?: return@publicar false
         val sender = mediaSenderFactory.create(client, sala)
+        if (mime.startsWith("video")) {
+            // Los videos de estados se comprimen a 720p y se guardan 24 horas en el servidor de Chamos.
+            val cfg = io.element.android.libraries.mediaupload.api.MediaOptimizationConfig(
+                compressImages = true,
+                videoCompressionPreset = io.element.android.libraries.preferences.api.store.VideoCompressionPreset.STANDARD,
+            )
+            val info = runCatching { sender.preProcessMedia(uri, mime, cfg).getOrNull() }.getOrNull()
+            val enlace = if (info != null && info.file.length() <= 95L * 1024 * 1024) subirVideoChamos(info.file, 24) else null
+            if (enlace != null) {
+                sender.cleanUp()
+                return@publicar sala.liveTimeline.sendMessage(MARCA_VIDEO_EXT + enlace, null, emptyList()).isSuccess
+            }
+        }
         val config = mediaConfigFactory.create(client).get()
         val resultado = sender.sendMedia(uri = uri, mimeType = mime, mediaOptimizationConfig = config)
         sender.cleanUp()
@@ -455,6 +473,11 @@ fun rememberChamosEstados(
             return@cargar local.absolutePath
         }
         val fuente = e.fuente ?: return@cargar null
+        if (e.nombre.startsWith("https://")) {
+            if (!bajarVideoChamos(e.nombre, local)) return@cargar null
+            cacheArchivos[e.id] = local.absolutePath
+            return@cargar local.absolutePath
+        }
         var archivo: java.io.File? = null
         for (intento in 0 until 4) {
             archivo = client.matrixMediaLoader.downloadMediaFile(fuente, e.mime, e.nombre).getOrNull()?.toFile()
