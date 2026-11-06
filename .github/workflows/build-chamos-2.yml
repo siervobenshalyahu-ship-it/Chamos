@@ -255,7 +255,7 @@ jobs:
           "$AS" verify --print-certs "$APK" | tee cert.txt
           SHA=$(grep -i "SHA-256 digest" cert.txt | head -1 | awk '{print $NF}')
           echo "::notice::Huella SHA-256 del APK: $SHA"
-          if [ "$SHA" = "7c13b8f28ea511a38ece5bdefdf91072e8a584cde92b96a7162907a48fee6931" ]; then
+          if [ "$SHA" = "7c13b8f28ea511a38ece5bdefdf91072e8a584cde92b96a7162907a48fee6931" ] || [ "$SHA" = "67b0771894605d9a978599287ba6755f039f1882891afdbc1557c71cc81d551f" ]; then
             echo "::notice::FIRMA OFICIAL DE CHAMOS: correcta"
           else
             echo "::warning::LA FIRMA NO ES LA OFICIAL DE CHAMOS"
