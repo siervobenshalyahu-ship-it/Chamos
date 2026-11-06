@@ -102,6 +102,21 @@ async function vincular(env, matrixId, telefono) {
 
 /* ---------------- API para la app ---------------- */
 
+// Nombre del bot: se le pregunta a Telegram con el mismo TG_TOKEN, así el enlace nunca apunta a un bot que no existe.
+async function nombreBot(env) {
+  const guardado = await env.CUENTAS.get("cfg:bot");
+  if (guardado) return guardado;
+  try {
+    const r = await fetch("https://api.telegram.org/bot" + env.TG_TOKEN + "/getMe");
+    const j = await r.json();
+    if (j && j.ok && j.result && j.result.username) {
+      await env.CUENTAS.put("cfg:bot", j.result.username, { expirationTtl: 86400 });
+      return j.result.username;
+    }
+  } catch {}
+  return String(env.TG_BOT || "").trim().replace(/^@/, "").replace(/^https?:\/\/t\.me\//, "");
+}
+
 async function iniciar(req, env) {
   const b = await leer(req);
   if (!b) return json({ error: "solicitud inválida" }, 400);
@@ -110,7 +125,9 @@ async function iniciar(req, env) {
   if (!(await limite(env, "ini:" + id, 5, 600))) return json({ error: "demasiados intentos, espera unos minutos" }, 429);
   const token = tokenAleatorio();
   await env.CUENTAS.put("ses:" + token, JSON.stringify({ matrixId: id, estado: "pendiente" }), { expirationTtl: SESSION_TTL });
-  return json({ token, enlace: "https://t.me/" + env.TG_BOT + "?start=" + token, expira_en: SESSION_TTL });
+  const bot = await nombreBot(env);
+  if (!/^[A-Za-z0-9_]{4,}$/.test(bot) || bot.startsWith("CAMBIA")) return json({ error: "falta configurar TG_TOKEN o TG_BOT" }, 500);
+  return json({ token, enlace: "https://t.me/" + bot + "?start=" + token, expira_en: SESSION_TTL });
 }
 
 async function estado(url, env) {
