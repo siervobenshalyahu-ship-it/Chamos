@@ -60,7 +60,7 @@ edit(os.path.join(root, "libraries/usersearch/impl/src/main/kotlin/io/element/an
     ("        return res.getOrNull()?.results.orEmpty()\n",
      "        val todos = res.getOrNull()?.results.orEmpty()\n"
      "        val f = io.element.android.libraries.matrix.api.ChamosFiltroBusqueda.filtro\n"
-     "        if (f == null || query.trim().startsWith(\"@\")) return todos\n"
+     "        if (f == null || query.trim().startsWith(\"@\") || !io.element.android.libraries.matrix.api.ChamosFiltroBusqueda.soloChamos.value) return todos\n"
      "        val son = f(todos.map { it.userId.value }) ?: return todos\n"
      "        return todos.filter { it.userId.value in son }\n"),
 ])

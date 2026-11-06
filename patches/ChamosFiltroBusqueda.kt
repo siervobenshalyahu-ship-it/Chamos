@@ -4,4 +4,7 @@ package io.element.android.libraries.matrix.api
 object ChamosFiltroBusqueda {
     @Volatile
     var filtro: (suspend (List<String>) -> Set<String>?)? = null
+
+    /** Interruptor de la búsqueda: true = solo cuentas de Chamos, false = todos (Chamos, Matrix y Element). */
+    val soloChamos = kotlinx.coroutines.flow.MutableStateFlow(true)
 }
