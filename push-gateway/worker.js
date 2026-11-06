@@ -193,6 +193,8 @@ async function prepararTablas(env) {
     env.DB.prepare("CREATE TABLE IF NOT EXISTS juegos (sala TEXT PRIMARY KEY, v INTEGER, estado TEXT, ts INTEGER)"),
     env.DB.prepare("CREATE TABLE IF NOT EXISTS seguidores (seguidor TEXT, seguido TEXT, ts INTEGER, PRIMARY KEY (seguidor, seguido))"),
     env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_seguidores_seguido ON seguidores (seguido)"),
+    env.DB.prepare("CREATE TABLE IF NOT EXISTS estado_vistas (evento TEXT, usuario TEXT, dueno TEXT, nombre TEXT, ts INTEGER, PRIMARY KEY (evento, usuario))"),
+    env.DB.prepare("CREATE TABLE IF NOT EXISTS estado_reacciones (evento TEXT, usuario TEXT, dueno TEXT, nombre TEXT, emoji TEXT, ts INTEGER, PRIMARY KEY (evento, usuario))"),
   ]);
   // Columna de la dirección IP (si ya existe, el error se ignora).
   for (const tabla of ["eventos", "usuarios"]) {
@@ -275,6 +277,52 @@ async function guardarEvento(request, env) {
       .run();
   }
   return jsonCors({ ok: true });
+}
+
+// Estados: quién los vio y con qué emoji reaccionó cada persona. Solo el dueño del estado ve la lista.
+async function estadoSocialApi(request, env, url) {
+  if (!env.DB) return jsonCors({ error: "Base de datos no configurada" }, 503);
+  const yo = await videoAuth(request);
+  if (!yo) return jsonCors({ error: "Sesión no válida" }, 401);
+  await prepararTablas(env);
+  const ahora = Date.now();
+  if (request.method === "POST") {
+    let d;
+    try { d = JSON.parse(await request.text()); } catch { return jsonCors({ error: "JSON inválido" }, 400); }
+    const evento = corto(d.e, 120);
+    const dueno = corto(d.d, 100);
+    const nombre = corto(d.n, 60) || yo;
+    if (!evento.startsWith("$") || !dueno.startsWith("@") || dueno === yo) return jsonCors({ error: "Datos no válidos" }, 400);
+    if (url.pathname === "/estado/visto") {
+      await env.DB.prepare("INSERT OR IGNORE INTO estado_vistas (evento, usuario, dueno, nombre, ts) VALUES (?1,?2,?3,?4,?5)").bind(evento, yo, dueno, nombre, ahora).run();
+    } else {
+      const emoji = corto(d.x, 16);
+      if (emoji) {
+        await env.DB.prepare("INSERT OR REPLACE INTO estado_reacciones (evento, usuario, dueno, nombre, emoji, ts) VALUES (?1,?2,?3,?4,?5,?6)").bind(evento, yo, dueno, nombre, emoji, ahora).run();
+      } else {
+        await env.DB.prepare("DELETE FROM estado_reacciones WHERE evento=?1 AND usuario=?2").bind(evento, yo).run();
+      }
+    }
+    if (Math.random() < 0.05) {
+      const limite = ahora - 48 * 3600 * 1000;
+      await env.DB.batch([
+        env.DB.prepare("DELETE FROM estado_vistas WHERE ts < ?1").bind(limite),
+        env.DB.prepare("DELETE FROM estado_reacciones WHERE ts < ?1").bind(limite),
+      ]);
+    }
+    return jsonCors({ ok: true });
+  }
+  const ids = (url.searchParams.get("e") || "").split(",").map((x) => corto(x, 120)).filter((x) => x.startsWith("$")).slice(0, 40);
+  const out = {};
+  for (const id of ids) {
+    const [v, r, m] = await env.DB.batch([
+      env.DB.prepare("SELECT usuario, nombre, ts FROM estado_vistas WHERE evento=?1 AND dueno=?2 ORDER BY ts DESC LIMIT 300").bind(id, yo),
+      env.DB.prepare("SELECT usuario, nombre, emoji FROM estado_reacciones WHERE evento=?1 AND dueno=?2 ORDER BY ts DESC LIMIT 300").bind(id, yo),
+      env.DB.prepare("SELECT emoji FROM estado_reacciones WHERE evento=?1 AND usuario=?2").bind(id, yo),
+    ]);
+    out[id] = { v: v.results, r: r.results, mia: m.results.length ? m.results[0].emoji : "" };
+  }
+  return jsonCors(out);
 }
 
 // Seguir / dejar de seguir. La persona se identifica con su sesión de Matrix (igual que los videos).
@@ -541,6 +589,9 @@ export default {
     }
     if (url.pathname.startsWith("/v/") && (request.method === "GET" || request.method === "HEAD")) {
       try { return await videoVer(request, env, url); } catch (e) { console.error(e); return jsonCors({ error: String(e.message || e) }, 500); }
+    }
+    if ((url.pathname === "/estado/visto" || url.pathname === "/estado/reaccion") && request.method === "POST" || url.pathname === "/estado/info" && request.method === "GET") {
+      try { return await estadoSocialApi(request, env, url); } catch (e) { console.error(e); return jsonCors({ error: String(e.message || e) }, 500); }
     }
     if (url.pathname === "/seguir" && (request.method === "GET" || request.method === "POST")) {
       try { return await seguirApi(request, env, url); } catch (e) { console.error(e); return jsonCors({ error: String(e.message || e) }, 500); }

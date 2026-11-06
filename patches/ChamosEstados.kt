@@ -28,6 +28,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -141,6 +144,7 @@ data class ChamosEstadoItem(
     val avatar: AvatarData? = null,
     val propio: Boolean = false,
     val nombreMarca: String = "",
+    val dueno: String = "",
 )
 
 data class ChamosEstadosState(
@@ -562,10 +566,12 @@ fun rememberChamosEstados(
             titulo = titulo,
             nuevo = entradas.isNotEmpty() && vistos[sala.roomId.value] != entradas.last().id,
             entradas = entradas,
+            dueno = perfiles[sala.roomId]?.userId?.value ?: "",
             avatar = perfiles[sala.roomId]?.let { AvatarData(it.userId.value, it.displayName, it.avatarUrl, AvatarSize.UserListItem) },
         )
     }
 
+    ChamosEstadoSocial.miNombre = perfil.displayName?.takeIf { it.isNotBlank() } ?: perfil.userId.value
     return ChamosEstadosState(
         propio = propia?.let { p ->
             val todas = propias.flatMap { entradasPorSala[it.roomId].orEmpty() }.distinctBy { it.id }.sortedBy { it.timestamp }
@@ -574,6 +580,7 @@ fun rememberChamosEstados(
                 nuevo = false,
                 propio = true,
                 nombreMarca = perfil.displayName?.takeIf { it.isNotBlank() } ?: perfil.userId.value,
+                dueno = perfil.userId.value,
             )
         },
         otros = otras.map { sala -> item(sala, perfiles[sala.roomId]?.displayName?.takeIf { it.isNotBlank() } ?: sala.tituloEstado()) }.filter { it.entradas.isNotEmpty() },
@@ -1056,11 +1063,17 @@ private fun PaginaEstado(
     var confirmarBorrar by remember { mutableStateOf(false) }
     var editando by remember { mutableStateOf(false) }
     var denunciando by remember { mutableStateOf(false) }
-    var guardandoEstado by remember { mutableStateOf(false) }
-    val ctxGuardar = androidx.compose.ui.platform.LocalContext.current
-    val scopeGuardar = androidx.compose.runtime.rememberCoroutineScope()
+    var verVistas by remember { mutableStateOf(false) }
+    val social = remember(item.roomId, iEntrada) { mutableStateOf<ChamosEstadoSocial.Info?>(null) }
+    val scopeSocial = androidx.compose.runtime.rememberCoroutineScope()
+    androidx.compose.runtime.LaunchedEffect(entrada.id, activo, verVistas) {
+        if (activo && item.dueno.isNotBlank()) {
+            if (!item.propio) ChamosEstadoSocial.visto(entrada.id, item.dueno)
+            social.value = ChamosEstadoSocial.info(entrada.id)
+        }
+    }
     var textoNuevo by remember { mutableStateOf("") }
-    val pausa = menu || confirmarBorrar || editando || denunciando
+    val pausa = menu || confirmarBorrar || editando || denunciando || verVistas
 
     fun siguiente() = onSiguiente()
 
@@ -1202,28 +1215,6 @@ private fun PaginaEstado(
                                     }
                                 }
                             }
-                            if (entrada.tipo != TipoEstado.TEXTO) {
-                                Text(
-                                    if (guardandoEstado) "…" else "⬇️",
-                                    fontSize = 20.sp,
-                                    modifier = Modifier.clickable {
-                                        if (!guardandoEstado) {
-                                            guardandoEstado = true
-                                            Toast.makeText(ctxGuardar, "Guardando con la marca de Chamos…", Toast.LENGTH_SHORT).show()
-                                            scopeGuardar.launch {
-                                                val ruta = cargar(entrada)
-                                                val ok = ruta != null && (
-                                                    if (entrada.tipo == TipoEstado.VIDEO) ChamosDescarga.guardarVideo(ctxGuardar, ruta, item.nombreMarca.ifBlank { item.titulo })
-                                                    else ChamosDescarga.guardarFoto(ctxGuardar, ruta, item.nombreMarca.ifBlank { item.titulo })
-                                                )
-                                                guardandoEstado = false
-                                                if (ok) ChamosStats.evento(ctxGuardar, "descarga_media")
-                                                Toast.makeText(ctxGuardar, if (ok) "Guardado en tu galería (Chamos)" else "No se pudo guardar", Toast.LENGTH_LONG).show()
-                                            }
-                                        }
-                                    }.padding(horizontal = 10.dp, vertical = 4.dp),
-                                )
-                            }
                             if (!item.propio) {
                                 Text(
                                     "🚩",
@@ -1253,6 +1244,66 @@ private fun PaginaEstado(
                             .fillMaxWidth()
                             .background(Color.Black.copy(alpha = 0.45f))
                             .padding(16.dp),
+                    )
+                }
+                if (!item.propio && item.dueno.isNotBlank()) {
+                    Row(
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .padding(bottom = 90.dp)
+                            .background(Color.Black.copy(alpha = 0.5f), androidx.compose.foundation.shape.RoundedCornerShape(28.dp))
+                            .padding(horizontal = 6.dp, vertical = 2.dp),
+                    ) {
+                        listOf("❤️", "😂", "😮", "😢", "🔥", "👏").forEach { em ->
+                            val mia = social.value?.mia == em
+                            Text(
+                                em,
+                                fontSize = if (mia) 32.sp else 24.sp,
+                                modifier = Modifier.clickable {
+                                    scopeSocial.launch {
+                                        val nuevo = if (mia) "" else em
+                                        if (ChamosEstadoSocial.reaccionar(entrada.id, item.dueno, nuevo)) {
+                                            social.value = (social.value ?: ChamosEstadoSocial.Info(emptyList(), emptyList(), "")).copy(mia = nuevo)
+                                        }
+                                    }
+                                }.padding(horizontal = 8.dp, vertical = 6.dp),
+                            )
+                        }
+                    }
+                }
+                if (item.propio) {
+                    val inf = social.value
+                    val resumen = (inf?.reacciones ?: emptyList()).groupBy { it.emoji }.entries.joinToString("  ") { it.key + it.value.size }
+                    Text(
+                        "👁 " + (inf?.vistos?.size ?: 0) + (if (resumen.isNotEmpty()) "   " + resumen else ""),
+                        color = Color.White,
+                        fontSize = 16.sp,
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .padding(bottom = 90.dp)
+                            .background(Color.Black.copy(alpha = 0.5f), androidx.compose.foundation.shape.RoundedCornerShape(20.dp))
+                            .clickable { verVistas = true }
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                    )
+                }
+                if (verVistas) {
+                    val inf = social.value
+                    AlertDialog(
+                        onDismissRequest = { verVistas = false },
+                        title = { Text("Vieron tu estado (" + (inf?.vistos?.size ?: 0) + ")") },
+                        text = {
+                            Column(modifier = Modifier.heightIn(max = 360.dp).verticalScroll(rememberScrollState())) {
+                                if (inf == null || inf.vistos.isEmpty()) Text("Todavía nadie lo ha visto.")
+                                inf?.vistos?.forEach { v ->
+                                    val em = inf.reacciones.firstOrNull { it.usuario == v.usuario }?.emoji ?: ""
+                                    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                                        Text(v.nombre.ifBlank { v.usuario }, fontSize = 16.sp)
+                                        Text(em, fontSize = 20.sp)
+                                    }
+                                }
+                            }
+                        },
+                        confirmButton = { TextButton(onClick = { verVistas = false }) { Text("Cerrar") } },
                     )
                 }
                 if (confirmarBorrar) {

@@ -244,3 +244,61 @@ object ChamosDescarga {
         return guardado
     }
 }
+
+/** Estados: quién los vio y con qué emoji reaccionó cada persona (base de datos de Chamos). */
+object ChamosEstadoSocial {
+    private const val BASE = "https://chamos-push.siervodeyhwh57.workers.dev"
+
+    @Volatile
+    var miNombre: String = ""
+
+    data class Persona(val usuario: String, val nombre: String)
+    data class Reaccion(val usuario: String, val nombre: String, val emoji: String)
+    data class Info(val vistos: List<Persona>, val reacciones: List<Reaccion>, val mia: String)
+
+    private suspend fun peticion(metodo: String, ruta: String, cuerpo: JSONObject?): String? = withContext(Dispatchers.IO) {
+        try {
+            val token = ChamosNumero.tokenSesion() ?: return@withContext null
+            val con = URL(BASE + ruta).openConnection() as HttpURLConnection
+            con.requestMethod = metodo
+            con.connectTimeout = 10000
+            con.readTimeout = 10000
+            con.setRequestProperty("Authorization", "Bearer $token")
+            if (cuerpo != null) {
+                con.doOutput = true
+                con.setRequestProperty("content-type", "application/json")
+                con.outputStream.use { it.write(cuerpo.toString().toByteArray()) }
+            }
+            val ok = con.responseCode in 200..299
+            val txt = if (ok) con.inputStream.bufferedReader().readText() else null
+            con.disconnect()
+            txt
+        } catch (e: Exception) {
+            android.util.Log.w("Chamos", "estado social", e)
+            null
+        }
+    }
+
+    suspend fun visto(evento: String, dueno: String): Boolean =
+        peticion("POST", "/estado/visto", JSONObject().put("e", evento).put("d", dueno).put("n", miNombre)) != null
+
+    /** emoji vacío = quitar mi reacción. */
+    suspend fun reaccionar(evento: String, dueno: String, emoji: String): Boolean =
+        peticion("POST", "/estado/reaccion", JSONObject().put("e", evento).put("d", dueno).put("n", miNombre).put("x", emoji)) != null
+
+    suspend fun info(evento: String): Info? {
+        val txt = peticion("GET", "/estado/info?e=" + java.net.URLEncoder.encode(evento, "UTF-8"), null) ?: return null
+        return try {
+            val j = JSONObject(txt).optJSONObject(evento) ?: return Info(emptyList(), emptyList(), "")
+            val v = j.optJSONArray("v")
+            val r = j.optJSONArray("r")
+            Info(
+                vistos = (0 until (v?.length() ?: 0)).map { val o = v!!.getJSONObject(it); Persona(o.optString("usuario"), o.optString("nombre")) },
+                reacciones = (0 until (r?.length() ?: 0)).map { val o = r!!.getJSONObject(it); Reaccion(o.optString("usuario"), o.optString("nombre"), o.optString("emoji")) },
+                mia = j.optString("mia", ""),
+            )
+        } catch (e: Exception) {
+            null
+        }
+    }
+}
