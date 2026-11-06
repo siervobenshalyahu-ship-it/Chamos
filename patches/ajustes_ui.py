@@ -39,10 +39,4 @@ edit(hv, [
     ("        HomeNavigationBarItem.entries.forEachIndexed { index, item ->\n",
      "        HomeNavigationBarItem.entries.filter { it != HomeNavigationBarItem.Spaces }.forEachIndexed { index, item ->\n"),
 ])
-# 3) Se quita la burbuja "Número" de la barra de abajo
-s = open(hv, encoding="utf-8").read()
-bloque = ("        HorizontalFloatingToolbarItem(\n            icon = CompoundIcons.UserProfile(),\n            tooltipLabel = \"Número\",\n"
-          "            isSelected = false,\n            onClick = onNumberClick,\n        )\n")
-assert s.count(bloque) == 1, "bloque Número"
-open(hv, "w", encoding="utf-8").write(s.replace(bloque, ""))
 print("ajustes_ui OK")
