@@ -240,7 +240,7 @@ jobs:
         working-directory: chamos
         run: |
           set -o pipefail
-          ./gradlew :app:assemble${FLAVOR}Debug --stacktrace --no-configuration-cache 2>&1 | tee ../gradle.log
+          ./gradlew :app:assemble${FLAVOR}Debug -PuseLegacyPackaging=true --stacktrace --no-configuration-cache 2>&1 | tee ../gradle.log
 
       - name: Mostrar errores de compilación
         if: failure()
