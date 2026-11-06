@@ -67,6 +67,19 @@ object ChamosNumero {
     fun attach(c: MatrixClient, s: SessionStore) {
         client = c
         sesiones = s
+        if (configurado) {
+            io.element.android.libraries.matrix.api.ChamosFiltroBusqueda.filtro = { ids -> filtrarChamos(ids) }
+            kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch { llamar("/chamos/registrar") }
+        }
+    }
+
+    /** De estos ids, cuáles son cuentas de Chamos. null = el servidor no respondió (no se filtra). */
+    suspend fun filtrarChamos(ids: List<String>): Set<String>? {
+        if (ids.isEmpty()) return emptySet()
+        val r = llamar("/chamos/filtrar") { put("ids", org.json.JSONArray(ids)) } ?: return null
+        if (r.optInt("_http") != 200) return null
+        val a = r.optJSONArray("son") ?: return null
+        return (0 until a.length()).map { a.getString(it) }.toSet()
     }
 
     class Estado(val vinculado: Boolean, val telefono: String?)

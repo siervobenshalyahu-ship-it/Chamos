@@ -159,6 +159,27 @@ async function buscar(req, env) {
   return json({ encontrados });
 }
 
+/* Cuentas de Chamos: cada app registra su cuenta al abrir; la búsqueda solo muestra las registradas */
+async function registrar(req, env) {
+  const b = await leer(req);
+  const id = b && (await identidad(b.openid, env));
+  if (!id) return json({ error: "no se pudo comprobar tu cuenta" }, 401);
+  await env.CUENTAS.put("cu:" + id, "1");
+  return json({ ok: true });
+}
+
+async function filtrar(req, env) {
+  const b = await leer(req);
+  const id = b && (await identidad(b.openid, env));
+  if (!id) return json({ error: "no se pudo comprobar tu cuenta" }, 401);
+  if (!Array.isArray(b.ids)) return json({ error: "faltan las cuentas" }, 400);
+  const son = [];
+  for (const x of b.ids.slice(0, 50)) {
+    if (typeof x === "string" && x.length < 200 && (await env.CUENTAS.get("cu:" + x))) son.push(x);
+  }
+  return json({ son });
+}
+
 /* ---------------- Bot de Telegram ---------------- */
 
 async function tg(env, metodo, datos) {
@@ -220,6 +241,8 @@ export default {
     if (req.method === "POST" && ruta === "/mi/numero") return miNumero(req, env);
     if (req.method === "POST" && ruta === "/mi/desvincular") return desvincular(req, env);
     if (req.method === "POST" && ruta === "/contactos/buscar") return buscar(req, env);
+    if (req.method === "POST" && ruta === "/chamos/registrar") return registrar(req, env);
+    if (req.method === "POST" && ruta === "/chamos/filtrar") return filtrar(req, env);
     if (ruta === "/") return json({ servicio: "Chamos Cuentas", ok: true });
     return json({ error: "no existe" }, 404);
   },

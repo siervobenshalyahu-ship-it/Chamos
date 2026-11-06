@@ -53,4 +53,15 @@ edit(os.path.join(hdir, "HomeView.kt"), [
 edit(os.path.join(root, "app/src/main/AndroidManifest.xml"), [
     ("    <application\n", '    <uses-permission android:name="android.permission.READ_CONTACTS" />\n\n    <application\n'),
 ])
+
+# 4) La búsqueda de usuarios solo muestra cuentas de Chamos (si el servidor responde)
+shutil.copy(os.path.join(pdir, "ChamosFiltroBusqueda.kt"), os.path.join(root, "libraries/matrix/api/src/main/kotlin/io/element/android/libraries/matrix/api/ChamosFiltroBusqueda.kt"))
+edit(os.path.join(root, "libraries/usersearch/impl/src/main/kotlin/io/element/android/libraries/usersearch/impl/MatrixUserListDataSource.kt"), [
+    ("        return res.getOrNull()?.results.orEmpty()\n",
+     "        val todos = res.getOrNull()?.results.orEmpty()\n"
+     "        val f = io.element.android.libraries.matrix.api.ChamosFiltroBusqueda.filtro\n"
+     "        if (f == null || query.trim().startsWith(\"@\")) return todos\n"
+     "        val son = f(todos.map { it.userId.value }) ?: return todos\n"
+     "        return todos.filter { it.userId.value in son }\n"),
+])
 print("numero OK" + (" (servidor: " + url + ")" if url.startswith("https://") else " (sin servidor: pantalla desactivada)"))
