@@ -224,6 +224,9 @@ jobs:
       - name: Barra de abajo con Chamo Muro (el lápiz pasa arriba)
         run: python3 chamos-repo/patches/barra_muro.py chamos
 
+      - name: Seguir, guardar con marca de agua y estadísticas
+        run: python3 chamos-repo/patches/social.py chamos
+
       - name: Notificaciones push (Firebase) si ya están configuradas
         run: |
           if [ -f chamos-repo/firebase/google-services.json ] && [ -s chamos-repo/firebase/gateway-url.txt ]; then

@@ -140,6 +140,7 @@ data class ChamosEstadoItem(
     val entradas: List<EstadoEntrada>,
     val avatar: AvatarData? = null,
     val propio: Boolean = false,
+    val nombreMarca: String = "",
 )
 
 data class ChamosEstadosState(
@@ -572,6 +573,7 @@ fun rememberChamosEstados(
                 entradas = todas,
                 nuevo = false,
                 propio = true,
+                nombreMarca = perfil.displayName?.takeIf { it.isNotBlank() } ?: perfil.userId.value,
             )
         },
         otros = otras.map { sala -> item(sala, perfiles[sala.roomId]?.displayName?.takeIf { it.isNotBlank() } ?: sala.tituloEstado()) }.filter { it.entradas.isNotEmpty() },
@@ -756,6 +758,7 @@ fun ChamosEstadosRow(
                 visor = null
                 scope.launch {
                     val ok = state.denunciar(rid, e, dejar)
+                    if (ok) ChamosStats.evento(contexto, "denuncia")
                     Toast.makeText(contexto, if (ok) (if (dejar) "Listo: ya no verás sus estados" else "Gracias, lo vamos a revisar") else "No se pudo denunciar", Toast.LENGTH_LONG).show()
                 }
             },
@@ -952,7 +955,20 @@ private fun NuevoEstadoDialogo(
     val selector = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         if (uri != null) {
             val mime = contexto.contentResolver.getType(uri) ?: "image/jpeg"
-            onMedia(uri, mime)
+            val duracion = if (mime.startsWith("video")) {
+                runCatching {
+                    val r = android.media.MediaMetadataRetriever()
+                    try {
+                        r.setDataSource(contexto, uri)
+                        r.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 0L
+                    } finally { r.release() }
+                }.getOrDefault(0L)
+            } else 0L
+            if (duracion > 46_000L) {
+                Toast.makeText(contexto, "Los videos de estados duran máximo 45 segundos. Recórtalo e inténtalo otra vez.", Toast.LENGTH_LONG).show()
+            } else {
+                onMedia(uri, mime)
+            }
         }
         onCerrar()
     }
@@ -971,7 +987,7 @@ private fun NuevoEstadoDialogo(
                 Column {
                     TextButton(onClick = {
                         selector.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo))
-                    }) { Text("Foto o video") }
+                    }) { Text("Foto o video (video: máx. 45 s)") }
                     TextButton(onClick = { modoTexto = true }) { Text("Texto") }
                     Text(
                         "¿Quién ve mis estados?",
@@ -1040,6 +1056,9 @@ private fun PaginaEstado(
     var confirmarBorrar by remember { mutableStateOf(false) }
     var editando by remember { mutableStateOf(false) }
     var denunciando by remember { mutableStateOf(false) }
+    var guardandoEstado by remember { mutableStateOf(false) }
+    val ctxGuardar = androidx.compose.ui.platform.LocalContext.current
+    val scopeGuardar = androidx.compose.runtime.rememberCoroutineScope()
     var textoNuevo by remember { mutableStateOf("") }
     val pausa = menu || confirmarBorrar || editando || denunciando
 
@@ -1182,6 +1201,28 @@ private fun PaginaEstado(
                                         )
                                     }
                                 }
+                            }
+                            if (entrada.tipo != TipoEstado.TEXTO) {
+                                Text(
+                                    if (guardandoEstado) "…" else "⬇️",
+                                    fontSize = 20.sp,
+                                    modifier = Modifier.clickable {
+                                        if (!guardandoEstado) {
+                                            guardandoEstado = true
+                                            Toast.makeText(ctxGuardar, "Guardando con la marca de Chamos…", Toast.LENGTH_SHORT).show()
+                                            scopeGuardar.launch {
+                                                val ruta = cargar(entrada)
+                                                val ok = ruta != null && (
+                                                    if (entrada.tipo == TipoEstado.VIDEO) ChamosDescarga.guardarVideo(ctxGuardar, ruta, item.nombreMarca.ifBlank { item.titulo })
+                                                    else ChamosDescarga.guardarFoto(ctxGuardar, ruta, item.nombreMarca.ifBlank { item.titulo })
+                                                )
+                                                guardandoEstado = false
+                                                if (ok) ChamosStats.evento(ctxGuardar, "descarga_media")
+                                                Toast.makeText(ctxGuardar, if (ok) "Guardado en tu galería (Chamos)" else "No se pudo guardar", Toast.LENGTH_LONG).show()
+                                            }
+                                        }
+                                    }.padding(horizontal = 10.dp, vertical = 4.dp),
+                                )
                             }
                             if (!item.propio) {
                                 Text(

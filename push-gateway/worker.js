@@ -191,6 +191,8 @@ async function prepararTablas(env) {
     env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_eventos_tipo_ts ON eventos (tipo, ts)"),
     env.DB.prepare("CREATE TABLE IF NOT EXISTS ia_uso (clave TEXT, dia TEXT, n INTEGER, PRIMARY KEY (clave, dia))"),
     env.DB.prepare("CREATE TABLE IF NOT EXISTS juegos (sala TEXT PRIMARY KEY, v INTEGER, estado TEXT, ts INTEGER)"),
+    env.DB.prepare("CREATE TABLE IF NOT EXISTS seguidores (seguidor TEXT, seguido TEXT, ts INTEGER, PRIMARY KEY (seguidor, seguido))"),
+    env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_seguidores_seguido ON seguidores (seguido)"),
   ]);
   // Columna de la dirección IP (si ya existe, el error se ignora).
   for (const tabla of ["eventos", "usuarios"]) {
@@ -250,7 +252,7 @@ async function guardarEvento(request, env) {
     return jsonCors({ error: "JSON inválido" }, 400);
   }
   const tipo = corto(d.t, 20);
-  if (!["visita", "descarga", "instalacion", "registro"].includes(tipo)) return jsonCors({ error: "Tipo desconocido" }, 400);
+  if (!["visita", "descarga", "instalacion", "registro", "descarga_media", "denuncia", "publicacion"].includes(tipo)) return jsonCors({ error: "Tipo desconocido" }, 400);
   await prepararTablas(env);
   const ahora = Date.now();
   const pais = corto(request.cf && request.cf.country, 4);
@@ -275,13 +277,48 @@ async function guardarEvento(request, env) {
   return jsonCors({ ok: true });
 }
 
+// Seguir / dejar de seguir. La persona se identifica con su sesión de Matrix (igual que los videos).
+async function seguirApi(request, env, url) {
+  if (!env.DB) return jsonCors({ error: "Base de datos no configurada" }, 503);
+  const yo = await videoAuth(request);
+  if (!yo) return jsonCors({ error: "Sesión no válida" }, 401);
+  await prepararTablas(env);
+  let otro = "";
+  let accion = null;
+  if (request.method === "POST") {
+    let d;
+    try { d = JSON.parse(await request.text()); } catch { return jsonCors({ error: "JSON inválido" }, 400); }
+    otro = corto(d.u, 100);
+    accion = d.s === true ? "seguir" : "dejar_seguir";
+  } else {
+    otro = corto(url.searchParams.get("u"), 100);
+  }
+  if (!otro.startsWith("@") || otro === yo) return jsonCors({ error: "Usuario no válido" }, 400);
+  const ahora = Date.now();
+  if (accion === "seguir") {
+    await env.DB.prepare("INSERT OR IGNORE INTO seguidores (seguidor, seguido, ts) VALUES (?1,?2,?3)").bind(yo, otro, ahora).run();
+  } else if (accion === "dejar_seguir") {
+    await env.DB.prepare("DELETE FROM seguidores WHERE seguidor=?1 AND seguido=?2").bind(yo, otro).run();
+  }
+  if (accion) {
+    await env.DB.prepare("INSERT INTO eventos (ts, tipo, anon, pais, extra) VALUES (?1,?2,?3,?4,?5)")
+      .bind(ahora, accion, "", corto(request.cf && request.cf.country, 4), JSON.stringify({ u: yo, a: otro }))
+      .run();
+  }
+  const [n, sigo] = await env.DB.batch([
+    env.DB.prepare("SELECT COUNT(*) AS n FROM seguidores WHERE seguido=?1").bind(otro),
+    env.DB.prepare("SELECT COUNT(*) AS n FROM seguidores WHERE seguidor=?1 AND seguido=?2").bind(yo, otro),
+  ]);
+  return jsonCors({ n: n.results[0].n, sigo: sigo.results[0].n > 0 });
+}
+
 async function resumen(request, env) {
   if (!env.DB) return jsonCors({ error: "Base de datos no configurada" }, 503);
   if (!env.ADMIN_KEY) return jsonCors({ error: "Falta el secreto ADMIN_KEY" }, 503);
   if (request.headers.get("x-clave") !== env.ADMIN_KEY) return jsonCors({ error: "Clave incorrecta" }, 401);
   await prepararTablas(env);
   const hace30 = Date.now() - 30 * 24 * 3600 * 1000;
-  const [tot, unicos, dias, paises, usuarios, nUsuarios, versiones, recientes] = await env.DB.batch([
+  const [tot, unicos, dias, paises, usuarios, nUsuarios, versiones, recientes, topSeg, nSeg] = await env.DB.batch([
     env.DB.prepare("SELECT tipo, COUNT(*) AS n FROM eventos GROUP BY tipo"),
     env.DB.prepare("SELECT tipo, COUNT(DISTINCT anon) AS n FROM eventos GROUP BY tipo"),
     env.DB.prepare(
@@ -292,6 +329,8 @@ async function resumen(request, env) {
     env.DB.prepare("SELECT COUNT(*) AS n FROM usuarios"),
     env.DB.prepare("SELECT version, COUNT(*) AS n FROM usuarios GROUP BY version ORDER BY n DESC"),
     env.DB.prepare("SELECT ts, tipo, pais, ip, disp FROM eventos WHERE tipo IN ('visita','descarga','instalacion') ORDER BY ts DESC LIMIT 200"),
+    env.DB.prepare("SELECT seguido AS usuario, COUNT(*) AS n FROM seguidores GROUP BY seguido ORDER BY n DESC LIMIT 15"),
+    env.DB.prepare("SELECT COUNT(*) AS n FROM seguidores"),
   ]);
   return jsonCors({
     totales: tot.results,
@@ -302,6 +341,8 @@ async function resumen(request, env) {
     total_usuarios: nUsuarios.results[0].n,
     versiones: versiones.results,
     recientes: recientes.results,
+    top_seguidos: topSeg.results,
+    total_seguidores: nSeg.results[0].n,
   });
 }
 
@@ -411,7 +452,11 @@ async function go(){
    '<div class="c"><b>'+n(d.totales,'descarga')+'</b><span>Toques en Descargar ('+n(d.unicos,'descarga')+' personas)</span></div>'+
    '<div class="c"><b>'+n(d.totales,'instalacion')+'</b><span>Instalaciones abiertas ('+n(d.unicos,'instalacion')+' teléfonos)</span></div>'+
    '<div class="c"><b>'+d.total_usuarios+'</b><span>Usuarios registrados (aceptaron el aviso)</span></div>'+
-   '<div class="c"><b>'+n(d.totales,'ia')+'</b><span>Mensajes a Chamos IA ('+n(d.unicos,'ia')+' personas)</span></div></div>'+
+   '<div class="c"><b>'+n(d.totales,'ia')+'</b><span>Mensajes a Chamos IA ('+n(d.unicos,'ia')+' personas)</span></div>'+
+   '<div class="c"><b>'+n(d.totales,'descarga_media')+'</b><span>Videos y fotos guardados con marca de agua</span></div>'+
+   '<div class="c"><b>'+n(d.totales,'denuncia')+'</b><span>Denuncias enviadas</span></div>'+
+   '<div class="c"><b>'+d.total_seguidores+'</b><span>Seguimientos activos ('+n(d.totales,'seguir')+' en total, '+n(d.totales,'dejar_seguir')+' dejados)</span></div></div>'+
+   '<h2>Más seguidos</h2><div class="sc"><table><tr><th>Usuario</th><th>Seguidores</th></tr>'+(d.top_seguidos||[]).map(t=>'<tr><td>'+esc(t.usuario)+'</td><td>'+t.n+'</td></tr>').join('')+'</table></div>'+
    '<h2>Últimos 30 días</h2><div class="sc"><table><tr><th>Día</th><th>Visitas</th><th>Descargas</th><th>Instal.</th></tr>'+
    Object.keys(dias).map(x=>'<tr><td>'+x+'</td><td>'+(dias[x].visita||0)+'</td><td>'+(dias[x].descarga||0)+'</td><td>'+(dias[x].instalacion||0)+'</td></tr>').join('')+'</table></div>'+
    '<h2>Visitas por país</h2><div>'+d.paises.map(p=>(p.pais||'?')+': '+p.n).join(' · ')+'</div>'+
@@ -496,6 +541,9 @@ export default {
     }
     if (url.pathname.startsWith("/v/") && (request.method === "GET" || request.method === "HEAD")) {
       try { return await videoVer(request, env, url); } catch (e) { console.error(e); return jsonCors({ error: String(e.message || e) }, 500); }
+    }
+    if (url.pathname === "/seguir" && (request.method === "GET" || request.method === "POST")) {
+      try { return await seguirApi(request, env, url); } catch (e) { console.error(e); return jsonCors({ error: String(e.message || e) }, 500); }
     }
     if (url.pathname === "/e" && request.method === "POST") {
       try {

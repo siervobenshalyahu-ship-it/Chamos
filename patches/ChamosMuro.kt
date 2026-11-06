@@ -1180,6 +1180,7 @@ private fun TarjetaPost(post: MuroPost, state: ChamosMuroState, onPerfil: (Strin
                     color = Color(0xFFCFD6E6), fontSize = 12.sp,
                 )
             }
+            if (!post.propio) BotonSeguir(post.autorId)
             Box {
                 Text("⋮", color = Color.White, fontSize = 24.sp, modifier = Modifier.clickable { menu = true }.padding(horizontal = 10.dp))
                 DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
@@ -1254,6 +1255,7 @@ private fun TarjetaPost(post: MuroPost, state: ChamosMuroState, onPerfil: (Strin
                             reportando = false
                             scope.launch {
                                 val ok = state.reportar(post, motivo)
+                                if (ok) ChamosStats.evento(contexto, "denuncia")
                                 Toast.makeText(contexto, if (ok) "Gracias, lo vamos a revisar" else "No se pudo enviar el reporte", Toast.LENGTH_LONG).show()
                             }
                         }.padding(vertical = 12.dp))

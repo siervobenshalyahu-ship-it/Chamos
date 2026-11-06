@@ -51,6 +51,12 @@ object ChamosStats {
         }.start()
     }
 
+    /** Cuenta una acción (guardar un video, denunciar...). Solo si la persona aceptó el aviso de privacidad. */
+    fun evento(c: Context, tipo: String) {
+        if (decision(c) != true) return
+        enviar(JSONObject().put("t", tipo).put("id", anonId(c)).put("v", version(c)))
+    }
+
     /** Llamar con la sesión iniciada. Máximo un aviso de registro al día por usuario. */
     fun reportar(c: Context, userId: String, nombre: String?) {
         if (decision(c) != true) return

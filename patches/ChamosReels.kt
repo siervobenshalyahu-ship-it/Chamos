@@ -775,6 +775,7 @@ private fun PaginaReel(reel: ReelItem, state: ChamosReelsState, activo: Boolean,
     var compartir by remember { mutableStateOf(false) }
     var confirmarBorrar by remember { mutableStateOf(false) }
     var reportando by remember { mutableStateOf(false) }
+    var guardando by remember { mutableStateOf(false) }
     var editando by remember { mutableStateOf(false) }
     var textoNuevo by remember { mutableStateOf("") }
 
@@ -838,9 +839,23 @@ private fun PaginaReel(reel: ReelItem, state: ChamosReelsState, activo: Boolean,
                 avatarType = AvatarType.User,
                 forcedAvatarSize = 44.dp,
             )
+            if (!reel.propio) BotonSeguir(reel.autorId)
             AccionReel(if (reel.yoLike) "❤️" else "🤍", reel.likes.toString()) { scope.launch { state.meGusta(reel) } }
             AccionReel("💬", reel.comentarios.toString()) { verComentarios = true }
             AccionReel("↗️", "Enviar") { compartir = true }
+            AccionReel("⬇️", if (guardando) "…" else "Guardar") {
+                if (!guardando) {
+                    guardando = true
+                    Toast.makeText(contexto, "Guardando con la marca de Chamos…", Toast.LENGTH_SHORT).show()
+                    scope.launch {
+                        val archivo = state.cargarArchivo(reel)
+                        val ok = archivo != null && ChamosDescarga.guardarVideo(contexto, archivo, reel.autor)
+                        guardando = false
+                        if (ok) ChamosStats.evento(contexto, "descarga_media")
+                        Toast.makeText(contexto, if (ok) "Guardado en Películas/Chamos" else "No se pudo guardar el video", Toast.LENGTH_LONG).show()
+                    }
+                }
+            }
             if (!reel.propio) AccionReel("🚩", "Denunciar") { reportando = true }
             Box {
                 AccionReel("⋮", "") { menu = true }
@@ -874,6 +889,7 @@ private fun PaginaReel(reel: ReelItem, state: ChamosReelsState, activo: Boolean,
                             reportando = false
                             scope.launch {
                                 val ok = state.reportar(reel, m)
+                                if (ok) ChamosStats.evento(contexto, "denuncia")
                                 Toast.makeText(contexto, if (ok) "Gracias, ya lo reportamos" else "No se pudo reportar", Toast.LENGTH_SHORT).show()
                             }
                         }.padding(vertical = 12.dp))
