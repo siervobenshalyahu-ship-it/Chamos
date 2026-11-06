@@ -211,6 +211,15 @@ object ChamosNumero {
 
 private fun abrirEnlace(ctx: Context, url: String) {
     try {
+        // Primero se intenta abrir directo la app de Telegram (tg://); si no está, el navegador.
+        val m = Regex("^https://t\\.me/([A-Za-z0-9_]+)\\?start=([A-Za-z0-9_-]+)$").find(url)
+        if (m != null) {
+            try {
+                val tg = Uri.parse("tg://resolve?domain=" + m.groupValues[1] + "&start=" + m.groupValues[2])
+                ctx.startActivity(Intent(Intent.ACTION_VIEW, tg).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                return
+            } catch (e: Exception) { /* sin app de Telegram: se abre el enlace web */ }
+        }
         ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
     } catch (e: Exception) {
         Toast.makeText(ctx, "No se pudo abrir Telegram. ¿Lo tienes instalado?", Toast.LENGTH_LONG).show()
