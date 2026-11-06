@@ -208,6 +208,7 @@ data class ChamosReelsState(
     val comentar: suspend (ReelItem, String) -> Boolean = { _, _ -> false },
     val borrarComentario: suspend (ReelComentario) -> Boolean = { false },
     val reportar: suspend (ReelItem, String) -> Boolean = { _, _ -> false },
+    val bloquear: suspend (String) -> Boolean = { false },
     val enviarAChat: suspend (ReelItem, RoomId) -> Boolean = { _, _ -> false },
     val cargarArchivo: suspend (ReelItem) -> String? = { null },
 )
@@ -571,6 +572,7 @@ fun rememberChamosReels(
         runCatching { sala.reportContent(EventId(r.id), motivo, null) }
         runCatching { sala.liveTimeline.replyMessage(EventId(r.id), "\uD83D\uDEA9 " + motivo, null, emptyList()).isSuccess }.getOrDefault(false)
     }
+    val bloquear: suspend (String) -> Boolean = { id -> runCatching { client.ignoreUser(io.element.android.libraries.matrix.api.core.UserId(id)).isSuccess }.getOrDefault(false) }
     val enviarAChat: suspend (ReelItem, RoomId) -> Boolean = enviar@{ r, destino ->
         val sala = salaId?.let { client.getJoinedRoom(it) } ?: return@enviar false
         runCatching { sala.liveTimeline.forwardEvents(listOf(EventId(r.id)), listOf(destino)).isSuccess }.getOrDefault(false)
@@ -633,6 +635,7 @@ fun rememberChamosReels(
         comentar = comentar,
         borrarComentario = borrarComentario,
         reportar = reportar,
+        bloquear = bloquear,
         enviarAChat = enviarAChat,
         cargarArchivo = cargarArchivo,
     )
@@ -838,6 +841,7 @@ private fun PaginaReel(reel: ReelItem, state: ChamosReelsState, activo: Boolean,
             AccionReel(if (reel.yoLike) "❤️" else "🤍", reel.likes.toString()) { scope.launch { state.meGusta(reel) } }
             AccionReel("💬", reel.comentarios.toString()) { verComentarios = true }
             AccionReel("↗️", "Enviar") { compartir = true }
+            if (!reel.propio) AccionReel("🚩", "Denunciar") { reportando = true }
             Box {
                 AccionReel("⋮", "") { menu = true }
                 DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
@@ -874,6 +878,14 @@ private fun PaginaReel(reel: ReelItem, state: ChamosReelsState, activo: Boolean,
                             }
                         }.padding(vertical = 12.dp))
                     }
+                    Text("🚫 Bloquear a @" + reel.autor, fontSize = 16.sp, color = Color(0xFFD32F2F), modifier = Modifier.fillMaxWidth().clickable {
+                        reportando = false
+                        scope.launch {
+                            state.reportar(reel, "Usuario bloqueado")
+                            val ok = state.bloquear(reel.autorId)
+                            Toast.makeText(contexto, if (ok) "Usuario bloqueado: ya no verás sus videos" else "No se pudo bloquear", Toast.LENGTH_LONG).show()
+                        }
+                    }.padding(vertical = 12.dp))
                 }
             },
             confirmButton = {},

@@ -156,6 +156,7 @@ data class ChamosEstadosState(
     val yoAvatar: String? = null,
     val borrar: suspend (EstadoEntrada) -> Boolean = { false },
     val editar: suspend (EstadoEntrada, String) -> Boolean = { _, _ -> false },
+    val denunciar: suspend (RoomId, EstadoEntrada, Boolean) -> Boolean = { _, _, _ -> false },
     val diagnostico: String = "",
 )
 
@@ -506,6 +507,12 @@ fun rememberChamosEstados(
     fun salaDe(e: EstadoEntrada): RoomId? =
         propias.firstOrNull { s -> entradasPorSala[s.roomId]?.any { it.id == e.id } == true }?.roomId
 
+    val denunciarEstado: suspend (RoomId, EstadoEntrada, Boolean) -> Boolean = den@{ rid, e, dejar ->
+        val sala = client.getJoinedRoom(rid) ?: return@den false
+        val ok = runCatching { sala.reportContent(EventId(e.id), "Estado denunciado", null).isSuccess }.getOrDefault(false)
+        if (dejar) runCatching { sala.leave() }
+        ok || dejar
+    }
     val borrarEstado: suspend (EstadoEntrada) -> Boolean = borrar@{ e ->
         val id = salaDe(e) ?: return@borrar false
         val sala = client.getJoinedRoom(id) ?: return@borrar false
@@ -579,6 +586,7 @@ fun rememberChamosEstados(
         yoAvatar = perfil.avatarUrl,
         borrar = borrarEstado,
         editar = editarEstado,
+        denunciar = denunciarEstado,
         diagnostico = "salas ${salas.size} (invitaciones ${salas.count { it.displayType == RoomSummaryDisplayType.INVITE }}) · mías ${propias.size} · de otros ${otras.size} · contactos ${nContactos} · invitados ${invitados.size}",
     )
 }
@@ -742,6 +750,13 @@ fun ChamosEstadosRow(
                 scope.launch {
                     val ok = state.editar(e, texto)
                     Toast.makeText(contexto, if (ok) "Estado editado" else "No se pudo editar", Toast.LENGTH_SHORT).show()
+                }
+            },
+            onDenunciar = { rid, e, dejar ->
+                visor = null
+                scope.launch {
+                    val ok = state.denunciar(rid, e, dejar)
+                    Toast.makeText(contexto, if (ok) (if (dejar) "Listo: ya no verás sus estados" else "Gracias, lo vamos a revisar") else "No se pudo denunciar", Toast.LENGTH_LONG).show()
                 }
             },
             onCerrar = { visor = null },
@@ -1010,6 +1025,7 @@ private fun PaginaEstado(
     cargar: suspend (EstadoEntrada) -> String?,
     onBorrar: (EstadoEntrada) -> Unit,
     onEditar: (EstadoEntrada, String) -> Unit,
+    onDenunciar: (EstadoEntrada, Boolean) -> Unit,
     onCerrar: () -> Unit,
     onSiguiente: () -> Unit,
     onAnterior: () -> Unit,
@@ -1023,8 +1039,9 @@ private fun PaginaEstado(
     var menu by remember { mutableStateOf(false) }
     var confirmarBorrar by remember { mutableStateOf(false) }
     var editando by remember { mutableStateOf(false) }
+    var denunciando by remember { mutableStateOf(false) }
     var textoNuevo by remember { mutableStateOf("") }
-    val pausa = menu || confirmarBorrar || editando
+    val pausa = menu || confirmarBorrar || editando || denunciando
 
     fun siguiente() = onSiguiente()
 
@@ -1166,6 +1183,13 @@ private fun PaginaEstado(
                                     }
                                 }
                             }
+                            if (!item.propio) {
+                                Text(
+                                    "🚩",
+                                    fontSize = 20.sp,
+                                    modifier = Modifier.clickable { denunciando = true }.padding(horizontal = 10.dp, vertical = 4.dp),
+                                )
+                            }
                             Text(
                                 "✕",
                                 color = Color.White,
@@ -1197,6 +1221,20 @@ private fun PaginaEstado(
                         text = { Text("Dejará de verse para todos tus contactos.") },
                         confirmButton = { TextButton(onClick = { confirmarBorrar = false; onBorrar(entrada); onCerrar() }) { Text("Borrar") } },
                         dismissButton = { TextButton(onClick = { confirmarBorrar = false }) { Text("Cancelar") } },
+                    )
+                }
+                if (denunciando) {
+                    AlertDialog(
+                        onDismissRequest = { denunciando = false },
+                        title = { Text("¿Qué pasa con este estado?") },
+                        text = {
+                            Column {
+                                Text("Denunciar: contenido inapropiado", fontSize = 16.sp, modifier = Modifier.fillMaxWidth().clickable { denunciando = false; onDenunciar(entrada, false) }.padding(vertical = 12.dp))
+                                Text("🚫 Dejar de ver los estados de " + item.titulo, fontSize = 16.sp, color = Color(0xFFD32F2F), modifier = Modifier.fillMaxWidth().clickable { denunciando = false; onDenunciar(entrada, true) }.padding(vertical = 12.dp))
+                            }
+                        },
+                        confirmButton = {},
+                        dismissButton = { TextButton(onClick = { denunciando = false }) { Text("Cancelar") } },
                     )
                 }
                 if (editando) {
@@ -1233,6 +1271,7 @@ private fun VisorEstados(
     onVisto: (ChamosEstadoItem) -> Unit,
     onBorrar: (EstadoEntrada) -> Unit,
     onEditar: (EstadoEntrada, String) -> Unit,
+    onDenunciar: (RoomId, EstadoEntrada, Boolean) -> Unit,
     onCerrar: () -> Unit,
 ) {
     // Cada estado (de cada persona) es una página del carrusel.
@@ -1274,6 +1313,7 @@ private fun VisorEstados(
                     cargar = cargar,
                     onBorrar = onBorrar,
                     onEditar = onEditar,
+                    onDenunciar = { e, dejar -> onDenunciar(items[iItem].roomId, e, dejar) },
                     onCerrar = { onVisto(items[iItem]); onCerrar() },
                     onSiguiente = {
                         if (pagina < paginas.lastIndex) scope.launch { estado.animateScrollToPage(pagina + 1) } else { onVisto(items[iItem]); onCerrar() }

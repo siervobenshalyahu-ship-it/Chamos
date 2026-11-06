@@ -185,6 +185,7 @@ data class ChamosMuroState(
     val comentar: suspend (MuroPost, String) -> Boolean = { _, _ -> false },
     val borrarComentario: suspend (MuroComentario) -> Boolean = { false },
     val reportar: suspend (MuroPost, String) -> Boolean = { _, _ -> false },
+    val bloquear: suspend (String) -> Boolean = { false },
     val cargarImagen: suspend (MuroPost) -> String? = { null },
     val cargarAvatar: suspend (String) -> String? = { null },
     val envio: String = "",
@@ -498,6 +499,7 @@ fun rememberChamosMuro(
     }
 
     val evento: (String) -> EventOrTransactionId = { EventOrTransactionId.Event(EventId(it)) }
+    val bloquear: suspend (String) -> Boolean = { id -> runCatching { client.ignoreUser(io.element.android.libraries.matrix.api.core.UserId(id)).isSuccess }.getOrDefault(false) }
     val borrar: suspend (MuroPost) -> Boolean = borrar@{ p ->
         val sala = salaId?.let { client.getJoinedRoom(it) } ?: return@borrar false
         runCatching { sala.liveTimeline.redactEvent(evento(p.id), "Publicación borrada").isSuccess }.getOrDefault(false)
@@ -601,6 +603,7 @@ fun rememberChamosMuro(
         comentar = comentar,
         borrarComentario = borrarComentario,
         reportar = reportar,
+        bloquear = bloquear,
         cargarImagen = cargarImagen,
         cargarAvatar = cargarAvatar,
         envio = envio,
@@ -1205,6 +1208,7 @@ private fun TarjetaPost(post: MuroPost, state: ChamosMuroState, onPerfil: (Strin
             Text((if (post.yoNoMeGusta) "👎🏽 " else "👎 ") + post.noMeGusta, color = Color.White, fontSize = 16.sp, modifier = Modifier.clickable { scope.launch { state.noMeGusta(post) } })
             Text("💬 " + post.comentarios, color = Color.White, fontSize = 16.sp, modifier = Modifier.clickable { comentarios = true })
             Text("🔁 " + post.reposts, color = Color.White, fontSize = 16.sp, modifier = Modifier.clickable { reposteando = true })
+            if (!post.propio) Text("🚩 Denunciar", color = Color(0xFFFF8A80), fontSize = 14.sp, modifier = Modifier.clickable { reportando = true })
         }
     }
     if (reposteando) {
@@ -1254,6 +1258,14 @@ private fun TarjetaPost(post: MuroPost, state: ChamosMuroState, onPerfil: (Strin
                             }
                         }.padding(vertical = 12.dp))
                     }
+                    Text("🚫 Bloquear a " + post.autor, fontSize = 16.sp, color = Color(0xFFD32F2F), modifier = Modifier.fillMaxWidth().clickable {
+                        reportando = false
+                        scope.launch {
+                            state.reportar(post, "Usuario bloqueado")
+                            val ok = state.bloquear(post.autorId)
+                            Toast.makeText(contexto, if (ok) "Usuario bloqueado: ya no verás lo que publique" else "No se pudo bloquear", Toast.LENGTH_LONG).show()
+                        }
+                    }.padding(vertical = 12.dp))
                 }
             },
             confirmButton = {},
