@@ -16,6 +16,7 @@ import android.provider.MediaStore
 import androidx.annotation.OptIn
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -35,7 +36,6 @@ import androidx.media3.common.MimeTypes
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.effect.BitmapOverlay
 import androidx.media3.effect.OverlayEffect
-import androidx.media3.effect.OverlaySettings
 import androidx.media3.effect.TextureOverlay
 import androidx.media3.transformer.Composition
 import androidx.media3.transformer.EditedMediaItem
@@ -211,7 +211,7 @@ object ChamosDescarga {
         val ok = try {
             withContext(Dispatchers.Main) {
                 suspendCancellableCoroutine<Boolean> { cont ->
-                    val capa = BitmapOverlay.createStaticBitmapOverlay(marca(w, h, usuario), OverlaySettings.Builder().build())
+                    val capa = BitmapOverlay.createStaticBitmapOverlay(marca(w, h, usuario))
                     val efectos = Effects(emptyList(), listOf<Effect>(OverlayEffect(ImmutableList.of<TextureOverlay>(capa))))
                     val item = EditedMediaItem.Builder(MediaItem.fromUri(Uri.fromFile(File(ruta)))).setEffects(efectos).build()
                     val t = Transformer.Builder(c)
