@@ -216,11 +216,11 @@ fun rememberChamosEstados(
         mutableStateMapOf<String, String>().also { m -> prefs.all.forEach { (k, v) -> if (v is String) m[k] = v } }
     }
     val cacheArchivos = remember { mutableMapOf<String, String>() }
-    // Cada 20 segundos se reintenta entrar a salas de estado y enviar invitaciones que hayan fallado.
+    // Cada 90 segundos (antes 20, gastaba batería) se reintenta entrar a salas de estado y enviar invitaciones que hayan fallado.
     var latido by remember { mutableStateOf(0) }
     LaunchedEffect(Unit) {
         while (true) {
-            delay(20_000)
+            delay(90_000)
             latido++
         }
     }
@@ -805,30 +805,35 @@ private fun cometa(color: Color, alfa: Float, largo: Float): Brush = Brush.sweep
  * - Cargando: una luz corre alrededor de la foto, en el color del contacto y otra de color contrario, hasta que el estado esté listo.
  */
 private fun Modifier.aroNeon(color: Color, visible: Boolean, brillo: Float, cargando: Boolean): Modifier = composed {
-    val transicion = rememberInfiniteTransition(label = "neon")
-    val giro by transicion.animateFloat(
-        initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = infiniteRepeatable(tween(1100, easing = LinearEasing)),
-        label = "giro",
-    )
-    val giroLento by transicion.animateFloat(
-        initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = infiniteRepeatable(tween(5000, easing = LinearEasing)),
-        label = "giroLento",
-    )
-    val latido by transicion.animateFloat(
-        initialValue = 0.7f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(1000, easing = FastOutSlowInEasing), RepeatMode.Reverse),
-        label = "latido",
-    )
+    val contextoAro = androidx.compose.ui.platform.LocalContext.current
+    val ahorro = remember {
+        runCatching { (contextoAro.getSystemService(android.content.Context.POWER_SERVICE) as android.os.PowerManager).isPowerSaveMode }.getOrDefault(false)
+    }
     // Modo del aro (Estilos): discoteca, un solo color, igual al marco o combinado con el marco.
     val modo = io.element.android.compound.theme.ChamosEstilo.aroModo
     val coloresNeon = io.element.android.compound.theme.ChamosEstilo.neonColores
     val marcoIdx = io.element.android.compound.theme.ChamosEstilo.marcoColor
-    val marcoCol = if (marcoIdx >= coloresNeon.size) Color.hsv(giroLento % 360f, 0.9f, 1f) else coloresNeon[marcoIdx]
+    val transicion = rememberInfiniteTransition(label = "neon")
+    // Cada animación solo existe cuando se usa (menos batería): el giro solo mientras carga, el giro lento solo con marco de colores.
+    val giroE = if (cargando && visible) transicion.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(tween(1100, easing = LinearEasing)),
+        label = "giro",
+    ) else null
+    val giroLentoE = if (visible && !ahorro && (modo == 3 || (modo == 2 && marcoIdx >= coloresNeon.size))) transicion.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(tween(5000, easing = LinearEasing)),
+        label = "giroLento",
+    ) else null
+    val latidoE = if (visible && !cargando && !ahorro) transicion.animateFloat(
+        initialValue = 0.7f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(1000, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+        label = "latido",
+    ) else null
+    val marcoCol = if (marcoIdx >= coloresNeon.size) Color.hsv((giroLentoE?.value ?: 0f) % 360f, 0.9f, 1f) else coloresNeon[marcoIdx]
     val c = when (modo) {
         1 -> coloresNeon[io.element.android.compound.theme.ChamosEstilo.aroColor.coerceIn(0, coloresNeon.lastIndex)]
         2 -> marcoCol
@@ -837,6 +842,10 @@ private fun Modifier.aroNeon(color: Color, visible: Boolean, brillo: Float, carg
     val contrario = if (modo == 3) marcoCol else NEON_PALETA[(NEON_PALETA.indexOf(c).coerceAtLeast(0) + NEON_PALETA.size / 2) % NEON_PALETA.size]
     drawBehind {
         if (!visible) return@drawBehind
+        // Las animaciones se leen aquí (al dibujar) para no recomponer en cada cuadro.
+        val giro = giroE?.value ?: 0f
+        val giroLento = giroLentoE?.value ?: 0f
+        val latido = latidoE?.value ?: 1f
         val grosor = 3.dp.toPx()
         val radio = size.minDimension / 2f - 2.5.dp.toPx()
         val arcoTopLeft = Offset(center.x - radio, center.y - radio)

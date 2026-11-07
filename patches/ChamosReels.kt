@@ -442,6 +442,8 @@ fun rememberChamosReels(
         val idSala = salaId ?: return@LaunchedEffect
         while (true) {
             delay(4_000)
+            // Casi nunca hay envíos fallidos: no se consulta la sala si no hay nada que cancelar (ahorra batería).
+            if (fallidosTx.isEmpty()) continue
             val sala = client.getJoinedRoom(idSala) ?: continue
             for (tx in fallidosTx.values.toList()) {
                 runCatching { sala.liveTimeline.cancelSend(tx) }

@@ -9,6 +9,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
@@ -30,24 +31,32 @@ import io.element.android.compound.theme.ChamosEstilo
 fun ChamosMarcoNeon() {
     ChamosEstilo.init(LocalContext.current)
     if (!ChamosEstilo.marcoActivo) return
-    val movimiento = ChamosEstilo.marcoMovimiento
+    // Con el ahorro de batería del teléfono encendido, el marco queda quieto (sin luz que corre).
+    val contextoMarco = LocalContext.current
+    val ahorro = remember {
+        runCatching { (contextoMarco.getSystemService(android.content.Context.POWER_SERVICE) as android.os.PowerManager).isPowerSaveMode }.getOrDefault(false)
+    }
+    val movimiento = ChamosEstilo.marcoMovimiento && !ahorro
     val arcoiris = ChamosEstilo.marcoColor >= ChamosEstilo.neonColores.size
     val transicion = rememberInfiniteTransition(label = "marco")
-    val vuelta by transicion.animateFloat(
+    // Las animaciones solo existen cuando hacen falta: una animación infinita despierta la pantalla 60 veces por segundo aunque no se vea.
+    val vueltaE = if (movimiento) transicion.animateFloat(
         initialValue = 0f,
         targetValue = 1f,
         animationSpec = infiniteRepeatable(tween(7000, easing = LinearEasing), RepeatMode.Restart),
         label = "vuelta",
-    )
-    val tono by transicion.animateFloat(
+    ) else null
+    val tonoE = if (movimiento && arcoiris) transicion.animateFloat(
         initialValue = 0f,
         targetValue = 360f,
         animationSpec = infiniteRepeatable(tween(12000, easing = LinearEasing), RepeatMode.Restart),
         label = "tono",
-    )
-    val base = if (arcoiris) Color.hsv(if (movimiento) tono else 190f, 0.85f, 1f) else ChamosEstilo.neonColores[ChamosEstilo.marcoColor]
+    ) else null
 
     Canvas(modifier = Modifier.fillMaxSize()) {
+        val vuelta = vueltaE?.value ?: 0f
+        val tono = tonoE?.value ?: 0f
+        val base = if (arcoiris) Color.hsv(if (movimiento) tono else 190f, 0.85f, 1f) else ChamosEstilo.neonColores[ChamosEstilo.marcoColor]
         val margen = 1.5.dp.toPx()
         val tam = Size(size.width - margen * 2, size.height - margen * 2)
         val radio = CornerRadius(26.dp.toPx())

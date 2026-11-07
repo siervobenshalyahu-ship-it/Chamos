@@ -88,12 +88,14 @@ fun ChamosPalomitas(estado: Int, modifier: Modifier = Modifier) {
         else -> Color(0xFF9AA0A6)
     }
     val t = rememberInfiniteTransition(label = "palomitas")
-    val brillo by t.animateFloat(
-        initialValue = if (estado == 3) 0.45f else 0.85f,
+    // Solo late (animación) cuando la otra persona está escribiendo; el resto queda fijo para gastar menos batería.
+    val brilloE = if (estado == 3) t.animateFloat(
+        initialValue = 0.45f,
         targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(if (estado == 3) 600 else 1400, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+        animationSpec = infiniteRepeatable(tween(600, easing = FastOutSlowInEasing), RepeatMode.Reverse),
         label = "brilloPalomitas",
-    )
+    ) else null
+    val brillo = brilloE?.value ?: 1f
     val texto = when (estado) {
         0 -> "◷"
         1 -> "✓"

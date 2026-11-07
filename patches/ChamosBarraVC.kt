@@ -77,11 +77,11 @@ fun ChamosBarraVC(modifier: Modifier = Modifier) {
         io.element.android.libraries.matrix.api.ChamosReinicio.acciones.add(accion)
         onDispose { io.element.android.libraries.matrix.api.ChamosReinicio.acciones.remove(accion) }
     }
-    // Se actualiza sola cada 15 segundos para que los likes, compartidos, seguidores y denuncias aparezcan al momento.
+    // Se actualiza sola cada minuto para que los likes, compartidos, seguidores y denuncias aparezcan al momento.
     LaunchedEffect(recarga) {
         while (true) {
             pedirResumen()?.let { datos = it }
-            delay(15_000)
+            delay(60_000)
         }
     }
     val t = rememberInfiniteTransition(label = "vc")
