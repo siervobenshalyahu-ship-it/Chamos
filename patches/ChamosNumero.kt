@@ -210,6 +210,33 @@ object ChamosNumero {
     }
 }
 
+private const val TEXTO_INVITACION =
+    "Hola, uso Chamos, la app de mensajes de los venezolanos 🇻🇪. Chats, videos, estados y juegos, gratis. Descárgala aquí: https://siervobenshalyahu-ship-it.github.io/Chamos-apk-web/"
+
+/** Invita por WhatsApp, Telegram, mensaje de texto o cualquier otra app (canal = "whatsapp", "telegram", "sms" o "otro"). */
+fun chamosInvitar(ctx: Context, canal: String) {
+    val texto = TEXTO_INVITACION
+    val nuevo = Intent.FLAG_ACTIVITY_NEW_TASK
+    try {
+        when (canal) {
+            "whatsapp" -> ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://wa.me/?text=" + URLEncoder.encode(texto, "UTF-8"))).addFlags(nuevo))
+            "telegram" -> ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/share/url?url=" + URLEncoder.encode("https://siervobenshalyahu-ship-it.github.io/Chamos-apk-web/", "UTF-8") + "&text=" + URLEncoder.encode("Hola, uso Chamos, la app de mensajes de los venezolanos 🇻🇪. Gratis, descárgala aquí:", "UTF-8"))).addFlags(nuevo))
+            "sms" -> ctx.startActivity(Intent(Intent.ACTION_SENDTO, Uri.parse("smsto:")).putExtra("sms_body", texto).addFlags(nuevo))
+            else -> {
+                val enviar = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, texto)
+                ctx.startActivity(Intent.createChooser(enviar, "Invitar a Chamos").addFlags(nuevo))
+            }
+        }
+    } catch (e: Exception) {
+        try {
+            val enviar = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, texto)
+            ctx.startActivity(Intent.createChooser(enviar, "Invitar a Chamos").addFlags(nuevo))
+        } catch (e2: Exception) {
+            Toast.makeText(ctx, "No se pudo abrir la app para invitar.", Toast.LENGTH_LONG).show()
+        }
+    }
+}
+
 private fun abrirEnlace(ctx: Context, url: String) {
     try {
         // Primero se intenta abrir directo la app de Telegram (tg://); si no está, el navegador.
@@ -369,6 +396,16 @@ fun ChamosNumeroDialog(onDismiss: () -> Unit) {
                 } else {
                     Text("Vincula tu número de teléfono para que tus contactos te encuentren en Chamos. Se verifica con Telegram (gratis): compartes tu contacto con el bot y listo.")
                     TextButton(onClick = { vincular() }) { Text("Vincular con Telegram") }
+                }
+
+                if (ChamosNumero.configurado && !cargando) {
+                    Text("Invita a tus contactos a Chamos", style = MaterialTheme.typography.titleSmall)
+                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        TextButton(onClick = { chamosInvitar(ctx, "whatsapp") }) { Text("WhatsApp") }
+                        TextButton(onClick = { chamosInvitar(ctx, "telegram") }) { Text("Telegram") }
+                        TextButton(onClick = { chamosInvitar(ctx, "sms") }) { Text("SMS") }
+                    }
+                    TextButton(onClick = { chamosInvitar(ctx, "otro") }) { Text("Otras apps…") }
                 }
 
                 mensaje?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
