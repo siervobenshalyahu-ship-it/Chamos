@@ -296,7 +296,13 @@ fun ChamosNumeroDialog(onDismiss: () -> Unit) {
             if (e == "verificado") {
                 estado = ChamosNumero.miNumero()
                 esperando = null
-                mensaje = "¡Listo! Tu número quedó vinculado."
+                mensaje = "¡Listo! Tu número quedó vinculado. Buscando a tus contactos que usan Chamos…"
+                // Al verificar, se buscan solos los contactos de la agenda (pide el permiso si hace falta).
+                if (ctx.checkSelfPermission(Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED) {
+                    buscarAhora()
+                } else {
+                    permiso.launch(Manifest.permission.READ_CONTACTS)
+                }
                 return@LaunchedEffect
             }
             if (e == "expirado") {
