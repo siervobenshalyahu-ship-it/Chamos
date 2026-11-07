@@ -1,4 +1,4 @@
-package io.element.android.features.preferences.impl.user
+package io.element.android.features.home.impl
 
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
@@ -9,6 +9,7 @@ import androidx.compose.animation.core.keyframes
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -33,7 +34,6 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import io.element.android.libraries.matrix.api.ChamosFiltroBusqueda
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -47,7 +47,7 @@ private data class ResumenVC(val likes: Int, val seguidores: Int, val compartido
 
 private suspend fun pedirResumen(): ResumenVC? = withContext(Dispatchers.IO) {
     try {
-        val token = ChamosFiltroBusqueda.token?.invoke() ?: return@withContext null
+        val token = ChamosNumero.tokenSesion() ?: return@withContext null
         val con = URL("https://chamos-push.siervodeyhwh57.workers.dev/video/resumen").openConnection() as HttpURLConnection
         con.connectTimeout = 10000
         con.readTimeout = 10000
@@ -113,7 +113,7 @@ fun ChamosBarraVC(modifier: Modifier = Modifier) {
     )
 
     Row(
-        modifier = modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 2.dp, bottom = 10.dp),
+        modifier = modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         letra("V", colorV)
@@ -123,19 +123,27 @@ fun ChamosBarraVC(modifier: Modifier = Modifier) {
             shape = RoundedCornerShape(50),
             color = Color(0xFF0A0A14),
             border = BorderStroke(2.dp, borde.copy(alpha = 0.4f + 0.6f * parpadeo)),
+            modifier = Modifier.weight(1f),
         ) {
             val d = datos
-            Text(
-                text = if (d == null) "—" else "❤ ${d.likes}   👥 ${d.seguidores}   ↗ ${d.compartidos}   🚩 ${d.denuncias}",
-                style = TextStyle(
-                    color = Color.White,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    shadow = Shadow(color = borde, offset = Offset.Zero, blurRadius = 10f),
-                ),
-                maxLines = 1,
-                modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 7.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                listOf("❤" to d?.likes, "👥" to d?.seguidores, "↗" to d?.compartidos, "🚩" to d?.denuncias).forEach { (icono, n) ->
+                    Text(
+                        text = "$icono ${n ?: "–"}",
+                        style = TextStyle(
+                            color = Color.White,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            shadow = Shadow(color = borde, offset = Offset.Zero, blurRadius = 10f),
+                        ),
+                        maxLines = 1,
+                    )
+                }
+            }
         }
     }
 }

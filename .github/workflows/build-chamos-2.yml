@@ -166,9 +166,6 @@ jobs:
       - name: Palomitas de neón y luz de neón en los audios enviados
         run: python3 chamos-repo/patches/palomitas.py chamos chamos-repo/patches
 
-      - name: Barra VC (Video Chamos) en el perfil
-        run: python3 chamos-repo/patches/barra_vc.py chamos chamos-repo/patches
-
       - name: Todo en español venezolano (sin frases en inglés)
         run: python3 chamos-repo/patches/espanol.py chamos
 

@@ -718,6 +718,7 @@ fun ChamosEstadosRow(
                 )
             }
         }
+        ChamosBarraVC()
     }
 
     if (creando && state != null) {
