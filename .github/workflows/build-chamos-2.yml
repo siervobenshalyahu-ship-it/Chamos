@@ -201,6 +201,9 @@ jobs:
       - name: Marco de neón, fondos propios y dictado por voz
         run: python3 chamos-repo/patches/neon.py chamos chamos-repo/patches
 
+      - name: Notas de voz (mantén para grabar, suelta para enviar, desliza para fijar)
+        run: python3 chamos-repo/patches/audio_gesto.py chamos
+
       - name: Fuentes y stickers
         run: python3 chamos-repo/patches/fuentes_stickers.py chamos chamos-repo/patches
 

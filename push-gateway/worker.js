@@ -193,6 +193,7 @@ async function prepararTablas(env) {
     env.DB.prepare("CREATE TABLE IF NOT EXISTS juegos (sala TEXT PRIMARY KEY, v INTEGER, estado TEXT, ts INTEGER)"),
     env.DB.prepare("CREATE TABLE IF NOT EXISTS seguidores (seguidor TEXT, seguido TEXT, ts INTEGER, PRIMARY KEY (seguidor, seguido))"),
     env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_seguidores_seguido ON seguidores (seguido)"),
+    env.DB.prepare("CREATE TABLE IF NOT EXISTS opiniones (id INTEGER PRIMARY KEY AUTOINCREMENT, ts INTEGER, nombre TEXT, texto TEXT, pais TEXT, ip TEXT)"),
     env.DB.prepare("CREATE TABLE IF NOT EXISTS video_acciones (evento TEXT, autor TEXT, usuario TEXT, tipo TEXT, ts INTEGER, PRIMARY KEY (evento, usuario, tipo))"),
     env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_video_acciones_autor ON video_acciones (autor, tipo)"),
     env.DB.prepare("CREATE TABLE IF NOT EXISTS estado_vistas (evento TEXT, usuario TEXT, dueno TEXT, nombre TEXT, ts INTEGER, PRIMARY KEY (evento, usuario))"),
@@ -359,6 +360,27 @@ async function videoSocialApi(request, env, url) {
   return jsonCors({ likes: por.like || 0, guardados: por.guardar || 0, compartidos: por.compartir || 0, denuncias: por.denuncia || 0, seguidores: s.results[0].n });
 }
 
+// Opiniones de la web ("Danos tu opinión"). Pública, con límite de 3 por hora y por dirección.
+async function opinionApi(request, env) {
+  if (!env.DB) return jsonCors({ error: "Base de datos no configurada" }, 503);
+  const raw = await request.text();
+  if (raw.length > 4096) return jsonCors({ error: "Demasiado largo" }, 413);
+  let d;
+  try { d = JSON.parse(raw); } catch { return jsonCors({ error: "JSON inválido" }, 400); }
+  if (d.web) return jsonCors({ ok: true }); // campo trampa para robots
+  const texto = corto(d.texto, 1000).trim();
+  const nombre = corto(d.nombre, 60).trim();
+  if (texto.length < 3) return jsonCors({ error: "Escribe tu opinión" }, 400);
+  await prepararTablas(env);
+  const ip = corto(request.headers.get("cf-connecting-ip"), 64);
+  const ahora = Date.now();
+  const r = await env.DB.prepare("SELECT COUNT(*) AS n FROM opiniones WHERE ip=?1 AND ts>?2").bind(ip, ahora - 3600 * 1000).all();
+  if (r.results[0].n >= 3) return jsonCors({ error: "Ya enviaste varias opiniones. Inténtalo más tarde." }, 429);
+  await env.DB.prepare("INSERT INTO opiniones (ts, nombre, texto, pais, ip) VALUES (?1,?2,?3,?4,?5)")
+    .bind(ahora, nombre, texto, corto(request.cf && request.cf.country, 4), ip).run();
+  return jsonCors({ ok: true });
+}
+
 // Seguir / dejar de seguir. La persona se identifica con su sesión de Matrix (igual que los videos).
 async function seguirApi(request, env, url) {
   if (!env.DB) return jsonCors({ error: "Base de datos no configurada" }, 503);
@@ -400,7 +422,7 @@ async function resumen(request, env) {
   if (request.headers.get("x-clave") !== env.ADMIN_KEY) return jsonCors({ error: "Clave incorrecta" }, 401);
   await prepararTablas(env);
   const hace30 = Date.now() - 30 * 24 * 3600 * 1000;
-  const [tot, unicos, dias, paises, usuarios, nUsuarios, versiones, recientes, topSeg, nSeg] = await env.DB.batch([
+  const [tot, unicos, dias, paises, usuarios, nUsuarios, versiones, recientes, topSeg, nSeg, opiniones] = await env.DB.batch([
     env.DB.prepare("SELECT tipo, COUNT(*) AS n FROM eventos GROUP BY tipo"),
     env.DB.prepare("SELECT tipo, COUNT(DISTINCT anon) AS n FROM eventos GROUP BY tipo"),
     env.DB.prepare(
@@ -413,6 +435,7 @@ async function resumen(request, env) {
     env.DB.prepare("SELECT ts, tipo, pais, ip, disp FROM eventos WHERE tipo IN ('visita','descarga','instalacion') ORDER BY ts DESC LIMIT 200"),
     env.DB.prepare("SELECT seguido AS usuario, COUNT(*) AS n FROM seguidores GROUP BY seguido ORDER BY n DESC LIMIT 15"),
     env.DB.prepare("SELECT COUNT(*) AS n FROM seguidores"),
+    env.DB.prepare("SELECT ts, nombre, texto, pais FROM opiniones ORDER BY ts DESC LIMIT 50"),
   ]);
   return jsonCors({
     totales: tot.results,
@@ -425,6 +448,7 @@ async function resumen(request, env) {
     recientes: recientes.results,
     top_seguidos: topSeg.results,
     total_seguidores: nSeg.results[0].n,
+    opiniones: opiniones.results,
   });
 }
 
@@ -538,6 +562,7 @@ async function go(){
    '<div class="c"><b>'+n(d.totales,'descarga_media')+'</b><span>Videos y fotos guardados con marca de agua</span></div>'+
    '<div class="c"><b>'+n(d.totales,'denuncia')+'</b><span>Denuncias enviadas</span></div>'+
    '<div class="c"><b>'+d.total_seguidores+'</b><span>Seguimientos activos ('+n(d.totales,'seguir')+' en total, '+n(d.totales,'dejar_seguir')+' dejados)</span></div></div>'+
+   '<h2>Opiniones de la web ('+(d.opiniones||[]).length+')</h2><div class="sc"><table><tr><th>Fecha</th><th>Nombre</th><th>Opinión</th></tr>'+(d.opiniones||[]).map(o=>'<tr><td>'+new Date(o.ts).toLocaleString()+'</td><td>'+esc(o.nombre||'—')+' '+esc(o.pais||'')+'</td><td>'+esc(o.texto)+'</td></tr>').join('')+'</table></div>'+
    '<h2>Más seguidos</h2><div class="sc"><table><tr><th>Usuario</th><th>Seguidores</th></tr>'+(d.top_seguidos||[]).map(t=>'<tr><td>'+esc(t.usuario)+'</td><td>'+t.n+'</td></tr>').join('')+'</table></div>'+
    '<h2>Últimos 30 días</h2><div class="sc"><table><tr><th>Día</th><th>Visitas</th><th>Descargas</th><th>Instal.</th></tr>'+
    Object.keys(dias).map(x=>'<tr><td>'+x+'</td><td>'+(dias[x].visita||0)+'</td><td>'+(dias[x].descarga||0)+'</td><td>'+(dias[x].instalacion||0)+'</td></tr>').join('')+'</table></div>'+
@@ -629,6 +654,9 @@ export default {
     }
     if (url.pathname === "/video/accion" && request.method === "POST" || url.pathname === "/video/resumen" && request.method === "GET") {
       try { return await videoSocialApi(request, env, url); } catch (e) { console.error(e); return jsonCors({ error: String(e.message || e) }, 500); }
+    }
+    if (url.pathname === "/opinion" && request.method === "POST") {
+      try { return await opinionApi(request, env); } catch (e) { console.error(e); return jsonCors({ error: String(e.message || e) }, 500); }
     }
     if (url.pathname === "/seguir" && (request.method === "GET" || request.method === "POST")) {
       try { return await seguirApi(request, env, url); } catch (e) { console.error(e); return jsonCors({ error: String(e.message || e) }, 500); }
