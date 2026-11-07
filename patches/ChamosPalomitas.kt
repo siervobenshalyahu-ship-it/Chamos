@@ -43,6 +43,10 @@ object ChamosEnvio {
     /** Hora del último mensaje mío que ya tiene recibo de lectura: todo lo anterior también llegó. */
     val leidoHasta = mutableLongStateOf(0L)
 
+    init {
+        io.element.android.libraries.matrix.api.ChamosReinicio.acciones.add { reiniciar() }
+    }
+
     fun reiniciar() {
         escribiendo.value = false
         leidoHasta.longValue = 0L

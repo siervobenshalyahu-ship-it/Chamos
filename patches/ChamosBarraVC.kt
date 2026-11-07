@@ -19,6 +19,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -35,6 +36,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.net.HttpURLConnection
@@ -68,8 +70,19 @@ private suspend fun pedirResumen(): ResumenVC? = withContext(Dispatchers.IO) {
 @Composable
 fun ChamosBarraVC(modifier: Modifier = Modifier) {
     var datos by remember { mutableStateOf<ResumenVC?>(null) }
-    LaunchedEffect(Unit) {
-        datos = pedirResumen()
+    var recarga by remember { mutableStateOf(0) }
+    // El botón 🔄 la pone en cero y vuelve a pedir los números.
+    DisposableEffect(Unit) {
+        val accion: () -> Unit = { datos = null; recarga++ }
+        io.element.android.libraries.matrix.api.ChamosReinicio.acciones.add(accion)
+        onDispose { io.element.android.libraries.matrix.api.ChamosReinicio.acciones.remove(accion) }
+    }
+    // Se actualiza sola cada 15 segundos para que los likes, compartidos, seguidores y denuncias aparezcan al momento.
+    LaunchedEffect(recarga) {
+        while (true) {
+            pedirResumen()?.let { datos = it }
+            delay(15_000)
+        }
     }
     val t = rememberInfiniteTransition(label = "vc")
     val mezcla by t.animateFloat(

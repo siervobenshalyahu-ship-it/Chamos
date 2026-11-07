@@ -574,11 +574,6 @@ fun rememberChamosReels(
         runCatching { sala.liveTimeline.replyMessage(EventId(r.id), "\uD83D\uDEA9 " + motivo, null, emptyList()).isSuccess }.getOrDefault(false)
     }
     val bloquear: suspend (String) -> Boolean = { id -> runCatching { client.ignoreUser(io.element.android.libraries.matrix.api.core.UserId(id)).isSuccess }.getOrDefault(false) }
-    val enviarAChat: suspend (ReelItem, RoomId) -> Boolean = enviar@{ r, destino ->
-        val sala = salaId?.let { client.getJoinedRoom(it) } ?: return@enviar false
-        runCatching { sala.liveTimeline.forwardEvents(listOf(EventId(r.id)), listOf(destino)).isSuccess }.getOrDefault(false)
-    }
-
     val cargarArchivo: suspend (ReelItem) -> String? = cargar@{ r ->
         r.rutaLocal?.let { if (java.io.File(it).exists()) return@cargar it }
         cacheArchivos[r.id]?.let { if (java.io.File(it).exists()) return@cargar it }
@@ -615,6 +610,30 @@ fun rememberChamosReels(
         }
         cacheArchivos[r.id] = ruta
         ruta
+    }
+
+    // Envía el video de verdad: se baja el archivo y se manda como video al chat elegido (no como un enlace o texto).
+    val enviarAChat: suspend (ReelItem, RoomId) -> Boolean = enviar@{ r, destino ->
+        val salaDestino = client.getJoinedRoom(destino) ?: return@enviar false
+        val ruta = runCatching { cargarArchivo(r) }.getOrNull()
+        if (ruta != null) {
+            val sender = mediaSenderFactory.create(client, salaDestino)
+            val config = io.element.android.libraries.mediaupload.api.MediaOptimizationConfig(
+                compressImages = true,
+                videoCompressionPreset = io.element.android.libraries.preferences.api.store.VideoCompressionPreset.STANDARD,
+            )
+            val ok = runCatching {
+                val info = sender.preProcessMedia(Uri.fromFile(java.io.File(ruta)), "video/mp4", config).getOrNull()
+                info != null && sender.sendPreProcessedMedia(info, r.descripcion.ifBlank { null }, null, null).isSuccess
+            }.getOrDefault(false)
+            runCatching { sender.cleanUp() }
+            if (ok) return@enviar true
+        }
+        // Respaldo: videos subidos directo a Matrix se reenvían tal cual.
+        if (r.urlExterna == null) {
+            val sala = salaId?.let { client.getJoinedRoom(it) } ?: return@enviar false
+            runCatching { sala.liveTimeline.forwardEvents(listOf(EventId(r.id)), listOf(destino)).isSuccess }.getOrDefault(false)
+        } else false
     }
 
     return ChamosReelsState(
@@ -949,6 +968,25 @@ private fun PaginaReel(reel: ReelItem, state: ChamosReelsState, activo: Boolean,
     if (compartir) CompartirDialogo(reel, state) { compartir = false }
 }
 
+/** Comparte el video como archivo real con otras apps (WhatsApp, Telegram…); si no se puede, comparte el texto. */
+private fun videoCompartido(contexto: android.content.Context, reel: ReelItem, ruta: String) {
+    val ok = runCatching {
+        val dir = java.io.File(contexto.cacheDir, "chamos_stickers_envio").apply { mkdirs() }
+        val copia = java.io.File(dir, "video_chamos_" + System.currentTimeMillis() + ".mp4")
+        java.io.File(ruta).copyTo(copia, overwrite = true)
+        val uri = androidx.core.content.FileProvider.getUriForFile(contexto, contexto.packageName + ".fileprovider", copia)
+        val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+            type = "video/mp4"
+            putExtra(android.content.Intent.EXTRA_STREAM, uri)
+            putExtra(android.content.Intent.EXTRA_TEXT, "Video de " + reel.autor + " en Chamos. Descarga Chamos: https://siervobenshalyahu-ship-it.github.io/Chamos-apk-web/")
+            addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        val chooser = android.content.Intent.createChooser(intent, "Compartir video").addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+        contexto.startActivity(chooser)
+    }.isSuccess
+    if (!ok) textoCompartido(contexto, reel)
+}
+
 private fun textoCompartido(contexto: android.content.Context, reel: ReelItem) {
     val texto = "Mira este video de " + reel.autor + " en Chamos" +
         (if (reel.descripcion.isNotBlank()) ": «" + reel.descripcion + "»" else "") +
@@ -1026,7 +1064,8 @@ private fun ComentariosDialogo(reel: ReelItem, state: ChamosReelsState, onCerrar
 @Composable
 private fun CompartirDialogo(reel: ReelItem, state: ChamosReelsState, onCerrar: () -> Unit) {
     val contexto = LocalContext.current
-    val scope = rememberCoroutineScope()
+    // Un scope propio: el del diálogo se cancelaba al cerrarlo y el video nunca llegaba a enviarse.
+    val scope = remember { kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + Dispatchers.Main) }
     var elegirChat by remember { mutableStateOf(false) }
     AlertDialog(
         onDismissRequest = onCerrar,
@@ -1042,6 +1081,7 @@ private fun CompartirDialogo(reel: ReelItem, state: ChamosReelsState, onCerrar: 
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.fillMaxWidth().clickable {
                                 onCerrar()
+                                Toast.makeText(contexto, "Enviando video…", Toast.LENGTH_SHORT).show()
                                 scope.launch {
                                     val ok = state.enviarAChat(reel, id)
                                     if (ok && !reel.propio) ChamosVideoSocial.accion(scope, reel.id, reel.autorId, "compartir")
@@ -1054,7 +1094,15 @@ private fun CompartirDialogo(reel: ReelItem, state: ChamosReelsState, onCerrar: 
             } else {
                 Column {
                     TextButton(onClick = { elegirChat = true }) { Text("Enviar a un chat de Chamos") }
-                    TextButton(onClick = { onCerrar(); textoCompartido(contexto, reel); if (!reel.propio) ChamosVideoSocial.accion(scope, reel.id, reel.autorId, "compartir") }) { Text("Compartir fuera de Chamos") }
+                    TextButton(onClick = {
+                        onCerrar()
+                        Toast.makeText(contexto, "Preparando el video…", Toast.LENGTH_SHORT).show()
+                        scope.launch {
+                            val ruta = runCatching { state.cargarArchivo(reel) }.getOrNull()
+                            if (ruta != null) videoCompartido(contexto, reel, ruta) else textoCompartido(contexto, reel)
+                            if (!reel.propio) ChamosVideoSocial.accion(scope, reel.id, reel.autorId, "compartir")
+                        }
+                    }) { Text("Compartir fuera de Chamos") }
                 }
             }
         },

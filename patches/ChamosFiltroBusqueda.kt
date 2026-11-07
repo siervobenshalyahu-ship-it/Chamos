@@ -12,3 +12,12 @@ object ChamosFiltroBusqueda {
     /** Interruptor de la búsqueda: true = solo cuentas de Chamos, false = todos (Chamos, Matrix y Element). */
     val soloChamos = kotlinx.coroutines.flow.MutableStateFlow(true)
 }
+
+/** Botón de reiniciar (🔄): cada parte de la app se registra aquí para limpiarse y volver a cargar. */
+object ChamosReinicio {
+    val acciones = java.util.concurrent.CopyOnWriteArrayList<() -> Unit>()
+
+    fun ejecutar() {
+        acciones.forEach { runCatching { it() } }
+    }
+}
