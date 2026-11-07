@@ -57,16 +57,48 @@ export async function identidad(openid, env) {
   const tok = openid && typeof openid.access_token === "string" ? openid.access_token : "";
   if (!tok || tok.length > 512) return null;
   const servidor = env.MATRIX_SERVER || "matrix.org";
-  const base = env.FEDERATION_URL || (servidor === "matrix.org" ? "https://matrix-federation.matrix.org" : "https://" + servidor);
-  try {
-    const r = await fetch(base + "/_matrix/federation/v1/openid/userinfo?access_token=" + encodeURIComponent(tok));
-    if (!r.ok) return null;
-    const j = await r.json();
-    const sub = typeof j.sub === "string" ? j.sub : "";
-    return /^@[^:\s]+:[^\s]+$/.test(sub) && sub.endsWith(":" + servidor) ? sub : null;
-  } catch {
-    return null;
+  const bases = env.FEDERATION_URL ? [env.FEDERATION_URL] : servidor === "matrix.org" ? ["https://matrix-federation.matrix.org", "https://matrix.org"] : ["https://" + servidor];
+  for (const base of bases) {
+    try {
+      const r = await fetch(base + "/_matrix/federation/v1/openid/userinfo?access_token=" + encodeURIComponent(tok));
+      if (!r.ok) continue;
+      const j = await r.json();
+      const sub = typeof j.sub === "string" ? j.sub : "";
+      if (/^@[^:\s]+:[^\s]+$/.test(sub) && sub.endsWith(":" + servidor)) return sub;
+    } catch {}
   }
+  return null;
+}
+
+/** Revisa la configuración sin mostrar ningún secreto: abre /diagnostico en el navegador. */
+async function diagnostico(env) {
+  const r = {
+    kv_CUENTAS: !!env.CUENTAS,
+    secreto_PEPPER: !!env.PEPPER,
+    secreto_TG_TOKEN: !!env.TG_TOKEN,
+    secreto_TG_SECRET: !!env.TG_SECRET,
+  };
+  if (env.TG_TOKEN) {
+    try {
+      const me = await (await fetch("https://api.telegram.org/bot" + env.TG_TOKEN + "/getMe")).json();
+      r.bot = me.ok ? "@" + me.result.username : "TOKEN NO VÁLIDO: " + (me.description || "");
+      const w = await (await fetch("https://api.telegram.org/bot" + env.TG_TOKEN + "/getWebhookInfo")).json();
+      if (w.ok) {
+        r.webhook_url = w.result.url || "(sin webhook)";
+        r.webhook_ultimo_error = w.result.last_error_message || "(ninguno)";
+        r.webhook_pendientes = w.result.pending_update_count;
+      }
+    } catch (e) {
+      r.telegram = "no se pudo consultar: " + e;
+    }
+  }
+  try {
+    const f = await fetch((env.FEDERATION_URL || "https://matrix-federation.matrix.org") + "/_matrix/federation/v1/openid/userinfo?access_token=x");
+    r.federacion_http = f.status;
+  } catch (e) {
+    r.federacion_http = "sin conexión: " + e;
+  }
+  return json(r);
 }
 
 async function leer(req) {
@@ -250,6 +282,7 @@ export default {
   async fetch(req, env) {
     const url = new URL(req.url);
     if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS });
+    if (url.pathname === "/diagnostico") return diagnostico(env);
     if (!env.CUENTAS || !env.PEPPER) return json({ error: "falta configurar el servidor" }, 500);
     const ruta = url.pathname;
     if (req.method === "POST" && ruta === "/telegram") return telegram(req, env);
