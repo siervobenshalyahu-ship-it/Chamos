@@ -69,7 +69,7 @@ edit(hv, [
      "                                    modifier = Modifier.clickable {\n"
      "                                        ChamosEstados.recargar()\n"
      "                                        io.element.android.libraries.matrix.api.ChamosReinicio.ejecutar()\n"
-     "                                        android.widget.Toast.makeText(chamosCtx, \"Reiniciando estados, barra VC y mensajes…\", android.widget.Toast.LENGTH_SHORT).show()\n"
+     "                                        android.widget.Toast.makeText(chamosCtx, \"Actualizando estados, barra VC y mensajes…\", android.widget.Toast.LENGTH_SHORT).show()\n"
      "                                    }.padding(horizontal = 12.dp, vertical = 8.dp),\n"
      "                                )\n"
      "                            }\n"

@@ -71,9 +71,9 @@ private suspend fun pedirResumen(): ResumenVC? = withContext(Dispatchers.IO) {
 fun ChamosBarraVC(modifier: Modifier = Modifier) {
     var datos by remember { mutableStateOf<ResumenVC?>(null) }
     var recarga by remember { mutableStateOf(0) }
-    // El botón 🔄 la pone en cero y vuelve a pedir los números.
+    // El botón 🔄 vuelve a pedir los números (no borra nada).
     DisposableEffect(Unit) {
-        val accion: () -> Unit = { datos = null; recarga++ }
+        val accion: () -> Unit = { recarga++ }
         io.element.android.libraries.matrix.api.ChamosReinicio.acciones.add(accion)
         onDispose { io.element.android.libraries.matrix.api.ChamosReinicio.acciones.remove(accion) }
     }
