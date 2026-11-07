@@ -246,6 +246,30 @@ object ChamosDescarga {
 }
 
 /** Estados: quién los vio y con qué emoji reaccionó cada persona (base de datos de Chamos). */
+/** Acciones sobre videos de otras personas (like, guardar, compartir, denuncia): el dueño las ve en su barra VC. */
+object ChamosVideoSocial {
+    fun accion(scope: kotlinx.coroutines.CoroutineScope, evento: String, autor: String, tipo: String) {
+        if (!evento.startsWith("$") || !autor.startsWith("@")) return
+        scope.launch(Dispatchers.IO) {
+            try {
+                val token = ChamosNumero.tokenSesion() ?: return@launch
+                val con = URL("https://chamos-push.siervodeyhwh57.workers.dev/video/accion").openConnection() as HttpURLConnection
+                con.requestMethod = "POST"
+                con.connectTimeout = 10000
+                con.readTimeout = 10000
+                con.setRequestProperty("Authorization", "Bearer $token")
+                con.setRequestProperty("content-type", "application/json")
+                con.doOutput = true
+                con.outputStream.use { it.write(JSONObject().put("e", evento).put("a", autor).put("t", tipo).toString().toByteArray()) }
+                con.responseCode
+                con.disconnect()
+            } catch (e: Exception) {
+                android.util.Log.w("Chamos", "video social", e)
+            }
+        }
+    }
+}
+
 object ChamosEstadoSocial {
     private const val BASE = "https://chamos-push.siervodeyhwh57.workers.dev"
 

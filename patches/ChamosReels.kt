@@ -557,7 +557,8 @@ fun rememberChamosReels(
     }
     val meGusta: suspend (ReelItem) -> Unit = gusta@{ r ->
         val sala = salaId?.let { client.getJoinedRoom(it) } ?: return@gusta
-        runCatching { sala.liveTimeline.toggleReaction("❤️", evento(r.id)) }
+        val res = runCatching { sala.liveTimeline.toggleReaction("❤️", evento(r.id)) }
+        if (!r.propio && res.isSuccess) ChamosVideoSocial.accion(kotlinx.coroutines.CoroutineScope(Dispatchers.IO), r.id, r.autorId, if (r.yoLike) "unlike" else "like")
     }
     val comentar: suspend (ReelItem, String) -> Boolean = comenta@{ r, texto ->
         val sala = salaId?.let { client.getJoinedRoom(it) } ?: return@comenta false
@@ -852,6 +853,7 @@ private fun PaginaReel(reel: ReelItem, state: ChamosReelsState, activo: Boolean,
                         val ok = archivo != null && ChamosDescarga.guardarVideo(contexto, archivo, reel.autor)
                         guardando = false
                         if (ok) ChamosStats.evento(contexto, "descarga_media")
+                        if (ok && !reel.propio) ChamosVideoSocial.accion(scope, reel.id, reel.autorId, "guardar")
                         Toast.makeText(contexto, if (ok) "Guardado en Películas/Chamos" else "No se pudo guardar el video", Toast.LENGTH_LONG).show()
                     }
                 }
@@ -890,6 +892,7 @@ private fun PaginaReel(reel: ReelItem, state: ChamosReelsState, activo: Boolean,
                             scope.launch {
                                 val ok = state.reportar(reel, m)
                                 if (ok) ChamosStats.evento(contexto, "denuncia")
+                                if (ok) ChamosVideoSocial.accion(scope, reel.id, reel.autorId, "denuncia")
                                 Toast.makeText(contexto, if (ok) "Gracias, ya lo reportamos" else "No se pudo reportar", Toast.LENGTH_SHORT).show()
                             }
                         }.padding(vertical = 12.dp))
@@ -1041,6 +1044,7 @@ private fun CompartirDialogo(reel: ReelItem, state: ChamosReelsState, onCerrar: 
                                 onCerrar()
                                 scope.launch {
                                     val ok = state.enviarAChat(reel, id)
+                                    if (ok && !reel.propio) ChamosVideoSocial.accion(scope, reel.id, reel.autorId, "compartir")
                                     Toast.makeText(contexto, if (ok) "Enviado a " + nombre else "No se pudo enviar", Toast.LENGTH_SHORT).show()
                                 }
                             }.padding(vertical = 12.dp),
@@ -1050,7 +1054,7 @@ private fun CompartirDialogo(reel: ReelItem, state: ChamosReelsState, onCerrar: 
             } else {
                 Column {
                     TextButton(onClick = { elegirChat = true }) { Text("Enviar a un chat de Chamos") }
-                    TextButton(onClick = { onCerrar(); textoCompartido(contexto, reel) }) { Text("Compartir fuera de Chamos") }
+                    TextButton(onClick = { onCerrar(); textoCompartido(contexto, reel); if (!reel.propio) ChamosVideoSocial.accion(scope, reel.id, reel.autorId, "compartir") }) { Text("Compartir fuera de Chamos") }
                 }
             }
         },

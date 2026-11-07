@@ -67,6 +67,7 @@ object ChamosNumero {
     fun attach(c: MatrixClient, s: SessionStore) {
         client = c
         sesiones = s
+        io.element.android.libraries.matrix.api.ChamosFiltroBusqueda.token = { tokenSesion() }
         if (configurado) {
             io.element.android.libraries.matrix.api.ChamosFiltroBusqueda.filtro = { ids -> filtrarChamos(ids) }
             kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch { llamar("/chamos/registrar") }

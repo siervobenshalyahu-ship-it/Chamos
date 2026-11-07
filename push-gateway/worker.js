@@ -193,6 +193,8 @@ async function prepararTablas(env) {
     env.DB.prepare("CREATE TABLE IF NOT EXISTS juegos (sala TEXT PRIMARY KEY, v INTEGER, estado TEXT, ts INTEGER)"),
     env.DB.prepare("CREATE TABLE IF NOT EXISTS seguidores (seguidor TEXT, seguido TEXT, ts INTEGER, PRIMARY KEY (seguidor, seguido))"),
     env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_seguidores_seguido ON seguidores (seguido)"),
+    env.DB.prepare("CREATE TABLE IF NOT EXISTS video_acciones (evento TEXT, autor TEXT, usuario TEXT, tipo TEXT, ts INTEGER, PRIMARY KEY (evento, usuario, tipo))"),
+    env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_video_acciones_autor ON video_acciones (autor, tipo)"),
     env.DB.prepare("CREATE TABLE IF NOT EXISTS estado_vistas (evento TEXT, usuario TEXT, dueno TEXT, nombre TEXT, ts INTEGER, PRIMARY KEY (evento, usuario))"),
     env.DB.prepare("CREATE TABLE IF NOT EXISTS estado_reacciones (evento TEXT, usuario TEXT, dueno TEXT, nombre TEXT, emoji TEXT, ts INTEGER, PRIMARY KEY (evento, usuario))"),
   ]);
@@ -323,6 +325,38 @@ async function estadoSocialApi(request, env, url) {
     out[id] = { v: v.results, r: r.results, mia: m.results.length ? m.results[0].emoji : "" };
   }
   return jsonCors(out);
+}
+
+// Acciones sobre los videos de alguien (like, guardar, compartir, denuncia) y resumen para su dueño.
+async function videoSocialApi(request, env, url) {
+  if (!env.DB) return jsonCors({ error: "Base de datos no configurada" }, 503);
+  const yo = await videoAuth(request);
+  if (!yo) return jsonCors({ error: "Sesión no válida" }, 401);
+  await prepararTablas(env);
+  const ahora = Date.now();
+  if (request.method === "POST") {
+    let d;
+    try { d = JSON.parse(await request.text()); } catch { return jsonCors({ error: "JSON inválido" }, 400); }
+    const evento = corto(d.e, 120);
+    const autor = corto(d.a, 100);
+    const tipo = corto(d.t, 12);
+    if (!evento.startsWith("$") || !autor.startsWith("@") || autor === yo) return jsonCors({ error: "Datos no válidos" }, 400);
+    if (tipo === "unlike") {
+      await env.DB.prepare("DELETE FROM video_acciones WHERE evento=?1 AND usuario=?2 AND tipo='like'").bind(evento, yo).run();
+    } else if (["like", "guardar", "compartir", "denuncia"].includes(tipo)) {
+      await env.DB.prepare("INSERT OR REPLACE INTO video_acciones (evento, autor, usuario, tipo, ts) VALUES (?1,?2,?3,?4,?5)").bind(evento, autor, yo, tipo, ahora).run();
+    } else {
+      return jsonCors({ error: "Acción no válida" }, 400);
+    }
+    return jsonCors({ ok: true });
+  }
+  const [t, s] = await env.DB.batch([
+    env.DB.prepare("SELECT tipo, COUNT(*) AS n FROM video_acciones WHERE autor=?1 GROUP BY tipo").bind(yo),
+    env.DB.prepare("SELECT COUNT(*) AS n FROM seguidores WHERE seguido=?1").bind(yo),
+  ]);
+  const por = {};
+  for (const r of t.results) por[r.tipo] = r.n;
+  return jsonCors({ likes: por.like || 0, guardados: por.guardar || 0, compartidos: por.compartir || 0, denuncias: por.denuncia || 0, seguidores: s.results[0].n });
 }
 
 // Seguir / dejar de seguir. La persona se identifica con su sesión de Matrix (igual que los videos).
@@ -592,6 +626,9 @@ export default {
     }
     if ((url.pathname === "/estado/visto" || url.pathname === "/estado/reaccion") && request.method === "POST" || url.pathname === "/estado/info" && request.method === "GET") {
       try { return await estadoSocialApi(request, env, url); } catch (e) { console.error(e); return jsonCors({ error: String(e.message || e) }, 500); }
+    }
+    if (url.pathname === "/video/accion" && request.method === "POST" || url.pathname === "/video/resumen" && request.method === "GET") {
+      try { return await videoSocialApi(request, env, url); } catch (e) { console.error(e); return jsonCors({ error: String(e.message || e) }, 500); }
     }
     if (url.pathname === "/seguir" && (request.method === "GET" || request.method === "POST")) {
       try { return await seguirApi(request, env, url); } catch (e) { console.error(e); return jsonCors({ error: String(e.message || e) }, 500); }
