@@ -278,6 +278,36 @@ async function telegram(req, env) {
   return new Response("ok");
 }
 
+// Contador anónimo de instalaciones: la app manda un código al azar (sin datos personales) la primera vez que se abre.
+async function instalacion(req, env) {
+  let b;
+  try { b = await req.json(); } catch { return json({ error: "datos inválidos" }, 400); }
+  const id = String(b.id || "");
+  if (!/^[A-Za-z0-9-]{16,64}$/.test(id)) return json({ error: "id inválido" }, 400);
+  const ya = await env.CUENTAS.get("inst:" + id);
+  if (ya) return json({ ok: true, nueva: false });
+  const dia = new Date().toISOString().slice(0, 10);
+  await env.CUENTAS.put("inst:" + id, JSON.stringify({ t: Date.now(), v: String(b.version || "").slice(0, 20) }));
+  const suma = async (k) => env.CUENTAS.put(k, String((parseInt((await env.CUENTAS.get(k)) || "0", 10) || 0) + 1));
+  await suma("inst:total");
+  await suma("inst:dia:" + dia);
+  return json({ ok: true, nueva: true });
+}
+
+async function instalaciones(env) {
+  const total = parseInt((await env.CUENTAS.get("inst:total")) || "0", 10) || 0;
+  const dias = {};
+  let ult7 = 0;
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(Date.now() - i * 86400000).toISOString().slice(0, 10);
+    const n = parseInt((await env.CUENTAS.get("inst:dia:" + d)) || "0", 10) || 0;
+    dias[d] = n;
+    ult7 += n;
+  }
+  const hoy = dias[new Date().toISOString().slice(0, 10)] || 0;
+  return json({ total, hoy, ultimos7dias: ult7, porDia: dias });
+}
+
 export default {
   async fetch(req, env) {
     const url = new URL(req.url);
@@ -293,6 +323,8 @@ export default {
     if (req.method === "POST" && ruta === "/contactos/buscar") return buscar(req, env);
     if (req.method === "POST" && ruta === "/chamos/registrar") return registrar(req, env);
     if (req.method === "POST" && ruta === "/chamos/filtrar") return filtrar(req, env);
+    if (req.method === "POST" && ruta === "/chamos/instalacion") return instalacion(req, env);
+    if (req.method === "GET" && ruta === "/chamos/instalaciones") return instalaciones(env);
     if (ruta === "/") return json({ servicio: "Chamos Cuentas", ok: true });
     return json({ error: "no existe" }, 404);
   },

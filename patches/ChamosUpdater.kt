@@ -52,6 +52,7 @@ object ChamosUpdater {
 
     fun checkForUpdate(activity: Activity, force: Boolean = false) {
         actividad = WeakReference(activity)
+        ChamosInstalaciones.avisar(activity)
         val prefs = activity.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         if (instalarDescargaPendiente(activity)) return
         val now = System.currentTimeMillis()
@@ -196,5 +197,31 @@ object ChamosUpdater {
             IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE),
             ContextCompat.RECEIVER_EXPORTED,
         )
+    }
+}
+
+/** Cuenta cuántas personas logran instalar y abrir Chamos: manda una sola vez un código al azar, sin datos personales. */
+object ChamosInstalaciones {
+    private const val URL_SERVICIO = "https://chamos-cuentas.siervodeyhwh57.workers.dev/chamos/instalacion"
+
+    @JvmStatic
+    fun avisar(contexto: Context) {
+        val prefs = contexto.getSharedPreferences("chamos_instalacion", Context.MODE_PRIVATE)
+        if (prefs.getBoolean("enviado", false)) return
+        val id = prefs.getString("id", null) ?: java.util.UUID.randomUUID().toString().also { prefs.edit().putString("id", it).apply() }
+        val version = runCatching { contexto.packageManager.getPackageInfo(contexto.packageName, 0).versionName }.getOrNull() ?: ""
+        thread {
+            runCatching {
+                val conn = URL(URL_SERVICIO).openConnection() as HttpURLConnection
+                conn.requestMethod = "POST"
+                conn.connectTimeout = 10000
+                conn.readTimeout = 10000
+                conn.doOutput = true
+                conn.setRequestProperty("Content-Type", "application/json")
+                conn.outputStream.use { it.write(JSONObject().put("id", id).put("version", version).toString().toByteArray()) }
+                if (conn.responseCode in 200..299) prefs.edit().putBoolean("enviado", true).apply()
+                conn.disconnect()
+            }
+        }
     }
 }
