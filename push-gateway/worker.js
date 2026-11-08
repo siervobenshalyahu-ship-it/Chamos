@@ -599,15 +599,16 @@ async function sigv4(method, host, path, query, headers, payloadHash, amzdate, r
   const firma = _hex(await _hmac(k, porFirmar));
   return "AWS4-HMAC-SHA256 Credential=" + id + "/" + alcance + ", SignedHeaders=" + nombres.join(";") + ", Signature=" + firma;
 }
-function b2Activo(env) { return env.USAR_B2 === "1" && env.B2_KEY_ID && env.B2_KEY && env.B2_BUCKET; }
+const _t = (v) => String(v || "").trim();
+function b2Activo(env) { return _t(env.USAR_B2) === "1" && _t(env.B2_KEY_ID) && _t(env.B2_KEY) && _t(env.B2_BUCKET); }
 async function b2Fetch(env, method, clave, cuerpo) {
-  const region = env.B2_REGION || "us-east-005";
+  const region = _t(env.B2_REGION) || "us-east-005";
   const host = "s3." + region + ".backblazeb2.com";
-  const path = "/" + env.B2_BUCKET + "/" + clave.split("/").map(encodeURIComponent).join("/");
+  const path = "/" + _t(env.B2_BUCKET) + "/" + clave.split("/").map(encodeURIComponent).join("/");
   const amz = new Date().toISOString().replace(/[:-]|\.\d{3}/g, "");
   const hash = cuerpo ? await _sha(cuerpo) : await _sha("");
   const h = { host, "x-amz-content-sha256": hash, "x-amz-date": amz };
-  const auth = await sigv4(method, host, path, "", h, hash, amz, region, env.B2_KEY_ID, env.B2_KEY);
+  const auth = await sigv4(method, host, path, "", h, hash, amz, region, _t(env.B2_KEY_ID), _t(env.B2_KEY));
   return fetch("https://" + host + path, { method, headers: { "x-amz-content-sha256": hash, "x-amz-date": amz, authorization: auth }, body: cuerpo || undefined });
 }
 // ---- Videos de Reels en Workers KV (plan gratis, sin tarjeta): la app los sube en pedazos de 20 MiB ----
@@ -770,7 +771,7 @@ export default {
       } catch {
         configured = false;
       }
-      return json({ servicio: "Chamos push gateway", ok: true, firebase_configurado: configured, estadisticas_configuradas: !!(env.DB && env.ADMIN_KEY), chamos_ia_configurada: !!(env.AI && env.DB), b2: { USAR_B2: env.USAR_B2 === "1" ? "1" : (env.USAR_B2 ? "valor raro: " + JSON.stringify(env.USAR_B2) : "falta"), B2_KEY_ID: !!env.B2_KEY_ID, B2_KEY: !!env.B2_KEY, B2_BUCKET: !!env.B2_BUCKET, B2_REGION: env.B2_REGION || "(usa us-east-005)", activo: !!b2Activo(env) } });
+      return json({ servicio: "Chamos push gateway", ok: true, firebase_configurado: configured, estadisticas_configuradas: !!(env.DB && env.ADMIN_KEY), chamos_ia_configurada: !!(env.AI && env.DB), b2: { USAR_B2: _t(env.USAR_B2) === "1" ? "1" : (env.USAR_B2 ? "valor raro: " + JSON.stringify(env.USAR_B2) : "falta"), B2_KEY_ID: !!env.B2_KEY_ID, B2_KEY: !!env.B2_KEY, B2_BUCKET: !!env.B2_BUCKET, B2_REGION: env.B2_REGION || "(usa us-east-005)", activo: !!b2Activo(env) } });
     }
     return json({ error: "No encontrado" }, 404);
   },
