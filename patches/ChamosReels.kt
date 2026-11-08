@@ -177,7 +177,10 @@ internal suspend fun bajarVideoChamos(url: String, destino: java.io.File): Boole
         con.readTimeout = 60000
         if (con.responseCode !in 200..299) return@withContext false
         con.inputStream.use { e -> tmp.outputStream().use { o -> e.copyTo(o, 64 * 1024) } }
-        tmp.renameTo(destino)
+        val listo = tmp.renameTo(destino)
+        // Se recuerda por enlace: si el reel cambia de identificador (al confirmarse el envío), no se vuelve a bajar.
+        if (listo) archivosSubidos[url] = destino.absolutePath
+        listo
     } catch (e: Exception) {
         false
     }
