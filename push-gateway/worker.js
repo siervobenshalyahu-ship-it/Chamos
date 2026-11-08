@@ -691,10 +691,10 @@ export default {
     const url = new URL(request.url);
     if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS });
     if (url.pathname === "/b2/prueba" && request.method === "GET") {
-      if (!env.ADMIN_KEY || url.searchParams.get("k") !== env.ADMIN_KEY) return jsonCors({ error: "Falta ?k=TU_CLAVE_DEL_PANEL" }, 401);
+      // TEMPORAL: prueba abierta (clave fija, no guarda nada nuevo). Quitar cuando B2 funcione.
       if (!b2Activo(env)) return jsonCors({ error: "B2 no esta activo: mira los datos en la pagina principal del worker" }, 400);
       try {
-        const clave = "prueba/" + Date.now();
+        const clave = "prueba/prueba.txt";
         const put = await b2Fetch(env, "PUT", clave, "hola chamos");
         const putTxt = put.ok ? "" : (await put.text()).slice(0, 300);
         const get = put.ok ? await b2Fetch(env, "GET", clave) : null;
