@@ -112,4 +112,41 @@ parchear(pres, [
         }
     }'''),
 ], AVISO)
+
+# 3) Al tocar el botón de parar mientras se graba, el audio se envía directo (sin pasar por la vista previa).
+parchear(pres, [
+    ('''                VoiceMessageRecorderEvent.Stop -> {
+                    Timber.v("Voice message stop button pressed")
+                    localCoroutineScope.finishRecording()
+                }''', '''                VoiceMessageRecorderEvent.Stop -> {
+                    Timber.v("Voice message stop button pressed: se envía directo")
+                    val chamosRespuesta = (messageComposerContext.composerMode as? MessageComposerMode.Reply)?.eventId
+                    localCoroutineScope.launch {
+                        voiceRecorder.stopRecord()
+                        audioFocus.releaseAudioFocus()
+                        val terminado = kotlinx.coroutines.withTimeoutOrNull(4000) {
+                            voiceRecorder.state.first { it !is VoiceRecorderState.Recording }
+                        } as? VoiceRecorderState.Finished
+                        if (terminado != null && !isSending) {
+                            isSending = true
+                            player.pause()
+                            analyticsService.captureComposerEvent()
+                            sessionCoroutineScope.launch {
+                                val resultado = sendMessage(
+                                    file = terminado.file,
+                                    mimeType = terminado.mimeType,
+                                    waveform = terminado.waveform,
+                                    inReplyToEventId = chamosRespuesta,
+                                )
+                                if (resultado.isFailure) {
+                                    showSendFailureDialog = true
+                                }
+                            }.invokeOnCompletion {
+                                isSending = false
+                            }
+                        }
+                    }
+                }'''),
+    ("import kotlinx.coroutines.launch\n", "import kotlinx.coroutines.flow.first\nimport kotlinx.coroutines.launch\n"),
+])
 print("voz OK")
