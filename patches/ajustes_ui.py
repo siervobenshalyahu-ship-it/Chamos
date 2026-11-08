@@ -27,7 +27,7 @@ edit(vista, [
 hv = os.path.join(root, "features/home/impl/src/main/kotlin/io/element/android/features/home/impl/HomeView.kt")
 s = open(hv, encoding="utf-8").read()
 a = s.index("                floatingActionButton = {\n                    when (state.currentHomeNavigationBarItem) {")
-b = s.index("                totalUnreadCount = state.totalUnreadCount,", a)
+b = s.index("                totalUnreadCount = state.totalUnreadCount", a)
 s = s[:a] + "                floatingActionButton = null,\n" + s[b:]
 open(hv, "w", encoding="utf-8").write(s)
 edit(hv, [
