@@ -93,6 +93,9 @@ private const val REELS_MAX_MS = 90_000L
 internal const val MARCA_VIDEO_EXT = "\u2065"
 private const val URL_VIDEOS = "https://chamos-push.siervodeyhwh57.workers.dev/v"
 
+/** Videos que este teléfono acaba de subir: enlace -> archivo local, para no volver a descargarlos. */
+internal val archivosSubidos = java.util.concurrent.ConcurrentHashMap<String, String>()
+
 /** Sube el video al servidor de Chamos (Cloudflare KV) en pedazos de 16 MiB. Devuelve el enlace o null si falla. */
 internal suspend fun subirVideoChamos(archivo: java.io.File, horas: Int = 12): String? = withContext(Dispatchers.IO) {
     try {
@@ -523,6 +526,16 @@ fun rememberChamosReels(
             val info = runCatching { sender.preProcessMedia(origen, mime, config).getOrNull() }.getOrNull()
             val aSubir = info?.file ?: copia
             val enlace = if (aSubir != null && aSubir.length() <= REELS_LIMITE_MB * 1024 * 1024) subirVideoChamos(aSubir) else null
+            if (enlace != null && aSubir != null) {
+                runCatching {
+                    withContext(Dispatchers.IO) {
+                        carpeta.mkdirs()
+                        val dest = java.io.File(carpeta, "subido_" + Math.abs(enlace.hashCode()) + ".mp4")
+                        aSubir.copyTo(dest, overwrite = true)
+                        archivosSubidos[enlace] = dest.absolutePath
+                    }
+                }
+            }
             if (enlace != null) {
                 error = runCatching {
                     sala.liveTimeline.sendMessage(MARCA_VIDEO_EXT + enlace + "\n" + desc, null, emptyList()).exceptionOrNull()?.let { "No se pudo publicar el video" }
@@ -586,6 +599,12 @@ fun rememberChamosReels(
             return@cargar local.absolutePath
         }
         if (r.urlExterna != null) {
+            archivosSubidos[r.urlExterna]?.let { ruta ->
+                if (java.io.File(ruta).exists()) {
+                    cacheArchivos[r.id] = ruta
+                    return@cargar ruta
+                }
+            }
             if (!bajarVideoChamos(r.urlExterna, local)) return@cargar null
             cacheArchivos[r.id] = local.absolutePath
             return@cargar local.absolutePath
