@@ -577,6 +577,39 @@ function esc(s){return String(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt
 if(sessionStorage.getItem('k'))go();
 </script></body></html>`;
 
+
+// ---- Backblaze B2 (opcional, 10 GB gratis): se activa con USAR_B2=1 y los secretos B2_KEY_ID, B2_KEY, B2_BUCKET ----
+// Firma AWS SigV4 (B2 habla el protocolo S3). Sin USAR_B2 todo sigue en KV.
+const _enc = new TextEncoder();
+const _hex = (b) => [...new Uint8Array(b)].map((x) => x.toString(16).padStart(2, "0")).join("");
+async function _sha(d) { return _hex(await crypto.subtle.digest("SHA-256", typeof d === "string" ? _enc.encode(d) : d)); }
+async function _hmac(k, d) {
+  const key = await crypto.subtle.importKey("raw", typeof k === "string" ? _enc.encode(k) : k, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  return crypto.subtle.sign("HMAC", key, _enc.encode(d));
+}
+async function sigv4(method, host, path, query, headers, payloadHash, amzdate, region, id, secret) {
+  const dia = amzdate.slice(0, 8);
+  const nombres = Object.keys(headers).map((h) => h.toLowerCase()).sort();
+  const hl = {}; for (const k of Object.keys(headers)) hl[k.toLowerCase()] = String(headers[k]).trim();
+  const canon = [method, path, query, nombres.map((n) => n + ":" + hl[n] + "\n").join(""), nombres.join(";"), payloadHash].join("\n");
+  const alcance = dia + "/" + region + "/s3/aws4_request";
+  const porFirmar = ["AWS4-HMAC-SHA256", amzdate, alcance, await _sha(canon)].join("\n");
+  let k = await _hmac("AWS4" + secret, dia);
+  k = await _hmac(k, region); k = await _hmac(k, "s3"); k = await _hmac(k, "aws4_request");
+  const firma = _hex(await _hmac(k, porFirmar));
+  return "AWS4-HMAC-SHA256 Credential=" + id + "/" + alcance + ", SignedHeaders=" + nombres.join(";") + ", Signature=" + firma;
+}
+function b2Activo(env) { return env.USAR_B2 === "1" && env.B2_KEY_ID && env.B2_KEY && env.B2_BUCKET; }
+async function b2Fetch(env, method, clave, cuerpo) {
+  const region = env.B2_REGION || "us-east-005";
+  const host = "s3." + region + ".backblazeb2.com";
+  const path = "/" + env.B2_BUCKET + "/" + clave.split("/").map(encodeURIComponent).join("/");
+  const amz = new Date().toISOString().replace(/[:-]|\.\d{3}/g, "");
+  const hash = cuerpo ? await _sha(cuerpo) : await _sha("");
+  const h = { host, "x-amz-content-sha256": hash, "x-amz-date": amz };
+  const auth = await sigv4(method, host, path, "", h, hash, amz, region, env.B2_KEY_ID, env.B2_KEY);
+  return fetch("https://" + host + path, { method, headers: { "x-amz-content-sha256": hash, "x-amz-date": amz, authorization: auth }, body: cuerpo || undefined });
+}
 // ---- Videos de Reels en Workers KV (plan gratis, sin tarjeta): la app los sube en pedazos de 20 MiB ----
 const VIDEO_HORAS = 12;
 async function videoAuth(request) {
@@ -586,7 +619,7 @@ async function videoAuth(request) {
   return (await w.json()).user_id || "";
 }
 async function videoSubir(request, env, url) {
-  if (!env.VIDEOS) return jsonCors({ error: "KV no esta conectado (falta el enlace VIDEOS)" }, 503);
+  if (!env.VIDEOS && !b2Activo(env)) return jsonCors({ error: "KV no esta conectado (falta el enlace VIDEOS)" }, 503);
   const m = /^\/v\/([a-f0-9]{32})\/(\d+|fin)$/.exec(url.pathname);
   if (!m) return jsonCors({ error: "Ruta no valida" }, 404);
   const quien = await videoAuth(request);
@@ -596,21 +629,32 @@ async function videoSubir(request, env, url) {
   if (m[2] === "fin") {
     const n = parseInt(url.searchParams.get("n") || "0", 10);
     if (!n || n > 6) return jsonCors({ error: "Cantidad de pedazos no valida" }, 400);
-    await env.VIDEOS.put("m:" + id, JSON.stringify({ n, u: quien }), ttl);
+    if (b2Activo(env)) {
+      const r = await b2Fetch(env, "PUT", "v/" + id + "/m", JSON.stringify({ n, u: quien, e: Date.now() + horas * 3600000 }));
+      if (!r.ok) return jsonCors({ error: "B2 manifiesto " + r.status }, 502);
+    } else await env.VIDEOS.put("m:" + id, JSON.stringify({ n, u: quien }), ttl);
     return jsonCors({ id, url: url.origin + "/v/" + id + ".mp4" });
   }
   const i = parseInt(m[2], 10);
   if (i > 5) return jsonCors({ error: "Pedazo fuera de rango" }, 400);
   const buf = await request.arrayBuffer();
   if (!buf.byteLength || buf.byteLength > 25 * 1024 * 1024 - 1024) return jsonCors({ error: "Tamaño de pedazo no valido" }, 413);
-  await env.VIDEOS.put("c:" + id + ":" + i, buf, ttl);
+  if (b2Activo(env)) {
+    const r = await b2Fetch(env, "PUT", "v/" + id + "/" + i, buf);
+    if (!r.ok) return jsonCors({ error: "B2 pedazo " + r.status }, 502);
+  } else await env.VIDEOS.put("c:" + id + ":" + i, buf, ttl);
   return jsonCors({ ok: true, i });
 }
 async function videoVer(request, env, url) {
-  if (!env.VIDEOS) return jsonCors({ error: "KV no conectado" }, 503);
+  if (!env.VIDEOS && !b2Activo(env)) return jsonCors({ error: "KV no conectado" }, 503);
   const m = /^\/v\/([a-f0-9]{32})\.mp4$/.exec(url.pathname);
   if (!m) return jsonCors({ error: "No encontrado" }, 404);
-  const man = await env.VIDEOS.get("m:" + m[1], "json");
+  let man = null, enB2 = false;
+  if (b2Activo(env)) {
+    const r = await b2Fetch(env, "GET", "v/" + m[1] + "/m");
+    if (r.ok) { man = await r.json(); enB2 = true; if (man.e && man.e < Date.now()) man = null; }
+  }
+  if (!man && !enB2 && env.VIDEOS) man = await env.VIDEOS.get("m:" + m[1], "json");
   if (!man) return jsonCors({ error: "El video ya no esta disponible" }, 404);
   const h = new Headers(CORS);
   h.set("content-type", "video/mp4");
@@ -623,7 +667,9 @@ async function videoVer(request, env, url) {
         for (;;) {
           if (!actual) {
             if (i >= man.n) { ctl.close(); return; }
-            const s = await env.VIDEOS.get("c:" + m[1] + ":" + i, "stream");
+            let s;
+            if (enB2) { const r = await b2Fetch(env, "GET", "v/" + m[1] + "/" + i); s = r.ok ? r.body : null; }
+            else s = await env.VIDEOS.get("c:" + m[1] + ":" + i, "stream");
             i++;
             if (!s) { ctl.error(new Error("falta un pedazo")); return; }
             actual = s.getReader();
