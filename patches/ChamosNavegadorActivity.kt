@@ -1,0 +1,352 @@
+package io.element.android.x
+
+import android.app.Activity
+import android.content.ActivityNotFoundException
+import android.content.Intent
+import android.content.res.ColorStateList
+import android.graphics.Color
+import android.graphics.Bitmap
+import android.graphics.drawable.GradientDrawable
+import android.net.Uri
+import android.os.Build
+import android.os.Bundle
+import android.text.InputType
+import android.view.Gravity
+import android.view.KeyEvent
+import android.view.View
+import android.view.ViewGroup
+import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.InputMethodManager
+import android.webkit.WebChromeClient
+import android.webkit.WebResourceRequest
+import android.webkit.WebView
+import android.webkit.WebViewClient
+import android.widget.EditText
+import android.widget.LinearLayout
+import android.widget.ProgressBar
+import android.widget.TextView
+import android.widget.Toast
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
+
+/**
+ * Navegador interno de Chamos: sirve para abrir lo que te nombran en un chat sin salir de la app.
+ * Pantalla propia (no usa Compose) para que sea liviana y no dependa de otras partes de la app.
+ * Se abre con: Intent().setClassName(paquete, "io.element.android.x.ChamosNavegadorActivity").putExtra("url", enlace)
+ */
+class ChamosNavegadorActivity : Activity() {
+    private lateinit var web: WebView
+    private lateinit var barra: ProgressBar
+    private lateinit var direccion: EditText
+    private lateinit var atras: TextView
+    private lateinit var adelante: TextView
+    private var vistaCompleta: View? = null
+    private var avisoCompleta: WebChromeClient.CustomViewCallback? = null
+
+    private val fondo = Color.parseColor("#0F1530")
+    private val panel = Color.parseColor("#1B2347")
+    private val neon = Color.parseColor("#22D3EE")
+    private val inicio = "https://chamos.local/"
+
+    private fun dp(v: Int): Int = (v * resources.displayMetrics.density).toInt()
+
+    private fun boton(texto: String, accion: () -> Unit): TextView = TextView(this).apply {
+        text = texto
+        textSize = 20f
+        gravity = Gravity.CENTER
+        setTextColor(Color.WHITE)
+        setPadding(dp(10), dp(8), dp(10), dp(8))
+        setOnClickListener { accion() }
+    }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+
+        val contenido = LinearLayout(this)
+        contenido.orientation = LinearLayout.VERTICAL
+        contenido.setBackgroundColor(fondo)
+        ViewCompat.setOnApplyWindowInsetsListener(contenido) { v, ins ->
+            val i = ins.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.ime())
+            v.setPadding(i.left, i.top, i.right, i.bottom)
+            WindowInsetsCompat.CONSUMED
+        }
+
+        // ---- barra de arriba: cerrar + dirección ----
+        val cabecera = LinearLayout(this)
+        cabecera.orientation = LinearLayout.HORIZONTAL
+        cabecera.gravity = Gravity.CENTER_VERTICAL
+        cabecera.setPadding(dp(6), dp(8), dp(10), dp(6))
+        cabecera.addView(boton("✕") { finish() })
+
+        direccion = EditText(this)
+        direccion.hint = "Busca o escribe una dirección"
+        direccion.setHintTextColor(Color.parseColor("#8A93B8"))
+        direccion.setTextColor(Color.WHITE)
+        direccion.textSize = 15f
+        direccion.isSingleLine = true
+        direccion.setSelectAllOnFocus(true)
+        direccion.imeOptions = EditorInfo.IME_ACTION_GO
+        direccion.inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI
+        direccion.setPadding(dp(16), dp(9), dp(16), dp(9))
+        val pildora = GradientDrawable()
+        pildora.setColor(panel)
+        pildora.cornerRadius = dp(24).toFloat()
+        pildora.setStroke(dp(2), neon)
+        direccion.background = pildora
+        direccion.setOnEditorActionListener { _, accion, evento ->
+            if (accion == EditorInfo.IME_ACTION_GO || (evento != null && evento.keyCode == KeyEvent.KEYCODE_ENTER && evento.action == KeyEvent.ACTION_DOWN)) {
+                ir(direccion.text.toString())
+                true
+            } else {
+                false
+            }
+        }
+        cabecera.addView(direccion, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        contenido.addView(cabecera, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+
+        // ---- progreso ----
+        barra = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal)
+        barra.max = 100
+        barra.progressTintList = ColorStateList.valueOf(neon)
+        barra.visibility = View.INVISIBLE
+        contenido.addView(barra, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(3)))
+
+        // ---- la página ----
+        web = WebView(this)
+        configurarWeb()
+        contenido.addView(web, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
+
+        // ---- barra de abajo ----
+        val pie = LinearLayout(this)
+        pie.orientation = LinearLayout.HORIZONTAL
+        pie.setBackgroundColor(panel)
+        atras = boton("⬅️") { if (web.canGoBack()) web.goBack() }
+        adelante = boton("➡️") { if (web.canGoForward()) web.goForward() }
+        val recargar = boton("🔄") { web.reload() }
+        val casa = boton("🏠") { cargarInicio() }
+        val compartir = boton("📤") { compartirEnlace() }
+        val fuera = boton("🌐") { abrirFuera() }
+        for (b in listOf(atras, adelante, recargar, casa, compartir, fuera)) {
+            pie.addView(b, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        }
+        contenido.addView(pie, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+
+        setContentView(contenido)
+
+        val enlace = intent?.getStringExtra("url")
+        if (enlace != null && (enlace.startsWith("http://") || enlace.startsWith("https://"))) {
+            direccion.setText(enlace)
+            web.loadUrl(enlace)
+        } else {
+            cargarInicio()
+        }
+        actualizarBotones()
+    }
+
+    @Suppress("SetJavaScriptEnabled")
+    private fun configurarWeb() {
+        val s = web.settings
+        s.javaScriptEnabled = true
+        s.domStorageEnabled = true
+        s.allowFileAccess = false
+        s.allowContentAccess = false
+        s.javaScriptCanOpenWindowsAutomatically = false
+        s.setSupportMultipleWindows(false)
+        s.setSupportZoom(true)
+        s.builtInZoomControls = true
+        s.displayZoomControls = false
+        s.useWideViewPort = true
+        s.loadWithOverviewMode = true
+        // Muchos sitios (y el inicio de sesión de Google) se portan mal si ven "; wv" en el identificador.
+        s.userAgentString = s.userAgentString.replace("; wv", "")
+        if (Build.VERSION.SDK_INT >= 26) s.safeBrowsingEnabled = true
+
+        web.setBackgroundColor(fondo)
+        web.setDownloadListener { url, _, _, _, _ -> if (url != null) externo(Uri.parse(url)) }
+
+        web.webViewClient = object : WebViewClient() {
+            override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
+                val u = request?.url ?: return true
+                return when (u.scheme?.lowercase()) {
+                    "http", "https", "about" -> false
+                    "tel", "mailto", "sms", "smsto", "whatsapp", "tg", "market", "geo" -> {
+                        if (request.hasGesture()) externo(u)
+                        true
+                    }
+                    else -> true // file:, content:, javascript:, intent:, data:… no se abren
+                }
+            }
+
+            override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
+                val u = url ?: return
+                if (!direccion.hasFocus()) direccion.setText(if (u.startsWith(inicio)) "" else u)
+            }
+
+            override fun onPageFinished(view: WebView?, url: String?) {
+                actualizarBotones()
+            }
+
+            override fun doUpdateVisitedHistory(view: WebView?, url: String?, isReload: Boolean) {
+                actualizarBotones()
+            }
+        }
+
+        web.webChromeClient = object : WebChromeClient() {
+            override fun onProgressChanged(view: WebView?, newProgress: Int) {
+                barra.progress = newProgress
+                barra.visibility = if (newProgress in 1..99) View.VISIBLE else View.INVISIBLE
+            }
+
+            override fun onShowCustomView(view: View?, callback: CustomViewCallback?) {
+                if (view == null || vistaCompleta != null) {
+                    callback?.onCustomViewHidden()
+                    return
+                }
+                vistaCompleta = view
+                avisoCompleta = callback
+                (window.decorView as ViewGroup).addView(
+                    view,
+                    ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT),
+                )
+            }
+
+            override fun onHideCustomView() {
+                quitarPantallaCompleta()
+            }
+        }
+    }
+
+    private fun quitarPantallaCompleta() {
+        val v = vistaCompleta ?: return
+        (window.decorView as ViewGroup).removeView(v)
+        vistaCompleta = null
+        avisoCompleta?.onCustomViewHidden()
+        avisoCompleta = null
+    }
+
+    private fun actualizarBotones() {
+        atras.alpha = if (web.canGoBack()) 1f else 0.35f
+        adelante.alpha = if (web.canGoForward()) 1f else 0.35f
+    }
+
+    /** Lo que escribes: una dirección (se abre) o palabras (se buscan en Google). */
+    private fun ir(texto: String) {
+        val t = texto.trim()
+        if (t.isEmpty()) return
+        val destino = when {
+            t.startsWith("http://") || t.startsWith("https://") -> t
+            !t.contains(' ') && t.contains('.') -> "https://$t"
+            else -> "https://www.google.com/search?q=" + Uri.encode(t)
+        }
+        val imm = getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager
+        imm.hideSoftInputFromWindow(direccion.windowToken, 0)
+        direccion.clearFocus()
+        web.loadUrl(destino)
+    }
+
+    private fun urlActual(): String? {
+        val u = web.url ?: return null
+        return if (u.startsWith("http://") || u.startsWith("https://")) {
+            if (u.startsWith(inicio)) null else u
+        } else {
+            null
+        }
+    }
+
+    private fun compartirEnlace() {
+        val u = urlActual()
+        if (u == null) {
+            Toast.makeText(this, "Abre una página primero", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val envio = Intent(Intent.ACTION_SEND)
+        envio.type = "text/plain"
+        envio.putExtra(Intent.EXTRA_TEXT, u)
+        startActivity(Intent.createChooser(envio, "Compartir enlace"))
+    }
+
+    private fun abrirFuera() {
+        val u = urlActual()
+        if (u == null) {
+            Toast.makeText(this, "Abre una página primero", Toast.LENGTH_SHORT).show()
+            return
+        }
+        externo(Uri.parse(u))
+    }
+
+    private fun externo(uri: Uri) {
+        try {
+            startActivity(Intent(Intent.ACTION_VIEW, uri))
+        } catch (e: ActivityNotFoundException) {
+            Toast.makeText(this, "No hay una app para abrir esto", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun cargarInicio() {
+        direccion.setText("")
+        web.loadDataWithBaseURL(inicio, PAGINA_INICIO, "text/html", "utf-8", null)
+    }
+
+    @Deprecated("Deprecated in Java")
+    override fun onBackPressed() {
+        when {
+            vistaCompleta != null -> quitarPantallaCompleta()
+            web.canGoBack() -> web.goBack()
+            else -> finish()
+        }
+    }
+
+    override fun onPause() {
+        web.onPause()
+        super.onPause()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        web.onResume()
+    }
+
+    override fun onDestroy() {
+        quitarPantallaCompleta()
+        (web.parent as? ViewGroup)?.removeView(web)
+        web.destroy()
+        super.onDestroy()
+    }
+
+    private companion object {
+        const val PAGINA_INICIO = """<!doctype html><html lang="es"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+*{box-sizing:border-box}
+body{margin:0;padding:28px 18px;background:#0F1530;color:#fff;font-family:sans-serif;text-align:center}
+h1{margin:6px 0 2px;font-size:30px;color:#22D3EE;text-shadow:0 0 12px #22D3EE,0 0 26px #1E90FF}
+p{margin:0 0 22px;color:#9AA3C7;font-size:14px}
+form{margin:0 auto 26px;max-width:480px;display:flex;gap:8px}
+input{flex:1;min-width:0;padding:13px 16px;border-radius:26px;border:2px solid #22D3EE;background:#1B2347;color:#fff;font-size:16px;outline:none}
+button{padding:0 18px;border-radius:26px;border:0;background:#22D3EE;color:#0F1530;font-weight:bold;font-size:16px}
+.g{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;max-width:480px;margin:0 auto}
+a{display:block;padding:16px 4px;border-radius:16px;background:#1B2347;border:1px solid #2B3566;color:#fff;text-decoration:none;font-size:13px}
+a b{display:block;font-size:26px;margin-bottom:6px}
+small{display:block;margin-top:26px;color:#6C76A0;font-size:12px}
+</style></head><body>
+<h1>Chamos 🌐</h1>
+<p>Busca lo que te nombraron sin salir del chat</p>
+<form action="https://www.google.com/search" method="get">
+<input name="q" type="search" placeholder="Busca en Google" autocomplete="off">
+<button type="submit">Ir</button>
+</form>
+<div class="g">
+<a href="https://www.google.com"><b>🔎</b>Google</a>
+<a href="https://m.youtube.com"><b>▶️</b>YouTube</a>
+<a href="https://es.m.wikipedia.org"><b>📚</b>Wikipedia</a>
+<a href="https://maps.google.com"><b>🗺️</b>Mapas</a>
+<a href="https://translate.google.com"><b>🌍</b>Traductor</a>
+<a href="https://news.google.com/?hl=es-419&amp;gl=VE&amp;ceid=VE:es-419"><b>📰</b>Noticias</a>
+<a href="https://www.bcv.org.ve"><b>💵</b>Dólar BCV</a>
+<a href="https://www.google.com/search?q=clima"><b>⛅</b>Clima</a>
+<a href="https://siervobenshalyahu-ship-it.github.io/Chamos-apk-web/"><b>🇻🇪</b>Chamos</a>
+</div>
+<small>Navegador de Chamos · no guardamos tu historial</small>
+</body></html>"""
+    }
+}
