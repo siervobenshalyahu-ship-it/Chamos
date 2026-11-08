@@ -241,6 +241,8 @@ jobs:
 
       - name: Navegador interno de Chamos
         run: python3 chamos-repo/patches/navegador.py chamos
+      - name: Iconos y engranaje arriba
+        run: python3 chamos-repo/patches/iconos_ui.py chamos chamos-repo/patches
 
       - name: Notificaciones push (Firebase) si ya están configuradas
         run: |
