@@ -141,7 +141,19 @@ internal suspend fun subirVideoChamos(archivo: java.io.File, horas: Int = 12): S
         fin.readTimeout = 30000
         if (fin.responseCode !in 200..299) return@withContext null
         val j = org.json.JSONObject(fin.inputStream.bufferedReader().use { it.readText() })
-        j.optString("url").ifEmpty { null }
+        val enlace = j.optString("url").ifEmpty { null }
+        if (enlace != null) {
+            // Copia local del video recién subido: así quien lo sube no tiene que volver a descargarlo.
+            runCatching {
+                val dir = java.io.File(System.getProperty("java.io.tmpdir") ?: ".", "subidos")
+                dir.mkdirs()
+                dir.listFiles()?.forEach { f -> if (System.currentTimeMillis() - f.lastModified() > 86_400_000L) f.delete() }
+                val copia = java.io.File(dir, "s_" + Math.abs(enlace.hashCode()) + ".mp4")
+                archivo.copyTo(copia, overwrite = true)
+                archivosSubidos[enlace] = copia.absolutePath
+            }
+        }
+        enlace
     } catch (e: Exception) {
         android.util.Log.w("Chamos", "reels: subida de video fallo", e)
         null
@@ -150,6 +162,14 @@ internal suspend fun subirVideoChamos(archivo: java.io.File, horas: Int = 12): S
 
 internal suspend fun bajarVideoChamos(url: String, destino: java.io.File): Boolean = withContext(Dispatchers.IO) {
     try {
+        archivosSubidos[url]?.let { ruta ->
+            val origen = java.io.File(ruta)
+            if (origen.exists() && origen.length() > 0) {
+                destino.parentFile?.mkdirs()
+                origen.copyTo(destino, overwrite = true)
+                return@withContext true
+            }
+        }
         destino.parentFile?.mkdirs()
         val tmp = java.io.File(destino.path + ".part")
         val con = java.net.URL(url).openConnection() as java.net.HttpURLConnection
@@ -526,16 +546,6 @@ fun rememberChamosReels(
             val info = runCatching { sender.preProcessMedia(origen, mime, config).getOrNull() }.getOrNull()
             val aSubir = info?.file ?: copia
             val enlace = if (aSubir != null && aSubir.length() <= REELS_LIMITE_MB * 1024 * 1024) subirVideoChamos(aSubir) else null
-            if (enlace != null && aSubir != null) {
-                runCatching {
-                    withContext(Dispatchers.IO) {
-                        carpeta.mkdirs()
-                        val dest = java.io.File(carpeta, "subido_" + Math.abs(enlace.hashCode()) + ".mp4")
-                        aSubir.copyTo(dest, overwrite = true)
-                        archivosSubidos[enlace] = dest.absolutePath
-                    }
-                }
-            }
             if (enlace != null) {
                 error = runCatching {
                     sala.liveTimeline.sendMessage(MARCA_VIDEO_EXT + enlace + "\n" + desc, null, emptyList()).exceptionOrNull()?.let { "No se pudo publicar el video" }
@@ -599,12 +609,6 @@ fun rememberChamosReels(
             return@cargar local.absolutePath
         }
         if (r.urlExterna != null) {
-            archivosSubidos[r.urlExterna]?.let { ruta ->
-                if (java.io.File(ruta).exists()) {
-                    cacheArchivos[r.id] = ruta
-                    return@cargar ruta
-                }
-            }
             if (!bajarVideoChamos(r.urlExterna, local)) return@cargar null
             cacheArchivos[r.id] = local.absolutePath
             return@cargar local.absolutePath
