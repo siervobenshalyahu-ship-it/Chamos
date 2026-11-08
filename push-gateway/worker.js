@@ -690,18 +690,6 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS });
-    if (url.pathname === "/b2/prueba" && request.method === "GET") {
-      // TEMPORAL: prueba abierta (clave fija, no guarda nada nuevo). Quitar cuando B2 funcione.
-      if (!b2Activo(env)) return jsonCors({ error: "B2 no esta activo: mira los datos en la pagina principal del worker" }, 400);
-      try {
-        const clave = "prueba/prueba.txt";
-        const put = await b2Fetch(env, "PUT", clave, "hola chamos");
-        const putTxt = put.ok ? "" : (await put.text()).slice(0, 300);
-        const get = put.ok ? await b2Fetch(env, "GET", clave) : null;
-        const txt = get ? await get.text() : "";
-        return jsonCors({ subir: put.status, subir_error: putTxt, leer: get ? get.status : null, contenido: txt.slice(0, 40), ok: put.ok && txt === "hola chamos" });
-      } catch (e) { return jsonCors({ error: String(e.message || e) }, 500); }
-    }
     if (url.pathname.startsWith("/v/") && request.method === "POST") {
       try { return await videoSubir(request, env, url); } catch (e) { console.error(e); return jsonCors({ error: String(e.message || e) }, 500); }
     }
