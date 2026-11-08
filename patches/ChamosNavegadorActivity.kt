@@ -167,6 +167,10 @@ class ChamosNavegadorActivity : Activity() {
         web.webViewClient = object : WebViewClient() {
             override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
                 val u = request?.url ?: return true
+                if (u.host == "chamos.local") {
+                    if (u.path == "/bancos") cargarBancos() else cargarInicio()
+                    return true
+                }
                 return when (u.scheme?.lowercase()) {
                     "http", "https", "about" -> false
                     "tel", "mailto", "sms", "smsto", "whatsapp", "tg", "market", "geo" -> {
@@ -287,6 +291,11 @@ class ChamosNavegadorActivity : Activity() {
         web.loadDataWithBaseURL(inicio, PAGINA_INICIO, "text/html", "utf-8", null)
     }
 
+    private fun cargarBancos() {
+        direccion.setText("")
+        web.loadDataWithBaseURL(inicio + "bancos", PAGINA_BANCOS, "text/html", "utf-8", null)
+    }
+
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
         when {
@@ -314,20 +323,29 @@ class ChamosNavegadorActivity : Activity() {
     }
 
     private companion object {
-        const val PAGINA_INICIO = """<!doctype html><html lang="es"><head><meta charset="utf-8">
+        // Los logos son los de cada sitio (se piden en línea); si alguno no carga, se ve el emoji.
+        const val ESTILO = """<meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <style>
 *{box-sizing:border-box}
-body{margin:0;padding:28px 18px;background:#0F1530;color:#fff;font-family:sans-serif;text-align:center}
-h1{margin:6px 0 2px;font-size:30px;color:#22D3EE;text-shadow:0 0 12px #22D3EE,0 0 26px #1E90FF}
-p{margin:0 0 22px;color:#9AA3C7;font-size:14px}
-form{margin:0 auto 26px;max-width:480px;display:flex;gap:8px}
+body{margin:0;padding:26px 16px 30px;background:radial-gradient(circle at 50% -10%,#1d2a66 0,#0F1530 55%);color:#fff;font-family:sans-serif;text-align:center}
+h1{margin:4px 0 2px;font-size:30px;color:#22D3EE;text-shadow:0 0 12px #22D3EE,0 0 26px #1E90FF}
+p{margin:0 0 20px;color:#9AA3C7;font-size:14px}
+a{color:#fff;text-decoration:none}
+.g{display:grid;grid-template-columns:repeat(3,1fr);gap:14px 10px;max-width:480px;margin:0 auto}
+.g a{display:block;padding:14px 2px 10px;border-radius:18px;background:linear-gradient(160deg,#222c5a,#161d42);border:1px solid #2B3566;font-size:13px}
+i{display:flex;width:58px;height:58px;margin:0 auto 9px;border-radius:50%;background:#fff;align-items:center;justify-content:center;font-style:normal;font-size:28px;box-shadow:0 0 0 2px #22D3EE,0 0 16px rgba(34,211,238,.55)}
+i img{width:36px;height:36px;border-radius:8px}
+small{display:block;margin-top:24px;color:#6C76A0;font-size:12px}
+</style>"""
+
+        const val PAGINA_INICIO = """<!doctype html><html lang="es"><head>""" + ESTILO + """
+<style>
+form{margin:0 auto 18px;max-width:480px;display:flex;gap:8px}
 input{flex:1;min-width:0;padding:13px 16px;border-radius:26px;border:2px solid #22D3EE;background:#1B2347;color:#fff;font-size:16px;outline:none}
 button{padding:0 18px;border-radius:26px;border:0;background:#22D3EE;color:#0F1530;font-weight:bold;font-size:16px}
-.g{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;max-width:480px;margin:0 auto}
-a{display:block;padding:16px 4px;border-radius:16px;background:#1B2347;border:1px solid #2B3566;color:#fff;text-decoration:none;font-size:13px}
-a b{display:block;font-size:26px;margin-bottom:6px}
-small{display:block;margin-top:26px;color:#6C76A0;font-size:12px}
+.t{display:flex;justify-content:space-between;align-items:center;max-width:480px;margin:0 auto 18px;padding:14px 18px;border-radius:18px;background:linear-gradient(160deg,#17503f,#0f2f2c);border:1px solid #1f7a5f;font-size:15px}
+.t b{font-size:20px;color:#7CFFB2;text-shadow:0 0 10px rgba(124,255,178,.6)}
 </style></head><body>
 <h1>Chamos 🌐</h1>
 <p>Busca lo que te nombraron sin salir del chat</p>
@@ -335,18 +353,67 @@ small{display:block;margin-top:26px;color:#6C76A0;font-size:12px}
 <input name="q" type="search" placeholder="Busca en Google" autocomplete="off">
 <button type="submit">Ir</button>
 </form>
+<a class="t" href="https://www.google.com/search?q=d%C3%B3lar+bcv+hoy"><span>💵 Dólar BCV</span><b id="bcv">ver hoy ›</b></a>
 <div class="g">
-<a href="https://www.google.com"><b>🔎</b>Google</a>
-<a href="https://m.youtube.com"><b>▶️</b>YouTube</a>
-<a href="https://es.m.wikipedia.org"><b>📚</b>Wikipedia</a>
-<a href="https://maps.google.com"><b>🗺️</b>Mapas</a>
-<a href="https://translate.google.com"><b>🌍</b>Traductor</a>
-<a href="https://news.google.com/?hl=es-419&amp;gl=VE&amp;ceid=VE:es-419"><b>📰</b>Noticias</a>
-<a href="https://www.bcv.org.ve"><b>💵</b>Dólar BCV</a>
-<a href="https://www.google.com/search?q=clima"><b>⛅</b>Clima</a>
-<a href="https://siervobenshalyahu-ship-it.github.io/Chamos-apk-web/"><b>🇻🇪</b>Chamos</a>
+<a href="https://www.google.com"><i><img data-e="🔎" onerror="this.parentNode.textContent=this.dataset.e" src="https://www.google.com/s2/favicons?domain=google.com&sz=128"></i>Google</a>
+<a href="https://m.youtube.com"><i><img data-e="▶️" onerror="this.parentNode.textContent=this.dataset.e" src="https://www.google.com/s2/favicons?domain=youtube.com&sz=128"></i>YouTube</a>
+<a href="https://maps.google.com"><i><img data-e="🗺️" onerror="this.parentNode.textContent=this.dataset.e" src="https://www.google.com/s2/favicons?domain=maps.google.com&sz=128"></i>Mapas</a>
+<a href="https://chamos.local/bancos"><i>🏦</i>Bancos</a>
+<a href="https://www.patria.org.ve"><i><img data-e="🇻🇪" onerror="this.parentNode.textContent=this.dataset.e" src="https://www.google.com/s2/favicons?domain=patria.org.ve&sz=128"></i>Patria</a>
+<a href="https://translate.google.com"><i><img data-e="🌍" onerror="this.parentNode.textContent=this.dataset.e" src="https://www.google.com/s2/favicons?domain=translate.google.com&sz=128"></i>Traductor</a>
+<a href="https://news.google.com/?hl=es-419&amp;gl=VE&amp;ceid=VE:es-419"><i><img data-e="📰" onerror="this.parentNode.textContent=this.dataset.e" src="https://www.google.com/s2/favicons?domain=news.google.com&sz=128"></i>Noticias</a>
+<a href="https://www.google.com/search?q=clima"><i>⛅</i>Clima</a>
+<a href="https://siervobenshalyahu-ship-it.github.io/Chamos-apk-web/"><i>🇻🇪</i>Chamos</a>
 </div>
 <small>Navegador de Chamos · no guardamos tu historial</small>
+<script>
+(function(){
+  var el=document.getElementById('bcv');
+  try{
+    var c=new AbortController();setTimeout(function(){c.abort()},6000);
+    fetch('https://ve.dolarapi.com/v1/dolares/oficial',{signal:c.signal})
+      .then(function(r){return r.json()})
+      .then(function(j){var v=j.promedio||j.venta||j.compra;if(v){el.textContent='Bs. '+Number(v).toFixed(2).replace('.',',')}})
+      .catch(function(){});
+  }catch(e){}
+})();
+</script>
+</body></html>"""
+
+        const val PAGINA_BANCOS = """<!doctype html><html lang="es"><head>""" + ESTILO + """
+<style>
+.b{max-width:480px;margin:0 auto;display:grid;gap:10px}
+.b a{display:flex;align-items:center;gap:14px;padding:12px 14px;border-radius:18px;background:linear-gradient(160deg,#222c5a,#161d42);border:1px solid #2B3566;text-align:left;font-size:16px}
+.b i{width:46px;height:46px;margin:0;flex:none;font-size:22px}
+.b span{display:block;font-size:12px;color:#9AA3C7;margin-top:2px}
+.v{display:inline-block;margin-bottom:16px;color:#22D3EE;font-size:14px}
+</style></head><body>
+<a class="v" href="https://chamos.local/">‹ Inicio</a>
+<h1>Bancos 🏦</h1>
+<p>Accesos rápidos a la banca en línea. Para el pago móvil, usa la app de tu banco.</p>
+<div class="b" id="lista"></div>
+<small>Si algún enlace no abre, usa el botón 🌐 para verlo en tu navegador.</small>
+<script>
+var B=[
+["Banco de Venezuela","bancodevenezuela.com","https://bdvenlinea.banvenez.com"],
+["Banesco","banesco.com","https://www.banesconline.com"],
+["Mercantil","mercantilbanco.com","https://www.mercantilbanco.com"],
+["BBVA Provincial","provincial.com","https://www.provincial.com"],
+["BNC","bnc.com.ve","https://www.bncenlinea.com"],
+["Bancamiga","bancamiga.com","https://www.bancamiga.com"],
+["Banco del Tesoro","bancodeltesoro.com","https://www.bancodeltesoro.com"],
+["Bancaribe","bancaribe.com.ve","https://www.bancaribe.com.ve"],
+["Banplus","banplus.com","https://www.banplus.com"],
+["Banco Exterior","bancoexterior.com","https://www.bancoexterior.com"],
+["100% Banco","100x100banco.com","https://www.100x100banco.com"],
+["Banco Plaza","bancoplaza.com","https://www.bancoplaza.com"]
+];
+var h="";
+for(var k=0;k<B.length;k++){
+  h+='<a href="'+B[k][2]+'"><i><img data-e="🏦" onerror="this.parentNode.textContent=this.dataset.e" src="https://www.google.com/s2/favicons?domain='+B[k][1]+'&sz=128"></i><div>'+B[k][0]+'<span>'+B[k][1]+'</span></div></a>';
+}
+document.getElementById("lista").innerHTML=h;
+</script>
 </body></html>"""
     }
 }
