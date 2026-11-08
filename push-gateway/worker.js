@@ -689,6 +689,18 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS });
+    if (url.pathname === "/b2/prueba" && request.method === "GET") {
+      if (!env.ADMIN_KEY || url.searchParams.get("k") !== env.ADMIN_KEY) return jsonCors({ error: "Falta ?k=TU_CLAVE_DEL_PANEL" }, 401);
+      if (!b2Activo(env)) return jsonCors({ error: "B2 no esta activo: mira los datos en la pagina principal del worker" }, 400);
+      try {
+        const clave = "prueba/" + Date.now();
+        const put = await b2Fetch(env, "PUT", clave, "hola chamos");
+        const putTxt = put.ok ? "" : (await put.text()).slice(0, 300);
+        const get = put.ok ? await b2Fetch(env, "GET", clave) : null;
+        const txt = get ? await get.text() : "";
+        return jsonCors({ subir: put.status, subir_error: putTxt, leer: get ? get.status : null, contenido: txt.slice(0, 40), ok: put.ok && txt === "hola chamos" });
+      } catch (e) { return jsonCors({ error: String(e.message || e) }, 500); }
+    }
     if (url.pathname.startsWith("/v/") && request.method === "POST") {
       try { return await videoSubir(request, env, url); } catch (e) { console.error(e); return jsonCors({ error: String(e.message || e) }, 500); }
     }
@@ -758,7 +770,7 @@ export default {
       } catch {
         configured = false;
       }
-      return json({ servicio: "Chamos push gateway", ok: true, firebase_configurado: configured, estadisticas_configuradas: !!(env.DB && env.ADMIN_KEY), chamos_ia_configurada: !!(env.AI && env.DB) });
+      return json({ servicio: "Chamos push gateway", ok: true, firebase_configurado: configured, estadisticas_configuradas: !!(env.DB && env.ADMIN_KEY), chamos_ia_configurada: !!(env.AI && env.DB), b2: { USAR_B2: env.USAR_B2 === "1" ? "1" : (env.USAR_B2 ? "valor raro: " + JSON.stringify(env.USAR_B2) : "falta"), B2_KEY_ID: !!env.B2_KEY_ID, B2_KEY: !!env.B2_KEY, B2_BUCKET: !!env.B2_BUCKET, B2_REGION: env.B2_REGION || "(usa us-east-005)", activo: !!b2Activo(env) } });
     }
     return json({ error: "No encontrado" }, 404);
   },
