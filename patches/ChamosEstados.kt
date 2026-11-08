@@ -609,6 +609,7 @@ fun ChamosEstadosRow(
     val contexto = LocalContext.current
     val scope = rememberCoroutineScope()
     var creando by remember { mutableStateOf(false) }
+    var videoRecortar by remember { mutableStateOf<Uri?>(null) }
     var visor by remember { mutableStateOf<Int?>(null) }
     // Contactos cuyo estado se está cargando: el visor NO se abre hasta que el archivo esté completo.
     val cargando = remember { mutableStateListOf<String>() }
@@ -733,9 +734,27 @@ fun ChamosEstadosRow(
                     Toast.makeText(contexto, if (ok) "Estado publicado" else "No se pudo publicar", Toast.LENGTH_SHORT).show()
                 }
             },
+            onVideo = { uri, _ -> videoRecortar = uri },
             onTexto = { texto ->
                 scope.launch {
                     val ok = state.publicarTexto(texto)
+                    Toast.makeText(contexto, if (ok) "Estado publicado" else "No se pudo publicar", Toast.LENGTH_SHORT).show()
+                }
+            },
+        )
+    }
+
+    val porRecortar = videoRecortar
+    if (porRecortar != null && state != null) {
+        RecortarVideoDialogo(
+            uri = porRecortar,
+            maxMs = 60_000L,
+            onCancelar = { videoRecortar = null },
+            onListo = { listo ->
+                videoRecortar = null
+                Toast.makeText(contexto, "Publicando estado…", Toast.LENGTH_SHORT).show()
+                scope.launch {
+                    val ok = state.publicarMedia(listo, "video/mp4")
                     Toast.makeText(contexto, if (ok) "Estado publicado" else "No se pudo publicar", Toast.LENGTH_SHORT).show()
                 }
             },
@@ -964,6 +983,7 @@ private fun NuevoEstadoDialogo(
     onAlcance: (Boolean) -> Unit,
     onCerrar: () -> Unit,
     onMedia: (Uri, String) -> Unit,
+    onVideo: (Uri, String) -> Unit,
     onTexto: (String) -> Unit,
 ) {
     val contexto = LocalContext.current
@@ -972,20 +992,8 @@ private fun NuevoEstadoDialogo(
     val selector = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         if (uri != null) {
             val mime = contexto.contentResolver.getType(uri) ?: "image/jpeg"
-            val duracion = if (mime.startsWith("video")) {
-                runCatching {
-                    val r = android.media.MediaMetadataRetriever()
-                    try {
-                        r.setDataSource(contexto, uri)
-                        r.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 0L
-                    } finally { r.release() }
-                }.getOrDefault(0L)
-            } else 0L
-            if (duracion > 46_000L) {
-                Toast.makeText(contexto, "Los videos de estados duran máximo 45 segundos. Recórtalo e inténtalo otra vez.", Toast.LENGTH_LONG).show()
-            } else {
-                onMedia(uri, mime)
-            }
+            // Los videos pasan primero por la barra de recorte (máximo 60 s).
+            if (mime.startsWith("video")) onVideo(uri, mime) else onMedia(uri, mime)
         }
         onCerrar()
     }
@@ -1004,7 +1012,7 @@ private fun NuevoEstadoDialogo(
                 Column {
                     TextButton(onClick = {
                         selector.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo))
-                    }) { Text("Foto o video (video: máx. 45 s)") }
+                    }) { Text("Foto o video (video: máx. 60 s, lo puedes recortar)") }
                     TextButton(onClick = { modoTexto = true }) { Text("Texto") }
                     Text(
                         "¿Quién ve mis estados?",

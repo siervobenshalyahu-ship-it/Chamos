@@ -5,6 +5,7 @@ root = sys.argv[1]
 aqui = os.path.dirname(os.path.abspath(__file__))
 d = os.path.join(root, "features/home/impl/src/main/kotlin/io/element/android/features/home/impl")
 shutil.copy(os.path.join(aqui, "ChamosSocial.kt"), os.path.join(d, "ChamosSocial.kt"))
+shutil.copy(os.path.join(aqui, "ChamosRecorteVideo.kt"), os.path.join(d, "ChamosRecorteVideo.kt"))
 g = os.path.join(root, "features/home/impl/build.gradle.kts")
 s = open(g, encoding="utf-8").read()
 old = "    implementation(projects.libraries.matrix.api)\n"

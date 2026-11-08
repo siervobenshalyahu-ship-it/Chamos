@@ -672,6 +672,7 @@ fun ChamosReelsPantalla(state: ChamosReelsState, inicioMuro: Boolean = false, on
     val contexto = LocalContext.current
     val scope = rememberCoroutineScope()
     var subiendo by remember { mutableStateOf(false) }
+    var paraRecortar by remember { mutableStateOf<Pair<Uri, String>?>(null) }
     val verMuro = inicioMuro
     LaunchedEffect(Unit) { if (!inicioMuro) state.activar() }
     // La pantalla de neón se queda hasta que los Reels terminan de cargar (mínimo 2 segundos).
@@ -748,18 +749,30 @@ fun ChamosReelsPantalla(state: ChamosReelsState, inicioMuro: Boolean = false, on
         }
     }
 
+    val recorte = paraRecortar
+    if (recorte != null) {
+        RecortarVideoDialogo(
+            uri = recorte.first,
+            maxMs = REELS_MAX_MS,
+            onCancelar = { paraRecortar = null },
+            onListo = { listo ->
+                paraRecortar = null
+                Toast.makeText(contexto, "Subiendo tu video…", Toast.LENGTH_SHORT).show()
+                scope.launch {
+                    val error = state.publicar(listo, "video/mp4", recorte.second)
+                    if (error != null) Toast.makeText(contexto, error, Toast.LENGTH_LONG).show()
+                }
+            },
+        )
+    }
+
     if (subiendo) {
         var desc by remember { mutableStateOf("") }
         val selector = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
             if (uri != null) {
-                val mime = contexto.contentResolver.getType(uri) ?: "video/mp4"
-                val descripcion = desc.trim()
+                // Primero se recorta (máximo 1:30); la descripción se guarda para después.
+                paraRecortar = uri to desc.trim()
                 subiendo = false
-                Toast.makeText(contexto, "Subiendo tu video…", Toast.LENGTH_SHORT).show()
-                scope.launch {
-                    val error = state.publicar(uri, mime, descripcion)
-                    if (error != null) Toast.makeText(contexto, error, Toast.LENGTH_LONG).show()
-                }
             }
         }
         AlertDialog(
@@ -773,7 +786,7 @@ fun ChamosReelsPantalla(state: ChamosReelsState, inicioMuro: Boolean = false, on
                         placeholder = { Text("Cuéntales algo a los chamos (opcional)") },
                         modifier = Modifier.fillMaxWidth(),
                     )
-                    Text("Máximo 1:30 minutos. Se guarda en 720p y se borra solo a las 12 horas. Se publica para toda la comunidad Chamos.", fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp))
+                    Text("Máximo 1:30 minutos (si dura más, lo recortas antes de subir). Se guarda en 720p y se borra solo a las 12 horas. Se publica para toda la comunidad Chamos.", fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp))
                 }
             },
             confirmButton = {

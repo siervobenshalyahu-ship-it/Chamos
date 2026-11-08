@@ -236,6 +236,9 @@ jobs:
       - name: Seguir, guardar con marca de agua y estadísticas
         run: python3 chamos-repo/patches/social.py chamos
 
+      - name: Sonido en las notificaciones de mensajes
+        run: python3 chamos-repo/patches/sonido.py chamos
+
       - name: Notificaciones push (Firebase) si ya están configuradas
         run: |
           if [ -f chamos-repo/firebase/google-services.json ] && [ -s chamos-repo/firebase/gateway-url.txt ]; then
