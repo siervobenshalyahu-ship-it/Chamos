@@ -21,6 +21,7 @@ const BOTS = {
   sazon: { nombre: "Sazón Chamos 🤖", tema: "comida", horas: [8, 13, 19], reel: 17, busca: ["cooking food", "street food", "baking", "kitchen recipe"] },
   viajero: { nombre: "Chamo Viajero 🤖", tema: "lugares", horas: [10, 16], reel: 14, busca: ["travel landscape", "city travel", "beach island", "mountain nature"] },
   solidarios: { nombre: "Chamos Solidarios 🤖", tema: "social", horas: [11], reel: null, busca: [] },
+  noticias: { nombre: "Chamos Noticias 🤖", tema: "noticias", horas: [7, 12, 17], reel: null, busca: [] },
 };
 
 const BELLEZA = [
@@ -254,6 +255,7 @@ async function botHacerMuro(env, bot, cuentas) {
     await botMuroTexto(env, bot, cuentas, texto);
     return { clave: i, nota: "texto" };
   }
+  if (b.tema === "noticias") return botHacerNoticias(env, bot, cuentas);
   // comida y lugares: Wikipedia (texto y foto libres)
   const lista = b.tema === "comida" ? COMIDAS : LUGARES;
   const emoji = b.tema === "comida" ? "🍽️" : "🌎";
@@ -271,6 +273,48 @@ async function botHacerMuro(env, bot, cuentas) {
     return { clave: t, nota };
   }
   throw new Error("No encontré una página válida (último: " + ultimo + ")");
+}
+
+// Noticias: solo titular + fuente + enlace (Google Noticias, secciones sin política) y, por la mañana, el dólar BCV.
+const NOTICIAS_TEMAS = {
+  BUSINESS: "Economía y negocios", SPORTS: "Deportes", TECHNOLOGY: "Tecnología", SCIENCE: "Ciencia", HEALTH: "Salud", ENTERTAINMENT: "Espectáculos",
+};
+const _xml = (t) => String(t || "").replace(/<!\[CDATA\[|\]\]>/g, "").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'").replace(/&amp;/g, "&").trim();
+async function botTasaBCV() {
+  try {
+    const r = await fetch("https://ve.dolarapi.com/v1/dolares/oficial", { headers: { "user-agent": UA_BOT } });
+    if (!r.ok) return "";
+    const j = await r.json();
+    const v = Number(j.promedio || j.venta || j.compra);
+    return v ? "💵 Dólar BCV hoy: Bs. " + v.toFixed(2).replace(".", ",") + "\n\n" : "";
+  } catch (_) { return ""; }
+}
+async function botHacerNoticias(env, bot, cuentas) {
+  const { hora } = botHoy();
+  const mapa = { 7: ["BUSINESS"], 12: ["SPORTS"], 17: ["TECHNOLOGY", "SCIENCE", "HEALTH", "ENTERTAINMENT"] };
+  const temas = mapa[hora] || Object.keys(NOTICIAS_TEMAS);
+  const tema = temas[Math.floor(Math.random() * temas.length)];
+  const r = await fetch("https://news.google.com/rss/headlines/section/topic/" + tema + "?hl=es-419&gl=VE&ceid=VE:es-419", { headers: { "user-agent": UA_BOT } });
+  if (!r.ok) throw new Error("Noticias " + r.status);
+  const xml = await r.text();
+  const items = [];
+  for (const m of xml.matchAll(/<item>([\s\S]*?)<\/item>/g)) {
+    const t = /<title>([\s\S]*?)<\/title>/.exec(m[1]);
+    const l = /<link>([\s\S]*?)<\/link>/.exec(m[1]);
+    if (t && l) items.push({ titulo: _xml(t[1]), enlace: _xml(l[1]) });
+    if (items.length >= 15) break;
+  }
+  const usadas = new Set(
+    ((await env.DB.prepare("SELECT clave FROM bots_log WHERE bot=?1 AND modo='muro' AND ok=1 ORDER BY id DESC LIMIT 150").bind(bot).all()).results || []).map((x) => x.clave),
+  );
+  const nuevas = items.filter((i) => !usadas.has(i.titulo.slice(0, 120))).slice(0, 3);
+  if (!nuevas.length) throw new Error("No hay noticias nuevas en " + tema);
+  const tasa = hora <= 9 ? await botTasaBCV() : "";
+  const texto = "📰 " + NOTICIAS_TEMAS[tema] + "\n\n" + tasa + nuevas.map((i) => "• " + i.titulo + "\n" + i.enlace).join("\n\n") + "\n\nTitulares de Google Noticias. Toca el enlace para leer la nota completa en la fuente.\n— " + BOTS[bot].nombre + " · cuenta automática de Chamos";
+  await botMuroTexto(env, bot, cuentas, texto);
+  // Se guardan los titulares ya publicados para no repetirlos.
+  for (const i of nuevas.slice(1)) await env.DB.prepare("INSERT INTO bots_log (bot, ts, dia, hora, modo, clave, ok, nota) VALUES (?1,?2,'',0,'muro',?3,1,'pagina no valida')").bind(bot, Date.now(), i.titulo.slice(0, 120)).run();
+  return { clave: nuevas[0].titulo.slice(0, 120), nota: NOTICIAS_TEMAS[tema] + " · " + nuevas.length + " titulares" };
 }
 
 // Video de Pexels (licencia libre) → Backblaze/KV → Chamos Videos.
