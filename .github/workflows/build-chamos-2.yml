@@ -11,6 +11,10 @@ on:
         description: "Publicar el APK en Releases (así las apps instaladas se actualizan solas)"
         type: boolean
         default: true
+      aab:
+        description: "Generar también el paquete AAB (para APKPure u otras tiendas que lo pidan)"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -311,3 +315,37 @@ jobs:
           cp "$APK" Chamos.apk
           gh release create "V$APP_VERSION" Chamos.apk --repo "$GITHUB_REPOSITORY" --title "Chamos $APP_VERSION" --notes "Chamos $APP_VERSION" --latest \
             || gh release upload "V$APP_VERSION" Chamos.apk --repo "$GITHUB_REPOSITORY" --clobber
+
+      - name: Generar el paquete AAB (opcional)
+        if: ${{ inputs.aab == true }}
+        working-directory: chamos
+        env:
+          ELEMENT_ANDROID_MAPTILER_API_KEY: ${{ secrets.MAPTILER_API_KEY }}
+          ELEMENT_ANDROID_MAPTILER_LIGHT_MAP_ID: streets-v2
+          ELEMENT_ANDROID_MAPTILER_DARK_MAP_ID: streets-v2-dark
+        run: |
+          set -o pipefail
+          ./gradlew :app:bundle${FLAVOR}Debug --stacktrace --no-configuration-cache 2>&1 | tee ../gradle-aab.log
+          AAB=$(find app/build/outputs/bundle -name "*.aab" | head -1)
+          echo "AAB: $AAB"
+          ls -la "$AAB"
+          cp "$AAB" ../Chamos.aab
+          jarsigner -verify -verbose -certs ../Chamos.aab | tail -5 || true
+
+      - name: Mostrar errores del AAB
+        if: ${{ failure() && inputs.aab == true }}
+        run: |
+          grep -E "^e: |What went wrong|FAILED|Execution failed|Could not" -A3 gradle-aab.log | head -40 | while IFS= read -r l; do echo "::error::${l:0:900}"; done
+
+      - name: Guardar el AAB
+        if: ${{ inputs.aab == true }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: chamos-aab
+          path: Chamos.aab
+
+      - name: Publicar el AAB en Releases
+        if: ${{ inputs.aab == true && inputs.publicar != false }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "V$APP_VERSION" Chamos.aab --repo "$GITHUB_REPOSITORY" --clobber
