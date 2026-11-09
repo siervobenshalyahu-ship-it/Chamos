@@ -362,7 +362,7 @@ button{padding:0 18px;border-radius:26px;border:0;background:#22D3EE;color:#0F15
 </form>
 <a class="t" href="https://www.google.com/search?q=d%C3%B3lar+bcv+hoy"><span>💵 Dólar BCV</span><b id="bcv">ver hoy ›</b></a>
 <div class="g">
-<a href="https://biblehub.com/interlinear/"><i><img data-e="📖" onerror="this.parentNode.textContent=this.dataset.e" src="https://www.google.com/s2/favicons?domain=biblehub.com&sz=128"></i>Biblia interlineal</a>
+<a href="https://www.bibliatodo.com/interlineal/online"><i><img data-e="📖" onerror="this.parentNode.textContent=this.dataset.e" src="https://www.google.com/s2/favicons?domain=bibliatodo.com&sz=128"></i>Biblia interlineal</a>
 <a href="https://m.youtube.com"><i><img data-e="▶️" onerror="this.parentNode.textContent=this.dataset.e" src="https://www.google.com/s2/favicons?domain=youtube.com&sz=128"></i>YouTube</a>
 <a href="https://maps.google.com"><i><img data-e="🗺️" onerror="this.parentNode.textContent=this.dataset.e" src="https://www.google.com/s2/favicons?domain=maps.google.com&sz=128"></i>Mapas</a>
 <a href="https://chamos.local/bancos"><i>🏦</i>Bancos</a>
