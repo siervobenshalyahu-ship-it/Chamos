@@ -42,7 +42,7 @@ import kotlin.time.Duration.Companion.minutes
  * y para ver en un mapa de OpenStreetMap a quienes la están compartiendo.
  */
 internal object ChamosVivo {
-    @Volatile var room: JoinedRoom? = null
+    var room: JoinedRoom? by androidx.compose.runtime.mutableStateOf<JoinedRoom?>(null)
     @Volatile var manager: ActiveLiveLocationShareManager? = null
     @Volatile var scope: CoroutineScope? = null
 

@@ -247,6 +247,10 @@ jobs:
         run: python3 chamos-repo/patches/ubicacion_vivo.py chamos chamos-repo/patches
       - name: Boton para crear grupos
         run: python3 chamos-repo/patches/grupos.py chamos
+      - name: Barra ovalada plegable
+        run: python3 chamos-repo/patches/barra_oval.py chamos chamos-repo/patches
+      - name: Traductor por sala
+        run: python3 chamos-repo/patches/traductor.py chamos chamos-repo/patches
 
       - name: Notificaciones push (Firebase) si ya están configuradas
         run: |
