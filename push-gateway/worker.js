@@ -422,7 +422,7 @@ async function resumen(request, env) {
   if (request.headers.get("x-clave") !== env.ADMIN_KEY) return jsonCors({ error: "Clave incorrecta" }, 401);
   await prepararTablas(env);
   const hace30 = Date.now() - 30 * 24 * 3600 * 1000;
-  const [tot, unicos, dias, paises, usuarios, nUsuarios, versiones, recientes, topSeg, nSeg, opiniones] = await env.DB.batch([
+  const [tot, unicos, dias, paises, usuarios, nUsuarios, versiones, recientes, topSeg, nSeg, opiniones, modelos] = await env.DB.batch([
     env.DB.prepare("SELECT tipo, COUNT(*) AS n FROM eventos GROUP BY tipo"),
     env.DB.prepare("SELECT tipo, COUNT(DISTINCT anon) AS n FROM eventos GROUP BY tipo"),
     env.DB.prepare(
@@ -436,6 +436,10 @@ async function resumen(request, env) {
     env.DB.prepare("SELECT seguido AS usuario, COUNT(*) AS n FROM seguidores GROUP BY seguido ORDER BY n DESC LIMIT 15"),
     env.DB.prepare("SELECT COUNT(*) AS n FROM seguidores"),
     env.DB.prepare("SELECT ts, nombre, texto, pais FROM opiniones ORDER BY ts DESC LIMIT 50"),
+    env.DB.prepare(
+      "SELECT COALESCE(NULLIF(json_extract(extra,'$.m'),''),'(sin modelo)') AS modelo, COUNT(DISTINCT anon) AS telefonos, MAX(ts) AS ultima " +
+        "FROM eventos WHERE tipo='instalacion' GROUP BY modelo ORDER BY telefonos DESC, ultima DESC LIMIT 300",
+    ),
   ]);
   return jsonCors({
     totales: tot.results,
@@ -449,6 +453,7 @@ async function resumen(request, env) {
     top_seguidos: topSeg.results,
     total_seguidores: nSeg.results[0].n,
     opiniones: opiniones.results,
+    modelos: modelos.results,
   });
 }
 
@@ -570,6 +575,7 @@ async function go(){
    '<h2>Versiones de la app</h2><div>'+d.versiones.map(v=>(v.version||'?')+': '+v.n).join(' · ')+'</div>'+
    '<h2>Usuarios</h2><div class="sc"><table><tr><th>Usuario</th><th>Nombre</th><th>Versión</th><th>Teléfono</th><th>IP</th><th>Desde</th><th>Última vez</th></tr>'+
    d.usuarios.map(u=>'<tr><td>'+esc(u.user_id)+'</td><td>'+esc(u.nombre)+'</td><td>'+esc(u.version)+'</td><td>'+esc(u.modelo)+'</td><td>'+esc(u.ip)+'</td><td>'+fmt(u.primera)+'</td><td>'+fmt(u.ultima)+'</td></tr>').join('')+'</table></div>'+
+   '<h2>Modelos de teléfono con Chamos instalada ('+(d.modelos||[]).length+' modelos)</h2><div class="sc"><table><tr><th>Modelo</th><th>Teléfonos</th><th>Última vez</th></tr>'+(d.modelos||[]).map(m=>'<tr><td>'+esc(m.modelo)+'</td><td>'+m.telefonos+'</td><td>'+fmt(m.ultima)+'</td></tr>').join('')+'</table></div>'+
    '<h2>Últimas visitas, descargas e instalaciones</h2><div class="sc"><table><tr><th>Cuándo</th><th>Qué</th><th>País</th><th>IP</th><th>Dispositivo</th></tr>'+
    (d.recientes||[]).map(r=>'<tr><td>'+fmt(r.ts)+'</td><td>'+esc(r.tipo)+'</td><td>'+esc(r.pais)+'</td><td>'+esc(r.ip)+'</td><td>'+esc(r.disp)+'</td></tr>').join('')+'</table></div>';
 }
