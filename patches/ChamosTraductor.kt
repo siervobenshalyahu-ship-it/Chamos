@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.google.android.gms.tasks.Task
 import com.google.mlkit.nl.languageid.LanguageIdentification
+import com.google.mlkit.nl.languageid.LanguageIdentificationOptions
 import com.google.mlkit.nl.translate.TranslateLanguage
 import com.google.mlkit.nl.translate.Translation
 import com.google.mlkit.nl.translate.Translator
@@ -42,6 +43,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.suspendCancellableCoroutine
 import java.util.Locale
 import kotlin.coroutines.resume
@@ -71,7 +73,11 @@ internal object ChamosTraductor {
     private var prefs: SharedPreferences? = null
     private val traductores = HashMap<String, Translator>()
     private val cache = HashMap<String, String>()
-    private val identificador by lazy { LanguageIdentification.getClient() }
+    private val identificador by lazy {
+        LanguageIdentification.getClient(LanguageIdentificationOptions.Builder().setConfidenceThreshold(0.35f).build())
+    }
+    /** Estado visible en la pantalla del traductor: qué pasó con la descarga de idiomas. */
+    val estadoTxt = MutableStateFlow("")
 
     private val porDefecto: String
         get() = Locale.getDefault().language.takeIf { TranslateLanguage.fromLanguageTag(it) != null } ?: "es"
@@ -101,14 +107,17 @@ internal object ChamosTraductor {
         if (activa) {
             // baja los dos idiomas ahora (una sola vez), para que luego traduzca al instante
             scope.launch {
-                Toast.makeText(ctx.applicationContext, "Traductor listo; la primera vez baja el idioma (necesita internet)", Toast.LENGTH_LONG).show()
-                traducirCon("hola", mio, otro)
-                traducirCon("hello", otro, mio)
+                estadoTxt.value = "Descargando idiomas (solo la primera vez, necesita internet)…"
+                val a = traducirCon("hola", mio, otro)
+                val b = traducirCon("hello", otro, mio)
+                estadoTxt.value = if (a != null && b != null) "✓ Idiomas listos" else "✗ No se pudieron bajar los idiomas: " + (ultimoError ?: "sin detalle")
             }
         }
     }
 
-    private suspend fun traducirCon(texto: String, de: String, a: String): String? {
+    @Volatile private var ultimoError: String? = null
+
+    private suspend fun traducirCon(texto: String, de: String, a: String, esperaMs: Long = 120_000L): String? {
         if (de == a) return texto
         val s = TranslateLanguage.fromLanguageTag(de) ?: return null
         val t = TranslateLanguage.fromLanguageTag(a) ?: return null
@@ -117,14 +126,22 @@ internal object ChamosTraductor {
                 Translation.getClient(TranslatorOptions.Builder().setSourceLanguage(s).setTargetLanguage(t).build())
             }
         }
-        return runCatching {
-            tr.downloadModelIfNeeded(DownloadConditions.Builder().build()).esperar()
-            tr.translate(texto).esperar()
-        }.getOrNull()
+        return withTimeoutOrNull(esperaMs) {
+            try {
+                tr.downloadModelIfNeeded(DownloadConditions.Builder().build()).esperar()
+                tr.translate(texto).esperar()
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                ultimoError = e.message ?: e.javaClass.simpleName
+                android.util.Log.e("ChamosTraductor", "fallo al traducir", e)
+                null
+            }
+        } ?: run { if (ultimoError == null) ultimoError = "tardó demasiado"; null }
     }
 
     private suspend fun detectar(texto: String): String? =
-        runCatching { identificador.identifyLanguage(texto).esperar() }.getOrNull()?.takeIf { it != "und" }
+        withTimeoutOrNull(5_000L) { runCatching { identificador.identifyLanguage(texto).esperar() }.getOrNull() }?.takeIf { it != "und" }
 
     /** Lo que llega: si está en otro idioma, lo devuelve traducido a tu idioma; si no hace falta, null. */
     suspend fun traducirEntrante(sala: String, texto: String): String? {
@@ -133,9 +150,8 @@ internal object ChamosTraductor {
         val t = texto.trim()
         if (t.length < 3 || t.startsWith("http")) return null
         cache["$sala|${c.mio}|$t"]?.let { return it }
-        val origen = detectar(t) ?: return null
-        if (origen == c.mio) return null
-        val r = traducirCon(t, origen, c.mio)?.takeIf { it.isNotBlank() && it != t } ?: return null
+        if (detectar(t) == c.mio) return null
+        val r = traducirCon(t, c.otro, c.mio, 30_000L)?.takeIf { it.isNotBlank() && it != t } ?: return null
         if (cache.size > 500) cache.clear()
         cache["$sala|${c.mio}|$t"] = r
         return r
@@ -146,7 +162,7 @@ internal object ChamosTraductor {
         val c = config(sala)
         if (!c.activa || texto.isBlank()) return null
         if (detectar(texto) == c.otro) return null
-        return traducirCon(texto, c.mio, c.otro)?.takeIf { it.isNotBlank() }
+        return traducirCon(texto, c.mio, c.otro, 10_000L)?.takeIf { it.isNotBlank() }
     }
 }
 
@@ -210,6 +226,10 @@ internal fun ChamosTraductorBoton() {
                         fontSize = 13.sp,
                         modifier = Modifier.padding(vertical = 8.dp),
                     )
+                    val estadoDescarga by ChamosTraductor.estadoTxt.collectAsState()
+                    if (estadoDescarga.isNotEmpty()) {
+                        androidx.compose.material3.Text(estadoDescarga, fontSize = 13.sp, modifier = Modifier.padding(bottom = 8.dp))
+                    }
                     androidx.compose.material3.Text("Mi idioma:")
                     for ((codigo, nombre) in ChamosTraductor.IDIOMAS) {
                         TextButton(onClick = { ChamosTraductor.poner(ctx, sala, c.activa, codigo, c.otro) }) {

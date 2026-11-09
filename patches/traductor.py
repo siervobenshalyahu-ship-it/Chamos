@@ -51,13 +51,14 @@ fun TimelineItemTextView(
 ''')
 # lo que escribes: sale traducido
 edit(os.path.join(m, "messagecomposer/MessageComposerPresenter.kt"), [
-    ("        // Reset composer right away\n",
+    ("        resetComposer(markdownTextEditorState, richTextEditorState, fromEdit = capturedMode is MessageComposerMode.Edit)\n        when (capturedMode) {\n",
+     "        resetComposer(markdownTextEditorState, richTextEditorState, fromEdit = capturedMode is MessageComposerMode.Edit)\n"
      "        val chamosTraducido = if (capturedMode is MessageComposerMode.Normal || capturedMode is MessageComposerMode.Reply) {\n"
      "            ChamosTraductor.traducirSaliente(room.roomId.value, message.markdown)\n"
      "        } else {\n"
      "            null\n"
      "        }\n"
-     "        // Reset composer right away\n"),
+     "        when (capturedMode) {\n"),
     ("            is MessageComposerMode.Normal -> timelineController.invokeOnCurrentTimeline {\n                sendMessage(\n                    body = message.markdown,\n                    htmlBody = message.html,\n",
      "            is MessageComposerMode.Normal -> timelineController.invokeOnCurrentTimeline {\n                sendMessage(\n                    body = chamosTraducido ?: message.markdown,\n                    htmlBody = if (chamosTraducido != null) null else message.html,\n"),
     ("                        replyMessage(\n                            body = message.markdown,\n                            htmlBody = message.html,\n",
