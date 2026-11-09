@@ -76,7 +76,6 @@ class ChamosNavegadorActivity : Activity() {
         cabecera.orientation = LinearLayout.HORIZONTAL
         cabecera.gravity = Gravity.CENTER_VERTICAL
         cabecera.setPadding(dp(6), dp(8), dp(10), dp(6))
-        cabecera.addView(boton("✕") { finish() })
 
         direccion = EditText(this)
         direccion.hint = "Busca o escribe una dirección"
@@ -101,8 +100,7 @@ class ChamosNavegadorActivity : Activity() {
                 false
             }
         }
-        cabecera.addView(direccion, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
-        contenido.addView(cabecera, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+        // La barra de arriba ya no se muestra (menos barras); la caja de direccion queda oculta y se busca desde la pagina de inicio.
 
         // ---- progreso ----
         barra = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal)
@@ -125,8 +123,17 @@ class ChamosNavegadorActivity : Activity() {
         val recargar = boton("🔄") { web.reload() }
         val casa = boton("🏠") { cargarInicio() }
         val compartir = boton("📤") { compartirEnlace() }
-        val fuera = boton("🌐") { abrirFuera() }
-        for (b in listOf(atras, adelante, recargar, casa, compartir, fuera)) {
+        val cerrar = boton("✕") { finish() }
+        val fuera = android.widget.FrameLayout(this)
+        fuera.clipChildren = false
+        fuera.addView(boton("🌐") { abrirFuera() }, android.widget.FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+        val gorra = TextView(this)
+        gorra.text = "🧢"
+        gorra.textSize = 14f
+        gorra.scaleX = -1f  // al reves: la visera mira hacia atras
+        gorra.translationY = -dp(4).toFloat()
+        fuera.addView(gorra, android.widget.FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.TOP or Gravity.CENTER_HORIZONTAL))
+        for (b in listOf(cerrar, atras, adelante, recargar, casa, compartir, fuera)) {
             pie.addView(b, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
         }
         contenido.addView(pie, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
@@ -347,7 +354,7 @@ button{padding:0 18px;border-radius:26px;border:0;background:#22D3EE;color:#0F15
 .t{display:flex;justify-content:space-between;align-items:center;max-width:480px;margin:0 auto 18px;padding:14px 18px;border-radius:18px;background:linear-gradient(160deg,#17503f,#0f2f2c);border:1px solid #1f7a5f;font-size:15px}
 .t b{font-size:20px;color:#7CFFB2;text-shadow:0 0 10px rgba(124,255,178,.6)}
 </style></head><body>
-<h1>Chamos 🌐</h1>
+<h1>Chamos <span style="position:relative;display:inline-block">🌐<span style="position:absolute;left:50%;top:-.55em;font-size:.7em;transform:translateX(-50%) scaleX(-1)">🧢</span></span></h1>
 <p>Busca lo que te nombraron sin salir del chat</p>
 <form action="https://www.google.com/search" method="get">
 <input name="q" type="search" placeholder="Busca en Google" autocomplete="off">
@@ -355,7 +362,7 @@ button{padding:0 18px;border-radius:26px;border:0;background:#22D3EE;color:#0F15
 </form>
 <a class="t" href="https://www.google.com/search?q=d%C3%B3lar+bcv+hoy"><span>💵 Dólar BCV</span><b id="bcv">ver hoy ›</b></a>
 <div class="g">
-<a href="https://www.google.com"><i><img data-e="🔎" onerror="this.parentNode.textContent=this.dataset.e" src="https://www.google.com/s2/favicons?domain=google.com&sz=128"></i>Google</a>
+<a href="https://biblehub.com/interlinear/"><i><img data-e="📖" onerror="this.parentNode.textContent=this.dataset.e" src="https://www.google.com/s2/favicons?domain=biblehub.com&sz=128"></i>Biblia interlineal</a>
 <a href="https://m.youtube.com"><i><img data-e="▶️" onerror="this.parentNode.textContent=this.dataset.e" src="https://www.google.com/s2/favicons?domain=youtube.com&sz=128"></i>YouTube</a>
 <a href="https://maps.google.com"><i><img data-e="🗺️" onerror="this.parentNode.textContent=this.dataset.e" src="https://www.google.com/s2/favicons?domain=maps.google.com&sz=128"></i>Mapas</a>
 <a href="https://chamos.local/bancos"><i>🏦</i>Bancos</a>
