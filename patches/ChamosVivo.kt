@@ -11,7 +11,9 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -121,43 +123,67 @@ private fun ChamosVivoDialogo(cerrar: () -> Unit) {
 
     if (siguiendo != null) {
         val punto = actual?.lastLocation?.geoUri?.let { coords(it) }
-        AlertDialog(
+        val marca = actual?.lastLocation?.timestamp ?: 0L
+        val webRef = remember { arrayOfNulls<WebView>(1) }
+        // cada posición nueva mueve el punto en el mapa (sin recargar) y el mapa lo sigue
+        androidx.compose.runtime.LaunchedEffect(punto, marca) {
+            if (punto != null) webRef[0]?.evaluateJavascript("actualizar(${punto.first},${punto.second},$marca)", null)
+        }
+        androidx.compose.ui.window.Dialog(
             onDismissRequest = { siguiendo = null },
-            confirmButton = {
-                if (punto != null) {
-                    TextButton(onClick = {
-                        runCatching {
-                            ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("geo:${punto.first},${punto.second}?q=${punto.first},${punto.second}")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false),
+        ) {
+            androidx.compose.material3.Surface(modifier = Modifier.fillMaxSize()) {
+                Column(modifier = Modifier.systemBarsPadding().fillMaxSize()) {
+                    androidx.compose.foundation.layout.Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
+                        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                        horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceBetween,
+                    ) {
+                        androidx.compose.material3.Text("📍 " + (siguiendo ?: ""), modifier = Modifier.weight(1f))
+                        TextButton(onClick = { siguiendo = null }) { androidx.compose.material3.Text("Cerrar") }
+                    }
+                    if (punto == null) {
+                        androidx.compose.material3.Text("Esta persona ya dejó de compartir su ubicación.", modifier = Modifier.padding(16.dp))
+                    } else {
+                        AndroidView(
+                            modifier = Modifier.fillMaxWidth().weight(1f),
+                            factory = { c ->
+                                WebView(c).apply {
+                                    settings.javaScriptEnabled = true
+                                    settings.domStorageEnabled = true
+                                    webViewClient = android.webkit.WebViewClient()
+                                    webRef[0] = this
+                                    loadDataWithBaseURL(
+                                        "https://chamos.local/",
+                                        ChamosVivoMapa.HTML.replace("LAT0", punto.first.toString()).replace("LON0", punto.second.toString()).replace("TS0", marca.toString()),
+                                        "text/html", "utf-8", null,
+                                    )
+                                }
+                            },
+                        )
+                        androidx.compose.foundation.layout.Row(
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+                            horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceBetween,
+                        ) {
+                            TextButton(onClick = {
+                                val miPunto = miUbicacion(ctx)
+                                if (miPunto == null) {
+                                    Toast.makeText(ctx, "No tengo tu ubicación; activa el permiso o toca el mapa para elegir el destino", Toast.LENGTH_LONG).show()
+                                } else {
+                                    webRef[0]?.evaluateJavascript("destino(${miPunto.first},${miPunto.second})", null)
+                                }
+                            }) { androidx.compose.material3.Text("Hasta mí") }
+                            TextButton(onClick = {
+                                runCatching {
+                                    ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("geo:${punto.first},${punto.second}?q=${punto.first},${punto.second}")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                                }
+                            }) { androidx.compose.material3.Text("Abrir en mapas") }
                         }
-                    }) { androidx.compose.material3.Text("Abrir en mapas") }
+                    }
                 }
-            },
-            dismissButton = { TextButton(onClick = { siguiendo = null }) { androidx.compose.material3.Text("Cerrar") } },
-            title = { androidx.compose.material3.Text(siguiendo ?: "") },
-            text = {
-                if (punto == null) {
-                    androidx.compose.material3.Text("Esta persona ya dejó de compartir su ubicación.")
-                } else {
-                    val (la, lo) = punto
-                    val url = "https://www.openstreetmap.org/export/embed.html?bbox=${lo - 0.004},${la - 0.003},${lo + 0.004},${la + 0.003}&layer=mapnik&marker=$la,$lo"
-                    AndroidView(
-                        modifier = Modifier.fillMaxWidth().height(320.dp),
-                        factory = { c ->
-                            WebView(c).apply {
-                                settings.javaScriptEnabled = true
-                                settings.domStorageEnabled = true
-                            }
-                        },
-                        update = { w ->
-                            if (w.tag != url) {
-                                w.tag = url
-                                w.loadUrl(url)
-                            }
-                        },
-                    )
-                }
-            },
-        )
+            }
+        }
         return
     }
 
@@ -197,4 +223,51 @@ private fun ChamosVivoDialogo(cerrar: () -> Unit) {
             }
         },
     )
+}
+
+@android.annotation.SuppressLint("MissingPermission")
+private fun miUbicacion(ctx: android.content.Context): Pair<Double, Double>? = runCatching {
+    val lm = ctx.getSystemService(android.content.Context.LOCATION_SERVICE) as android.location.LocationManager
+    listOf(android.location.LocationManager.GPS_PROVIDER, android.location.LocationManager.NETWORK_PROVIDER, android.location.LocationManager.PASSIVE_PROVIDER)
+        .mapNotNull { runCatching { lm.getLastKnownLocation(it) }.getOrNull() }
+        .maxByOrNull { it.time }
+        ?.let { it.latitude to it.longitude }
+}.getOrNull()
+
+/** Mapa que sigue a la persona (OpenStreetMap + Leaflet) con distancia y tiempo aproximados hasta un destino. */
+internal object ChamosVivoMapa {
+    const val HTML = """<!doctype html><html><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+<style>
+html,body{margin:0;height:100%;background:#0B1026}#m{position:absolute;inset:0}
+#i{position:absolute;left:8px;right:8px;bottom:12px;z-index:1000;background:rgba(11,16,38,.92);color:#fff;font:15px sans-serif;padding:10px 14px;border-radius:14px;border:2px solid #22D3EE}
+#s{position:absolute;right:10px;top:10px;z-index:1000;background:#1A73E8;color:#fff;font:14px sans-serif;padding:8px 14px;border-radius:20px;display:none}
+</style></head><body><div id="m"></div><div id="s">Seguir</div><div id="i">Toca el mapa para elegir el destino</div>
+<script>
+var la0=LAT0,lo0=LON0,hist=[[la0,lo0,TS0]],seguir=true,dest=null,destM=null,anim=null;
+var map=L.map('m').setView([la0,lo0],16);
+L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(map);
+var persona=L.circleMarker([la0,lo0],{radius:9,color:'#fff',weight:3,fillColor:'#1A73E8',fillOpacity:1}).addTo(map);
+var ruta=L.polyline([[la0,lo0]],{color:'#1A73E8',weight:4}).addTo(map);
+var lineaD=L.polyline([],{color:'#EF4444',weight:3,dashArray:'6 8'}).addTo(map);
+var btn=document.getElementById('s'),info=document.getElementById('i');
+function km(a,b,c,d){var R=6371,r=Math.PI/180,x=(c-a)*r,y=(d-b)*r;var h=Math.sin(x/2)*Math.sin(x/2)+Math.cos(a*r)*Math.cos(c*r)*Math.sin(y/2)*Math.sin(y/2);return 2*R*Math.asin(Math.sqrt(h));}
+function actual(){return hist[hist.length-1];}
+function velocidad(){var a=hist[0],b=actual();var h=(b[2]-a[2])/3600000;if(hist.length<2||h<=0)return 0;return km(a[0],a[1],b[0],b[1])/h;}
+function texto(){var p=actual();if(!dest){info.textContent='Toca el mapa para elegir el destino';return;}
+var d=km(p[0],p[1],dest[0],dest[1]),v=velocidad(),usa=v>=5?v:40,calle=d*1.3,min=Math.round(calle/usa*60);
+var t=min<1?'menos de 1 min':(min<60?min+' min':Math.floor(min/60)+' h '+(min%60)+' min');
+info.textContent='A '+(d<1?Math.round(d*1000)+' m':d.toFixed(1)+' km')+' en línea recta · llega en ≈ '+t+(v>=5?' (a '+Math.round(v)+' km/h)':' (calculado a 40 km/h)')+' · aproximado';
+if(destM)lineaD.setLatLngs([[p[0],p[1]],dest]);}
+function actualizar(la,lo,t){var a=actual();if(a[0]===la&&a[1]===lo&&a[2]===t)return;hist.push([la,lo,t]);if(hist.length>8)hist.shift();
+ruta.addLatLng([la,lo]);var d0=a,t0=Date.now();if(anim)cancelAnimationFrame(anim);
+function paso(){var f=Math.min(1,(Date.now()-t0)/1000),x=d0[0]+(la-d0[0])*f,y=d0[1]+(lo-d0[1])*f;persona.setLatLng([x,y]);if(seguir)map.panTo([x,y],{animate:false});if(f<1)anim=requestAnimationFrame(paso);}
+paso();texto();}
+function destino(la,lo){dest=[la,lo];if(destM)destM.setLatLng(dest);else destM=L.marker(dest).addTo(map);texto();}
+map.on('click',function(e){destino(e.latlng.lat,e.latlng.lng);});
+map.on('dragstart',function(){seguir=false;btn.style.display='block';});
+btn.onclick=function(){seguir=true;btn.style.display='none';var p=actual();map.panTo([p[0],p[1]]);};
+</script></body></html>"""
 }
