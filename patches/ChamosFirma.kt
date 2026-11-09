@@ -70,6 +70,7 @@ object ChamosFirma {
                     con.readTimeout = 8000
                     con.doOutput = true
                     con.setRequestProperty("content-type", "text/plain")
+                    con.setRequestProperty("x-chamos-app", activity.packageName)
                     con.outputStream.use { it.write(cuerpo.toByteArray()) }
                     if (con.responseCode in 200..299) p.edit().putString("inst_v", version).apply()
                     con.disconnect()

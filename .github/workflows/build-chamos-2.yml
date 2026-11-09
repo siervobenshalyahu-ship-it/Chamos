@@ -264,6 +264,8 @@ jobs:
 
       - name: Navegador interno de Chamos
         run: python3 chamos-repo/patches/navegador.py chamos
+      - name: Marca de la app en las llamadas a los servidores
+        run: python3 chamos-repo/patches/marca.py chamos
       - name: Iconos y engranaje arriba
         run: python3 chamos-repo/patches/iconos_ui.py chamos chamos-repo/patches
       - name: Ubicación en tiempo real de Chamos

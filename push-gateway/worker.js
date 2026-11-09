@@ -258,6 +258,7 @@ async function guardarEvento(request, env) {
   }
   const tipo = corto(d.t, 20);
   if (!["visita", "descarga", "instalacion", "registro", "descarga_media", "denuncia", "publicacion"].includes(tipo)) return jsonCors({ error: "Tipo desconocido" }, 400);
+  if (String(env.SOLO_RELEASE || "").trim() === "1" && !["visita", "descarga"].includes(tipo) && request.headers.get("x-chamos-app") !== "com.chamos.app") return jsonCors(CERRADA, 426);
   await prepararTablas(env);
   const ahora = Date.now();
   const pais = corto(request.cf && request.cf.country, 4);
@@ -1141,10 +1142,20 @@ async function botsAhora(request, env, url) {
 }
 
 
+// Cierre de las versiones antiguas (debug): con el secreto SOLO_RELEASE=1 las llamadas de la app que no traen
+// la marca x-chamos-app: com.chamos.app se rechazan. La web, los bots y la reproducción de videos no se tocan.
+const CERRADA = { error: "Esta versión de Chamos ya no tiene servicio. Instala la nueva Chamos." };
+function soloRelease(request, env, url) {
+  if (String(env.SOLO_RELEASE || "").trim() !== "1") return false;
+  const p = url.pathname, m = request.method;
+  const deApp = (p.startsWith("/v/") && m === "POST") || p === "/seguir" || p.startsWith("/video/") || p.startsWith("/estado/");
+  return deApp && request.headers.get("x-chamos-app") !== "com.chamos.app";
+}
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS });
+    if (soloRelease(request, env, url)) return jsonCors(CERRADA, 426);
     if (url.pathname.startsWith("/v/") && request.method === "POST") {
       try { return await videoSubir(request, env, url); } catch (e) { console.error(e); return jsonCors({ error: String(e.message || e) }, 500); }
     }
