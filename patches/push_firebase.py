@@ -17,7 +17,10 @@ gs = json.load(open(gs_path, encoding="utf8"))
 info = gs["project_info"]
 clients = {c["client_info"]["android_client_info"]["package_name"]: c for c in gs["client"]}
 # La compilación de prueba (debug) usa el paquete com.chamos.app.debug
-client = clients.get("com.chamos.app.debug") or clients.get("com.chamos.app")
+quiero = os.environ.get("CHAMOS_PKG", "com.chamos.app.debug")
+client = clients.get(quiero) or clients.get("com.chamos.app.debug") or clients.get("com.chamos.app")
+if quiero not in clients:
+    print("push_firebase: AVISO: google-services.json no tiene la app %s; se usa otra (las notificaciones podrían no llegar)." % quiero)
 if client is None:
     sys.exit("push_firebase: en google-services.json no hay una app Android con paquete com.chamos.app.debug ni com.chamos.app. Paquetes encontrados: %s" % ", ".join(clients) )
 used_package = client["client_info"]["android_client_info"]["package_name"]
