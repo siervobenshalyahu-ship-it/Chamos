@@ -8,10 +8,9 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -22,15 +21,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 
 /**
- * Barra ovalada de arriba: los iconos van encima. Se despliega hacia la izquierda mostrando todos los iconos
- * y se esconde hacia la derecha dejando uno solo (el de abrir/cerrar).
+ * Barra ovalada de arriba: los iconos van encima. Desliza el dedo hacia la izquierda y se despliega mostrando todos
+ * los iconos; desliza hacia la derecha y se esconde dejando un solo icono ([fijo]).
  */
 @Composable
-internal fun ChamosBarraOvalada(contenido: @Composable RowScope.() -> Unit) {
+internal fun ChamosBarraOvalada(fijo: @Composable () -> Unit, contenido: @Composable RowScope.() -> Unit) {
     var abierta by rememberSaveable { mutableStateOf(false) }
     val forma = RoundedCornerShape(50)
     Row(
@@ -38,7 +37,18 @@ internal fun ChamosBarraOvalada(contenido: @Composable RowScope.() -> Unit) {
             .clip(forma)
             .background(Color(0xE61B2250))
             .border(1.5.dp, Color(0xFF2F8BFF), forma)
-            .animateContentSize(),
+            .animateContentSize()
+            .pointerInput(Unit) {
+                var total = 0f
+                detectHorizontalDragGestures(
+                    onDragStart = { total = 0f },
+                    onHorizontalDrag = { _, arrastre -> total += arrastre },
+                    onDragEnd = {
+                        if (total < -24f) abierta = true else if (total > 24f) abierta = false
+                    },
+                    onDragCancel = { total = 0f },
+                )
+            },
         verticalAlignment = Alignment.CenterVertically,
     ) {
         AnimatedVisibility(
@@ -48,11 +58,6 @@ internal fun ChamosBarraOvalada(contenido: @Composable RowScope.() -> Unit) {
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) { contenido() }
         }
-        androidx.compose.material3.Text(
-            text = if (abierta) "▶" else "◀",
-            color = Color.White,
-            fontSize = 18.sp,
-            modifier = Modifier.clickable { abierta = !abierta }.padding(horizontal = 14.dp, vertical = 8.dp),
-        )
+        fijo()
     }
 }

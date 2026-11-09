@@ -7,6 +7,12 @@ hv = os.path.join(d, "HomeView.kt")
 s = open(hv, encoding="utf-8").read()
 old = "                            androidx.compose.foundation.layout.Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {\n"
 assert s.count(old) == 1, s.count(old)
-s = s.replace(old, "                            ChamosBarraOvalada {\n")
+s = s.replace(old, "                            ChamosBarraOvalada(fijo = {\n"
+                "                                io.element.android.libraries.designsystem.theme.components.Text(\n"
+                "                                    text = \"⚙️\",\n"
+                "                                    style = androidx.compose.ui.text.TextStyle(fontSize = 20.sp),\n"
+                "                                    modifier = Modifier.clickable { onOpenSettings() }.padding(horizontal = 12.dp, vertical = 8.dp),\n"
+                "                                )\n"
+                "                            }) {\n")
 open(hv, "w", encoding="utf-8").write(s)
 print("barra_oval OK")

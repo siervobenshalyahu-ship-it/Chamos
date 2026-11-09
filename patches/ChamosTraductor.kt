@@ -57,7 +57,7 @@ private suspend fun <T> Task<T>.esperar(): T = suspendCancellableCoroutine { c -
  * Lo que llega en otro idioma se muestra traducido a tu idioma, y lo que escribes sale en el idioma elegido para esa sala.
  */
 internal object ChamosTraductor {
-    data class Config(val activa: Boolean, val idioma: String)
+    data class Config(val activa: Boolean, val mio: String, val otro: String)
 
     val IDIOMAS = listOf(
         "en" to "Inglés", "es" to "Español", "pt" to "Portugués", "fr" to "Francés", "de" to "Alemán", "it" to "Italiano",
@@ -73,7 +73,7 @@ internal object ChamosTraductor {
     private val cache = HashMap<String, String>()
     private val identificador by lazy { LanguageIdentification.getClient() }
 
-    val miIdioma: String
+    private val porDefecto: String
         get() = Locale.getDefault().language.takeIf { TranslateLanguage.fromLanguageTag(it) != null } ?: "es"
 
     fun iniciar(ctx: Context) {
@@ -83,22 +83,27 @@ internal object ChamosTraductor {
         val m = HashMap<String, Config>()
         for ((k, v) in p.all) {
             val t = (v as? String)?.split("|") ?: continue
-            if (t.size == 2) m[k] = Config(t[0] == "1", t[1])
+            if (t.size == 3) m[k] = Config(t[0] == "1", t[1], t[2])
+            else if (t.size == 2) m[k] = Config(t[0] == "1", porDefecto, t[1])
         }
         estado.value = m
     }
 
-    fun config(sala: String): Config = estado.value[sala] ?: Config(false, "en")
+    fun config(sala: String): Config = estado.value[sala] ?: Config(false, porDefecto, if (porDefecto == "en") "es" else "en")
 
-    fun poner(ctx: Context, sala: String, activa: Boolean, idioma: String) {
-        estado.value = estado.value + (sala to Config(activa, idioma))
-        prefs?.edit()?.putString(sala, (if (activa) "1" else "0") + "|" + idioma)?.apply()
+    fun poner(ctx: Context, sala: String, activa: Boolean, mio: String, otro: String) {
+        if (mio == otro) {
+            Toast.makeText(ctx.applicationContext, "Elige dos idiomas distintos", Toast.LENGTH_SHORT).show()
+            return
+        }
+        estado.value = estado.value + (sala to Config(activa, mio, otro))
+        prefs?.edit()?.putString(sala, (if (activa) "1" else "0") + "|" + mio + "|" + otro)?.apply()
         if (activa) {
             // baja los dos idiomas ahora (una sola vez), para que luego traduzca al instante
             scope.launch {
                 Toast.makeText(ctx.applicationContext, "Traductor listo; la primera vez baja el idioma (necesita internet)", Toast.LENGTH_LONG).show()
-                traducirCon("hola", miIdioma, idioma)
-                traducirCon("hello", idioma, miIdioma)
+                traducirCon("hola", mio, otro)
+                traducirCon("hello", otro, mio)
             }
         }
     }
@@ -123,24 +128,25 @@ internal object ChamosTraductor {
 
     /** Lo que llega: si está en otro idioma, lo devuelve traducido a tu idioma; si no hace falta, null. */
     suspend fun traducirEntrante(sala: String, texto: String): String? {
-        if (!config(sala).activa) return null
+        val c = config(sala)
+        if (!c.activa) return null
         val t = texto.trim()
         if (t.length < 3 || t.startsWith("http")) return null
-        cache["$sala|$t"]?.let { return it }
+        cache["$sala|${c.mio}|$t"]?.let { return it }
         val origen = detectar(t) ?: return null
-        if (origen == miIdioma) return null
-        val r = traducirCon(t, origen, miIdioma)?.takeIf { it.isNotBlank() && it != t } ?: return null
+        if (origen == c.mio) return null
+        val r = traducirCon(t, origen, c.mio)?.takeIf { it.isNotBlank() && it != t } ?: return null
         if (cache.size > 500) cache.clear()
-        cache["$sala|$t"] = r
+        cache["$sala|${c.mio}|$t"] = r
         return r
     }
 
     /** Lo que escribes: sale en el idioma elegido para la sala. Si falla o ya está en ese idioma, null (se envía tal cual). */
     suspend fun traducirSaliente(sala: String, texto: String): String? {
         val c = config(sala)
-        if (!c.activa || c.idioma == miIdioma || texto.isBlank()) return null
-        if (detectar(texto) == c.idioma) return null
-        return traducirCon(texto, miIdioma, c.idioma)?.takeIf { it.isNotBlank() }
+        if (!c.activa || texto.isBlank()) return null
+        if (detectar(texto) == c.otro) return null
+        return traducirCon(texto, c.mio, c.otro)?.takeIf { it.isNotBlank() }
     }
 }
 
@@ -176,7 +182,7 @@ internal fun ChamosTraductorBoton() {
     ChamosTraductor.iniciar(ctx)
     val sala = ChamosVivo.room?.roomId?.value ?: return
     val cfg by ChamosTraductor.flow.collectAsState()
-    val c = cfg[sala] ?: ChamosTraductor.Config(false, "en")
+    val c = cfg[sala] ?: ChamosTraductor.config(sala)
     var abierto by remember { mutableStateOf(false) }
     androidx.compose.material3.Text(
         text = "文A",
@@ -197,18 +203,23 @@ internal fun ChamosTraductorBoton() {
                         horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceBetween,
                     ) {
                         androidx.compose.material3.Text("Traducir automáticamente", modifier = Modifier.weight(1f))
-                        Switch(checked = c.activa, onCheckedChange = { ChamosTraductor.poner(ctx, sala, it, c.idioma) })
+                        Switch(checked = c.activa, onCheckedChange = { ChamosTraductor.poner(ctx, sala, it, c.mio, c.otro) })
                     }
                     androidx.compose.material3.Text(
-                        "Lo que te escriben en otro idioma lo ves en tu idioma, y lo que escribes sale en el idioma que elijas aquí. Se traduce en tu teléfono.",
+                        "Elige los dos idiomas de este chat: lo que te escriban en el otro idioma lo ves en el tuyo, y lo que escribas en el tuyo sale en el otro. Se traduce en tu teléfono.",
                         fontSize = 13.sp,
                         modifier = Modifier.padding(vertical = 8.dp),
                     )
-                    androidx.compose.material3.Text("Idioma de este chat:")
+                    androidx.compose.material3.Text("Mi idioma:")
                     for ((codigo, nombre) in ChamosTraductor.IDIOMAS) {
-                        if (codigo == ChamosTraductor.miIdioma) continue
-                        TextButton(onClick = { ChamosTraductor.poner(ctx, sala, c.activa, codigo) }) {
-                            androidx.compose.material3.Text((if (codigo == c.idioma) "✓ " else "") + nombre)
+                        TextButton(onClick = { ChamosTraductor.poner(ctx, sala, c.activa, codigo, c.otro) }) {
+                            androidx.compose.material3.Text((if (codigo == c.mio) "✓ " else "") + nombre)
+                        }
+                    }
+                    androidx.compose.material3.Text("Idioma de la otra persona:", modifier = Modifier.padding(top = 8.dp))
+                    for ((codigo, nombre) in ChamosTraductor.IDIOMAS) {
+                        TextButton(onClick = { ChamosTraductor.poner(ctx, sala, c.activa, c.mio, codigo) }) {
+                            androidx.compose.material3.Text((if (codigo == c.otro) "✓ " else "") + nombre)
                         }
                     }
                 }
