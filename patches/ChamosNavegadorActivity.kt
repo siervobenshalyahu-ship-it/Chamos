@@ -427,21 +427,18 @@ button{padding:0 18px;border-radius:26px;border:0;background:#22D3EE;color:#0F15
 <script>
 var B=[
 ["Banco de Venezuela","bancodevenezuela.com","https://bdvenlinea.banvenez.com"],
-["Banesco","banesco.com","https://www.banesconline.com"],
+["Banesco","banesco.com","https://www.banesco.com/"],
 ["Mercantil","mercantilbanco.com","https://www.mercantilbanco.com"],
 ["BBVA Provincial","provincial.com","https://www.provincial.com"],
 ["BNC","bnc.com.ve","https://www.bncenlinea.com"],
-["Bancamiga","online.bancamiga.com","https://online.bancamiga.com"],
-["Banco del Tesoro","bancodeltesoro.com","https://www.bancodeltesoro.com"],
-["Bancaribe","bancaribe.com.ve","https://www3.bancaribe.com.ve"],
+["Bancamiga","bancamiga.com","https://www.bancamiga.com/"],
+["Banco del Tesoro","bt.com.ve","https://www.bt.com.ve/"],
+["Bancaribe","bancaribe.com.ve","https://www.bancaribe.com.ve"],
 ["Banplus","banplus.com","https://www.banplus.com"],
 ["Banco Exterior","bancoexterior.com","https://www.bancoexterior.com"],
 ["100% Banco","100x100banco.com","https://www.100x100banco.com"],
 ["Banco Plaza","bancoplaza.com","https://www.bancoplaza.com"],
-["BOD","bodinternet.com","https://www.bodinternet.com"],
-["BAV","bavenlinea.com.ve","https://www.bavenlinea.com.ve"],
-["Mi Banco","mibanco.com.ve","https://bancaenlinea.mibanco.com.ve"],
-["Bicentenario","bicentenariobu.com.ve","https://www.bicentenariobu.com.ve"]
+["Banco Digital de los Trabajadores","bdt.com.ve","https://www.bdt.com.ve"]
 ];
 var h="";
 for(var k=0;k<B.length;k++){
