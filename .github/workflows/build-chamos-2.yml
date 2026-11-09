@@ -243,6 +243,8 @@ jobs:
         run: python3 chamos-repo/patches/navegador.py chamos
       - name: Iconos y engranaje arriba
         run: python3 chamos-repo/patches/iconos_ui.py chamos chamos-repo/patches
+      - name: Ubicación en tiempo real de Chamos
+        run: python3 chamos-repo/patches/ubicacion_vivo.py chamos chamos-repo/patches
 
       - name: Notificaciones push (Firebase) si ya están configuradas
         run: |
