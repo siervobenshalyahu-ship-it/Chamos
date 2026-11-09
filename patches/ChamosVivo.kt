@@ -112,6 +112,9 @@ private fun ChamosVivoDialogo(cerrar: () -> Unit) {
         permisos.launch(lista.toTypedArray())
     }
 
+    val info by room.roomInfoFlow.collectAsState()
+    val personas = info.joinedMembersCount
+    val cifrado = info.isEncrypted == true
     val ahora = System.currentTimeMillis()
     val activos = shares.filter { it.endTimestamp > ahora && it.lastLocation != null }
     val actual = siguiendo?.let { id -> activos.firstOrNull { it.userId.value == id } }
@@ -172,6 +175,12 @@ private fun ChamosVivoDialogo(cerrar: () -> Unit) {
                         cerrar()
                     }) { androidx.compose.material3.Text("Dejar de compartir") }
                 } else {
+                    androidx.compose.material3.Text(
+                        "🔒 Solo las $personas personas de este chat podrán verla; no hay ningún enlace público ni nadie de afuera puede abrirla. " +
+                            (if (cifrado) "Va cifrada." else "⚠️ Este chat no está cifrado.") +
+                            (if (personas > 2) " Ojo: es un grupo, la verán todos." else ""),
+                        modifier = Modifier.padding(bottom = 8.dp),
+                    )
                     androidx.compose.material3.Text("Comparte dónde estás, y se actualiza solo mientras dure:")
                     for ((min, nombre) in listOf(15 to "15 minutos", 60 to "1 hora", 480 to "8 horas")) {
                         TextButton(onClick = { pedir(min) }) { androidx.compose.material3.Text(nombre) }
