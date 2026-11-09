@@ -20,15 +20,19 @@ rep("            icon = CompoundIcons.Public(),\n            tooltipLabel = \"Ch
     "            icon = ChamosIconoNinos,\n            tooltipLabel = \"Chamo Muro\",\n")
 rep("            icon = CompoundIcons.Link(),\n            tooltipLabel = \"Navegador\",\n",
     "            icon = ChamosIconoMundoGorra,\n            tooltipLabel = \"Navegador\",\n")
-# 3) engranaje arriba, al lado del titulo
-rep("                            ChamosTituloNeon()\n",
-    "                            androidx.compose.foundation.layout.Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {\n"
-    "                                ChamosTituloNeon()\n"
+# 3) engranaje arriba a la derecha, junto a la lupa, la carta y reiniciar
+rep("                                    text = \"🔄\",\n",
+    "                                    text = \"🔄\",\n")
+rep("                                        android.widget.Toast.makeText(chamosCtx, \"Actualizando estados, barra VC y mensajes…\", android.widget.Toast.LENGTH_SHORT).show()\n"
+    "                                    }.padding(horizontal = 12.dp, vertical = 8.dp),\n"
+    "                                )\n",
+    "                                        android.widget.Toast.makeText(chamosCtx, \"Actualizando estados, barra VC y mensajes…\", android.widget.Toast.LENGTH_SHORT).show()\n"
+    "                                    }.padding(horizontal = 12.dp, vertical = 8.dp),\n"
+    "                                )\n"
     "                                io.element.android.libraries.designsystem.theme.components.Text(\n"
     "                                    text = \"⚙️\",\n"
     "                                    style = androidx.compose.ui.text.TextStyle(fontSize = 20.sp),\n"
-    "                                    modifier = Modifier.clickable { onOpenSettings() }.padding(horizontal = 10.dp, vertical = 8.dp),\n"
-    "                                )\n"
-    "                            }\n")
+    "                                    modifier = Modifier.clickable { onOpenSettings() }.padding(horizontal = 12.dp, vertical = 8.dp),\n"
+    "                                )\n")
 open(hv, "w", encoding="utf-8").write(s)
 print("iconos_ui OK")

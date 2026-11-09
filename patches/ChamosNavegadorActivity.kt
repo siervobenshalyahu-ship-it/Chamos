@@ -175,7 +175,11 @@ class ChamosNavegadorActivity : Activity() {
             override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
                 val u = request?.url ?: return true
                 if (u.host == "chamos.local") {
-                    if (u.path == "/bancos") cargarBancos() else cargarInicio()
+                    when (u.path) {
+                        "/bancos" -> cargarBancos()
+                        "/fuera" -> u.getQueryParameter("u")?.let { externo(Uri.parse(it)) }
+                        else -> cargarInicio()
+                    }
                     return true
                 }
                 return when (u.scheme?.lowercase()) {
@@ -191,6 +195,15 @@ class ChamosNavegadorActivity : Activity() {
             override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
                 val u = url ?: return
                 if (!direccion.hasFocus()) direccion.setText(if (u.startsWith(inicio)) "" else u)
+            }
+
+            override fun onReceivedError(view: WebView?, request: WebResourceRequest?, error: android.webkit.WebResourceError?) {
+                if (request?.isForMainFrame == true) mostrarError(request.url.toString(), error?.description?.toString())
+            }
+
+            override fun onReceivedSslError(view: WebView?, handler: android.webkit.SslErrorHandler?, error: android.net.http.SslError?) {
+                handler?.cancel()
+                mostrarError(error?.url ?: "", "El certificado de seguridad del sitio no es válido")
             }
 
             override fun onPageFinished(view: WebView?, url: String?) {
@@ -298,6 +311,17 @@ class ChamosNavegadorActivity : Activity() {
         web.loadDataWithBaseURL(inicio, PAGINA_INICIO, "text/html", "utf-8", null)
     }
 
+    private fun mostrarError(url: String, motivo: String?) {
+        if (url.startsWith("https://chamos.local") || url.isEmpty()) return
+        val m = (motivo ?: "No se pudo abrir").replace("<", "&lt;")
+        val u = Uri.encode(url)
+        web.loadDataWithBaseURL(inicio + "error", "<!doctype html><html lang=\"es\"><head><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">" +
+            "<style>body{background:#0B1026;color:#fff;font-family:sans-serif;padding:28px;text-align:center}a{display:inline-block;margin:10px;padding:12px 20px;border-radius:24px;border:2px solid #22D3EE;color:#22D3EE;text-decoration:none}</style></head><body>" +
+            "<h2>No se pudo abrir esta página</h2><p>" + m + "</p>" +
+            "<a href=\"https://chamos.local/fuera?u=" + u + "\">Abrir en tu navegador</a><a href=\"https://chamos.local/\">Inicio</a></body></html>",
+            "text/html", "utf-8", null)
+    }
+
     private fun cargarBancos() {
         direccion.setText("")
         web.loadDataWithBaseURL(inicio + "bancos", PAGINA_BANCOS, "text/html", "utf-8", null)
@@ -366,7 +390,7 @@ button{padding:0 18px;border-radius:26px;border:0;background:#22D3EE;color:#0F15
 <a href="https://m.youtube.com"><i><img data-e="▶️" onerror="this.parentNode.textContent=this.dataset.e" src="https://www.google.com/s2/favicons?domain=youtube.com&sz=128"></i>YouTube</a>
 <a href="https://maps.google.com"><i><img data-e="🗺️" onerror="this.parentNode.textContent=this.dataset.e" src="https://www.google.com/s2/favicons?domain=maps.google.com&sz=128"></i>Mapas</a>
 <a href="https://chamos.local/bancos"><i>🏦</i>Bancos</a>
-<a href="https://www.patria.org.ve"><i><img data-e="🇻🇪" onerror="this.parentNode.textContent=this.dataset.e" src="https://www.google.com/s2/favicons?domain=patria.org.ve&sz=128"></i>Patria</a>
+<a href="https://www.patria.gov.ve"><i><img data-e="🇻🇪" onerror="this.parentNode.textContent=this.dataset.e" src="https://www.google.com/s2/favicons?domain=patria.gov.ve&sz=128"></i>Patria</a>
 <a href="https://translate.google.com"><i><img data-e="🌍" onerror="this.parentNode.textContent=this.dataset.e" src="https://www.google.com/s2/favicons?domain=translate.google.com&sz=128"></i>Traductor</a>
 <a href="https://news.google.com/?hl=es-419&amp;gl=VE&amp;ceid=VE:es-419"><i><img data-e="📰" onerror="this.parentNode.textContent=this.dataset.e" src="https://www.google.com/s2/favicons?domain=news.google.com&sz=128"></i>Noticias</a>
 <a href="https://www.google.com/search?q=clima"><i>⛅</i>Clima</a>
@@ -407,13 +431,17 @@ var B=[
 ["Mercantil","mercantilbanco.com","https://www.mercantilbanco.com"],
 ["BBVA Provincial","provincial.com","https://www.provincial.com"],
 ["BNC","bnc.com.ve","https://www.bncenlinea.com"],
-["Bancamiga","bancamiga.com","https://www.bancamiga.com"],
+["Bancamiga","online.bancamiga.com","https://online.bancamiga.com"],
 ["Banco del Tesoro","bancodeltesoro.com","https://www.bancodeltesoro.com"],
-["Bancaribe","bancaribe.com.ve","https://www.bancaribe.com.ve"],
+["Bancaribe","bancaribe.com.ve","https://www3.bancaribe.com.ve"],
 ["Banplus","banplus.com","https://www.banplus.com"],
 ["Banco Exterior","bancoexterior.com","https://www.bancoexterior.com"],
 ["100% Banco","100x100banco.com","https://www.100x100banco.com"],
-["Banco Plaza","bancoplaza.com","https://www.bancoplaza.com"]
+["Banco Plaza","bancoplaza.com","https://www.bancoplaza.com"],
+["BOD","bodinternet.com","https://www.bodinternet.com"],
+["BAV","bavenlinea.com.ve","https://www.bavenlinea.com.ve"],
+["Mi Banco","mibanco.com.ve","https://bancaenlinea.mibanco.com.ve"],
+["Bicentenario","bicentenariobu.com.ve","https://www.bicentenariobu.com.ve"]
 ];
 var h="";
 for(var k=0;k<B.length;k++){

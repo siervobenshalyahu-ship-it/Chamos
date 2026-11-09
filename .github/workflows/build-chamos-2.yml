@@ -258,6 +258,11 @@ jobs:
 
       - name: Compilar APK
         working-directory: chamos
+        env:
+          # Mapas para compartir ubicación (y en tiempo real). Sin la clave, esa función queda oculta.
+          ELEMENT_ANDROID_MAPTILER_API_KEY: ${{ secrets.MAPTILER_API_KEY }}
+          ELEMENT_ANDROID_MAPTILER_LIGHT_MAP_ID: streets-v2
+          ELEMENT_ANDROID_MAPTILER_DARK_MAP_ID: streets-v2-dark
         run: |
           set -o pipefail
           ./gradlew :app:assemble${FLAVOR}Debug -PuseLegacyPackaging=true --stacktrace --no-configuration-cache 2>&1 | tee ../gradle.log
