@@ -18,6 +18,10 @@ on:
           - debug
           - release
         default: debug
+      minificar:
+        description: "Solo con release: minificar con R8 (APK más liviano y ofuscado; probar bien antes de publicar). Guarda mapping.txt"
+        type: boolean
+        default: false
       aab:
         description: "Generar también el paquete AAB (para APKPure u otras tiendas que lo pidan)"
         type: boolean
@@ -290,7 +294,7 @@ jobs:
           fi
 
       - name: Paquete release sin minificar (más seguro, evita fallos de R8)
-        if: ${{ inputs.tipo == 'release' }}
+        if: ${{ inputs.tipo == 'release' && inputs.minificar != true }}
         working-directory: chamos
         run: |
           python3 - <<'PYEOF'
@@ -317,6 +321,21 @@ jobs:
         if: failure()
         run: |
           grep -E "^e: |What went wrong|FAILED|Execution failed|Could not" -A3 gradle.log | head -60 | while IFS= read -r l; do echo "::error::${l:0:900}"; done
+
+      - name: Guardar mapping.txt (para leer los errores de una versión minificada)
+        if: ${{ inputs.tipo == 'release' && inputs.minificar == true }}
+        run: |
+          M=$(find chamos/app/build/outputs/mapping -name mapping.txt | head -1)
+          echo "mapping: $M"
+          mkdir -p mapping && cp "$M" "mapping/mapping-V${APP_VERSION}.txt"
+
+      - name: Subir mapping.txt
+        if: ${{ inputs.tipo == 'release' && inputs.minificar == true }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: chamos-mapping
+          path: mapping/*.txt
+          retention-days: 365
 
       - name: Huella de la firma del APK
         run: |
