@@ -1,0 +1,34 @@
+name: Publicar un APK ya compilado
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: "Número de la ejecución que tiene el artefacto (chamos-2-0-apk)"
+        required: true
+      version:
+        description: "Versión de la publicación (por ejemplo 2.1.15)"
+        required: true
+permissions:
+  contents: write
+  actions: read
+jobs:
+  publicar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: chamos-2-0-apk
+          run-id: ${{ inputs.run_id }}
+          github-token: ${{ github.token }}
+          path: apk
+      - name: Publicar en Releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          APK=$(ls apk/*.apk | head -1)
+          echo "APK: $APK"
+          cp "$APK" Chamos.apk
+          gh release create "V$VERSION" Chamos.apk --repo "$GITHUB_REPOSITORY" --title "Chamos $VERSION" --notes "Chamos $VERSION" --latest \
+            || gh release upload "V$VERSION" Chamos.apk --repo "$GITHUB_REPOSITORY" --clobber
+          gh release edit "V$VERSION" --repo "$GITHUB_REPOSITORY" --latest
