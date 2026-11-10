@@ -1063,7 +1063,7 @@ private fun ComentariosDialogo(reel: ReelItem, state: ChamosReelsState, onCerrar
                     Text("Sé el primero en comentar", fontSize = 14.sp, modifier = Modifier.padding(vertical = 8.dp))
                 } else {
                     LazyColumn(Modifier.fillMaxWidth().height(240.dp)) {
-                        items(lista, key = { it.id }) { c ->
+                        items(lista.distinctBy { it.id }, key = { it.id }) { c ->
                             Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
                                 Column(Modifier.weight(1f)) {
                                     Text(c.autor, fontWeight = FontWeight.Bold, fontSize = 13.sp)

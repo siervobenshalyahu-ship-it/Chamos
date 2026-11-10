@@ -421,7 +421,9 @@ fun rememberChamosMuro(
                 lista.removeAll { it.esVideo } // el Muro ya no admite videos: solo fotos, letras y grafitis
                 val ordenados = coment.mapValues { e -> e.value.sortedBy { it.timestamp } }
                 comentarios = ordenados
-                todos = lista.map { it.copy(comentarios = ordenados[it.id]?.size ?: 0, reposts = lista.count { x -> x.repostDe == it.id }) }.sortedByDescending { it.timestamp }
+                // El mismo evento puede aparecer dos veces (eco local + remoto al publicar o repostear): una sola vez por id.
+                val unicos = lista.distinctBy { it.id }
+                todos = unicos.map { it.copy(comentarios = ordenados[it.id]?.size ?: 0, reposts = unicos.count { x -> x.repostDe == it.id }) }.sortedByDescending { it.timestamp }
                 envio = if (fallos > 0) "⚠️ No se pudo subir tu publicación ($detalle)" else if (pendientes > 0) "⏳ Subiendo tu publicación…" else ""
                 cargando = false
             }
@@ -746,7 +748,7 @@ private fun ChamosMuroContenido(state: ChamosMuroState, onPestana: (Int) -> Unit
                     )
                 }
             }
-            items(lista, key = { it.id }) { post ->
+            items(lista.distinctBy { it.id }, key = { it.id }) { post ->
                 TarjetaPost(post, state, onPerfil = { perfilDe = it; pestana = 2 })
             }
             item(key = "mas") {
@@ -1284,7 +1286,7 @@ private fun ComentariosMuro(post: MuroPost, state: ChamosMuroState, onCerrar: ()
     val contexto = LocalContext.current
     val scope = rememberCoroutineScope()
     var texto by remember { mutableStateOf("") }
-    val lista = state.comentarios[post.id].orEmpty()
+    val lista = state.comentarios[post.id].orEmpty().distinctBy { it.id }
     AlertDialog(
         onDismissRequest = onCerrar,
         title = { Text(lista.size.toString() + " comentarios") },
