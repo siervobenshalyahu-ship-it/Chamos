@@ -1,0 +1,12 @@
+# Reglas extra para la versión minificada de Chamos (R8): no tocar el código que se carga por nombre o por reflexión.
+-keep class androidx.media3.** { *; }
+-keep class com.google.mediapipe.** { *; }
+-keep class com.google.protobuf.** { *; }
+-keep class io.element.android.x.Chamos* { *; }
+-keep class io.element.android.features.home.impl.Chamos* { *; }
+-keep class io.element.android.features.home.impl.RecortarVideoDialogoKt { *; }
+-keepclassmembers class * extends android.app.Activity { <init>(...); }
+-dontwarn com.google.mediapipe.**
+-dontwarn com.google.auto.value.**
+-dontwarn javax.annotation.**
+-dontwarn org.checkerframework.**

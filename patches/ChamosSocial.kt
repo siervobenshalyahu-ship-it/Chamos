@@ -236,7 +236,15 @@ object ChamosDescarga {
             android.util.Log.e("Chamos", "guardar video", e)
             false
         }
-        if (!ok) { tmp.delete(); return false }
+        if (!ok) {
+            // Si no se pudo poner la marca, se guarda el video tal cual para no perderlo.
+            tmp.delete()
+            val sinMarca = withContext(Dispatchers.IO) {
+                guardarEnGaleria(c, File(ruta), "Chamos_${System.currentTimeMillis()}.mp4", "video/mp4", true)
+            }
+            if (sinMarca) withContext(Dispatchers.Main) { android.widget.Toast.makeText(c, "Se guardó sin marca de agua", android.widget.Toast.LENGTH_LONG).show() }
+            return sinMarca
+        }
         val guardado = withContext(Dispatchers.IO) {
             guardarEnGaleria(c, tmp, "Chamos_${System.currentTimeMillis()}.mp4", "video/mp4", true)
         }
