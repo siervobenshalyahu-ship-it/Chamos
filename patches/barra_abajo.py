@@ -5,27 +5,25 @@ d = os.path.join(root, "features/home/impl/src/main/kotlin/io/element/android/fe
 shutil.copy(os.path.join(pdir, "ChamosBarraAbajo.kt"), os.path.join(d, "ChamosBarraAbajo.kt"))
 hv = os.path.join(d, "HomeView.kt")
 s = open(hv, encoding="utf-8").read()
-old = "@Composable\nprivate fun HomeBottomBar(\n    totalUnreadCount: Int,"
-assert s.count(old) == 1, s.count(old)
-s = s.replace(old, "@Composable\nprivate fun HomeBottomBarOriginal(\n    totalUnreadCount: Int,")
-s += '''
+import re
+# Se lee la firma real de HomeBottomBar (otros parches le agregan parametros) y el envoltorio copia la misma firma.
+m = re.search(r"@Composable\nprivate fun HomeBottomBar\(\n(.*?)\n\) \{\n", s, re.S)
+assert m, "no se encontro HomeBottomBar"
+params = m.group(1)
+nombres = re.findall(r"^    (\w+):", params, re.M)
+assert "modifier" in nombres and "floatingActionButton" in nombres, nombres
+s = s.replace("@Composable\nprivate fun HomeBottomBar(\n", "@Composable\nprivate fun HomeBottomBarOriginal(\n", 1)
+reenviar = "".join("            %s = %s,\n" % (n, n) for n in nombres if n != "modifier")
+s += """
 @Composable
 private fun HomeBottomBar(
-    totalUnreadCount: Int,
-    currentHomeNavigationBarItem: HomeNavigationBarItem,
-    onItemClick: (HomeNavigationBarItem) -> Unit,
-    modifier: Modifier = Modifier,
-    floatingActionButton: (@Composable () -> Unit)?,
+""" + params + """
 ) {
     ChamosBarraAbajo(modifier = modifier) {
         HomeBottomBarOriginal(
-            totalUnreadCount = totalUnreadCount,
-            currentHomeNavigationBarItem = currentHomeNavigationBarItem,
-            onItemClick = onItemClick,
-            floatingActionButton = floatingActionButton,
-        )
+""" + reenviar + """        )
     }
 }
-'''
+"""
 open(hv, "w", encoding="utf-8").write(s)
 print("barra_abajo OK")
