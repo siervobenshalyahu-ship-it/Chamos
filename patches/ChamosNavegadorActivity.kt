@@ -384,7 +384,7 @@ button{padding:0 18px;border-radius:26px;border:0;background:#22D3EE;color:#0F15
 <input name="q" type="search" placeholder="Busca en Google" autocomplete="off">
 <button type="submit">Ir</button>
 </form>
-<a class="t" href="https://www.google.com/search?q=d%C3%B3lar+bcv+hoy"><span>💵 Dólar BCV</span><b id="bcv">ver hoy ›</b></a>
+<a class="t" href="https://www.bcv.org.ve"><span>💵 Dólar BCV</span><span style="text-align:right"><b id="bcv">ver hoy ›</b><small id="bcvf" style="display:block;margin:2px 0 0;color:#9FE3BE;font-size:11px"></small></span></a>
 <div class="g">
 <a href="https://www.bibliatodo.com/interlineal/online"><i><img data-e="📖" onerror="this.parentNode.textContent=this.dataset.e" src="https://www.google.com/s2/favicons?domain=bibliatodo.com&sz=128"></i>Biblia interlineal</a>
 <a href="https://m.youtube.com"><i><img data-e="▶️" onerror="this.parentNode.textContent=this.dataset.e" src="https://www.google.com/s2/favicons?domain=youtube.com&sz=128"></i>YouTube</a>
@@ -399,14 +399,20 @@ button{padding:0 18px;border-radius:26px;border:0;background:#22D3EE;color:#0F15
 <small>Navegador de Chamos · no guardamos tu historial</small>
 <script>
 (function(){
-  var el=document.getElementById('bcv');
-  try{
-    var c=new AbortController();setTimeout(function(){c.abort()},6000);
-    fetch('https://ve.dolarapi.com/v1/dolares/oficial',{signal:c.signal})
-      .then(function(r){return r.json()})
-      .then(function(j){var v=j.promedio||j.venta||j.compra;if(v){el.textContent='Bs. '+Number(v).toFixed(2).replace('.',',')}})
-      .catch(function(){});
-  }catch(e){}
+  var el=document.getElementById('bcv'),sub=document.getElementById('bcvf');
+  function poner(j){
+    if(!j||!j.usd)return;
+    el.textContent='Bs. '+Number(j.usd).toFixed(2).replace('.',',');
+    if(j.fecha&&/^\d{4}-\d{2}-\d{2}/.test(j.fecha)){sub.textContent='valor del '+j.fecha.slice(8,10)+'/'+j.fecha.slice(5,7)}
+  }
+  function leer(){
+    try{
+      var c=new AbortController();setTimeout(function(){c.abort()},8000);
+      fetch('https://chamos-push.siervodeyhwh57.workers.dev/dolar',{signal:c.signal})
+        .then(function(r){return r.json()}).then(poner).catch(function(){});
+    }catch(e){}
+  }
+  leer();setInterval(leer,300000);
 })();
 </script>
 </body></html>"""

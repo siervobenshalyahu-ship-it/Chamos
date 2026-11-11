@@ -998,11 +998,10 @@ const NOTICIAS_TEMAS = {
 const _xml = (t) => String(t || "").replace(/<!\[CDATA\[|\]\]>/g, "").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'").replace(/&amp;/g, "&").trim();
 async function botTasaBCV() {
   try {
-    const r = await fetch("https://ve.dolarapi.com/v1/dolares/oficial", { headers: { "user-agent": UA_BOT } });
-    if (!r.ok) return "";
-    const j = await r.json();
-    const v = Number(j.promedio || j.venta || j.compra);
-    return v ? "💵 Dólar BCV hoy: Bs. " + v.toFixed(2).replace(".", ",") + "\n\n" : "";
+    const t = await tasaBCV();
+    if (!t) return "";
+    const f = t.fecha && /^\d{4}-\d{2}-\d{2}$/.test(t.fecha) ? " (valor del " + t.fecha.slice(8, 10) + "/" + t.fecha.slice(5, 7) + ")" : "";
+    return "💵 Dólar BCV: Bs. " + t.usd.toFixed(2).replace(".", ",") + f + "\n\n";
   } catch (_) { return ""; }
 }
 async function botHacerNoticias(env, bot, cuentas) {
@@ -1142,6 +1141,46 @@ async function botsAhora(request, env, url) {
 }
 
 
+// Tasa oficial del BCV: se lee de bcv.org.ve (lo mismo que ve la gente en su página) y, si no se puede, de DolarAPI.
+// Se guarda 5 minutos en la caché del Worker, así la app y los bots muestran lo mismo y se actualiza solo.
+const _num = (t) => {
+  const n = parseFloat(String(t).trim().replace(/\.(?=\d{3}\b)/g, "").replace(",", "."));
+  return isFinite(n) ? n : 0;
+};
+async function tasaBCV() {
+  const cache = caches.default;
+  const llave = new Request("https://cache.chamos/tasa-bcv-v1");
+  const guardada = await cache.match(llave);
+  if (guardada) return await guardada.json();
+  let out = null;
+  try {
+    const r = await fetch("https://www.bcv.org.ve/", { headers: { "user-agent": "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 Chrome/120 Mobile Safari/537.36", accept: "text/html" } });
+    if (r.ok) {
+      const h = await r.text();
+      const pos = (id) => { const i = h.search(new RegExp('id="' + id + '"', "i")); return i < 0 ? "" : h.slice(i, i + 900); };
+      const num = (id) => { const m = /(\d{1,3}(?:\.\d{3})*,\d{2,8})/.exec(pos(id)); return m ? _num(m[1]) : 0; };
+      const usd = num("dolar");
+      if (usd > 1 && usd < 1e7) {
+        const eur = num("euro");
+        const f = /date-display-single[^>]*content="(\d{4}-\d{2}-\d{2})/i.exec(h) || /Fecha\s*Valor[^0-9]{0,80}(\d{1,2}\s+\w+\s+\d{4})/i.exec(h);
+        out = { usd, eur: eur > 1 ? eur : null, fecha: f ? f[1] : null, fuente: "BCV" };
+      }
+    }
+  } catch (_) {}
+  if (!out) {
+    try {
+      const r = await fetch("https://ve.dolarapi.com/v1/dolares/oficial", { headers: { "user-agent": UA_BOT } });
+      if (r.ok) {
+        const j = await r.json();
+        const v = Number(j.promedio || j.venta || j.compra);
+        if (v > 1) out = { usd: v, eur: null, fecha: j.fechaActualizacion ? String(j.fechaActualizacion).slice(0, 10) : null, fuente: "DolarAPI" };
+      }
+    } catch (_) {}
+  }
+  if (out) await cache.put(llave, new Response(JSON.stringify(out), { headers: { "cache-control": "max-age=300", "content-type": "application/json" } }));
+  return out;
+}
+
 // Cierre de las versiones antiguas (debug): con el secreto SOLO_RELEASE=1 las llamadas de la app que no traen
 // la marca x-chamos-app: com.chamos.app se rechazan. La web, los bots y la reproducción de videos no se tocan.
 const CERRADA = { error: "Esta versión de Chamos ya no tiene servicio. Instala la nueva Chamos." };
@@ -1208,6 +1247,10 @@ export default {
     }
     if (url.pathname === "/panel") {
       return new Response(PANEL_HTML, { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" } });
+    }
+    if (url.pathname === "/dolar" && request.method === "GET") {
+      const t = await tasaBCV();
+      return t ? jsonCors(t) : jsonCors({ error: "Sin datos" }, 502);
     }
     if (url.pathname === "/bots/estado" && request.method === "GET") {
       try { return await botsEstado(request, env); } catch (e) { console.error(e); return jsonCors({ error: String(e.message || e) }, 500); }
