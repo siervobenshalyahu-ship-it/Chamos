@@ -136,7 +136,53 @@ internal fun separarMusica(cuerpo: String): Pair<String, String> {
     return partes[0].trim() to partes.getOrElse(1) { "" }
 }
 
-internal fun prefijoMusica(enlace: String): String = MARCA_MUSICA + enlace + "\n"
+/** La primera línea de la música es "enlace" o "enlace<TAB>título". */
+internal fun prefijoMusica(enlace: String, titulo: String = ""): String =
+    MARCA_MUSICA + enlace + (if (titulo.isNotBlank()) "\t" + titulo.replace("\n", " ") else "") + "\n"
+
+/** Una canción de la lista para elegir. */
+data class PistaMusica(val titulo: String, val autor: String, val url: String) {
+    val credito: String get() = if (autor.isBlank()) titulo else "$titulo · $autor"
+}
+
+/**
+ * Lista de canciones para los estados. Primero las que tú agregues en la web de Chamos
+ * (musica/catalogo.json en el repo Chamos-apk-web, se puede ampliar sin recompilar la app) y después las de Kevin MacLeod.
+ */
+internal object ChamosMusicaCatalogo {
+    private const val URL_CATALOGO = "https://siervobenshalyahu-ship-it.github.io/Chamos-apk-web/musica/catalogo.json"
+    private const val KM = "Kevin MacLeod (incompetech.com) · CC BY 4.0"
+    private fun km(titulo: String) =
+        PistaMusica(titulo, KM, "https://incompetech.com/music/royalty-free/mp3-royaltyfree/" + java.net.URLEncoder.encode(titulo, "UTF-8").replace("+", "%20") + ".mp3")
+
+    private val respaldo = listOf(
+        km("Sneaky Snitch"), km("Fluffing a Duck"), km("Monkeys Spinning Monkeys"), km("Carefree"),
+        km("Wallpaper"), km("Local Forecast - Elevator"), km("Cipher"), km("Jaunty Gumption"),
+    )
+
+    @Volatile
+    private var remotas: List<PistaMusica>? = null
+
+    suspend fun cargar(): List<PistaMusica> {
+        remotas?.let { return it + respaldo }
+        val bajadas = withContext(Dispatchers.IO) {
+            runCatching {
+                val con = java.net.URL(URL_CATALOGO).openConnection() as java.net.HttpURLConnection
+                con.connectTimeout = 8000
+                con.readTimeout = 8000
+                if (con.responseCode !in 200..299) return@runCatching emptyList<PistaMusica>()
+                val arr = org.json.JSONArray(con.inputStream.bufferedReader().use { it.readText() })
+                (0 until arr.length()).mapNotNull { i ->
+                    val o = arr.optJSONObject(i) ?: return@mapNotNull null
+                    val url = o.optString("url")
+                    if (!url.startsWith("https://")) null else PistaMusica(o.optString("titulo").ifBlank { "Canción" }, o.optString("autor"), url)
+                }
+            }.getOrDefault(emptyList())
+        }
+        remotas = bajadas
+        return bajadas + respaldo
+    }
+}
 
 data class EstadoEntrada(
     val id: String,
@@ -148,6 +194,8 @@ data class EstadoEntrada(
     val nombre: String,
     /** Enlace de la música del estado (texto e imagen), o "" si no tiene. */
     val musica: String = "",
+    /** Título y autor de la canción elegida de la lista (se muestra como crédito), o "". */
+    val musicaTitulo: String = "",
 )
 
 data class ChamosEstadoItem(
@@ -192,14 +240,14 @@ private fun extraerEntrada(item: MatrixTimelineItem): EstadoEntrada? {
     val id = ev.eventId?.value ?: ev.transactionId?.value ?: return null
     return when (val t = contenido.type) {
         is ImageMessageType -> separarMusica(t.caption ?: "").let { (mus, txt) ->
-            EstadoEntrada(id, ev.timestamp, TipoEstado.IMAGEN, txt, t.source, t.info?.mimetype, t.filename, mus)
+            EstadoEntrada(id, ev.timestamp, TipoEstado.IMAGEN, txt, t.source, t.info?.mimetype, t.filename, mus.substringBefore('\t'), mus.substringAfter('\t', ""))
         }
         is VideoMessageType -> EstadoEntrada(id, ev.timestamp, TipoEstado.VIDEO, t.caption ?: "", t.source, t.info?.mimetype, t.filename)
         is TextMessageType -> if (t.body.startsWith(MARCA_VIDEO_EXT)) {
             val partes = t.body.removePrefix(MARCA_VIDEO_EXT).split("\n", limit = 2)
             EstadoEntrada(id, ev.timestamp, TipoEstado.VIDEO, partes.getOrElse(1) { "" }.trim(), MediaSource(partes[0].trim()), "video/mp4", partes[0].trim())
         } else {
-            separarMusica(t.body).let { (mus, txt) -> EstadoEntrada(id, ev.timestamp, TipoEstado.TEXTO, txt, null, null, "", mus) }
+            separarMusica(t.body).let { (mus, txt) -> EstadoEntrada(id, ev.timestamp, TipoEstado.TEXTO, txt, null, null, "", mus.substringBefore('\t'), mus.substringAfter('\t', "")) }
         }
         else -> null
     }
@@ -586,7 +634,7 @@ fun rememberChamosEstados(
         if (!e.id.startsWith("$")) return@editar false
         val evento = EventOrTransactionId.Event(EventId(e.id))
         try {
-            val conMusica = if (e.musica.isNotBlank()) prefijoMusica(e.musica) + nuevo else nuevo
+            val conMusica = if (e.musica.isNotBlank()) prefijoMusica(e.musica, e.musicaTitulo) + nuevo else nuevo
             if (e.tipo == TipoEstado.TEXTO) {
                 sala.liveTimeline.editMessage(evento, conMusica, null, emptyList()).isSuccess
             } else {
@@ -776,18 +824,21 @@ fun ChamosEstadosRow(
             todos = state.alcanceTodos,
             onAlcance = state.cambiarAlcance,
             onCerrar = { creando = false },
-            onMedia = { uri, mime, musica ->
+            onMedia = { uri, mime, musica, pista ->
                 Toast.makeText(contexto, "Publicando estado…", Toast.LENGTH_SHORT).show()
                 scope.launch {
-                    val prefijo = if (musica != null && mime.startsWith("image")) state.subirMusica(musica) else null
+                    val prefijo = if (!mime.startsWith("image")) null
+                    else if (pista != null) prefijoMusica(pista.url, pista.credito)
+                    else if (musica != null) state.subirMusica(musica) else null
                     val ok = if (prefijo != null) state.publicarImagenConMusica(uri, mime, prefijo) else state.publicarMedia(uri, mime)
                     Toast.makeText(contexto, if (ok) "Estado publicado" else "No se pudo publicar", Toast.LENGTH_SHORT).show()
                 }
             },
             onVideo = { uri, _ -> videoRecortar = uri },
-            onTexto = { texto, musica ->
+            onTexto = { texto, musica, pista ->
                 scope.launch {
-                    val prefijo = if (musica != null) state.subirMusica(musica) else null
+                    val prefijo = if (pista != null) prefijoMusica(pista.url, pista.credito)
+                    else if (musica != null) state.subirMusica(musica) else null
                     val ok = state.publicarTexto((prefijo ?: "") + texto)
                     Toast.makeText(contexto, if (ok) "Estado publicado" else "No se pudo publicar", Toast.LENGTH_SHORT).show()
                 }
@@ -1033,18 +1084,21 @@ private fun NuevoEstadoDialogo(
     todos: Boolean,
     onAlcance: (Boolean) -> Unit,
     onCerrar: () -> Unit,
-    onMedia: (Uri, String, Uri?) -> Unit,
+    onMedia: (Uri, String, Uri?, PistaMusica?) -> Unit,
     onVideo: (Uri, String) -> Unit,
-    onTexto: (String, Uri?) -> Unit,
+    onTexto: (String, Uri?, PistaMusica?) -> Unit,
 ) {
     val contexto = LocalContext.current
     var modoTexto by remember { mutableStateOf(false) }
     var texto by remember { mutableStateOf("") }
     var musica by remember { mutableStateOf<Uri?>(null) }
     var nombreMusica by remember { mutableStateOf("") }
+    var pista by remember { mutableStateOf<PistaMusica?>(null) }
+    var verLista by remember { mutableStateOf(false) }
     val selectorMusica = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         if (uri != null) {
             musica = uri
+            pista = null
             nombreMusica = runCatching {
                 contexto.contentResolver.query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c ->
                     if (c.moveToFirst()) c.getString(0) else null
@@ -1056,9 +1110,36 @@ private fun NuevoEstadoDialogo(
         if (uri != null) {
             val mime = contexto.contentResolver.getType(uri) ?: "image/jpeg"
             // Los videos pasan primero por la barra de recorte (máximo 60 s).
-            if (mime.startsWith("video")) onVideo(uri, mime) else onMedia(uri, mime, musica)
+            if (mime.startsWith("video")) onVideo(uri, mime) else onMedia(uri, mime, musica, pista)
         }
         onCerrar()
+    }
+    if (verLista) {
+        var lista by remember { mutableStateOf<List<PistaMusica>?>(null) }
+        androidx.compose.runtime.LaunchedEffect(Unit) { lista = ChamosMusicaCatalogo.cargar() }
+        AlertDialog(
+            onDismissRequest = { verLista = false },
+            title = { Text("Música para tu estado") },
+            text = {
+                val pistas = lista
+                if (pistas == null) {
+                    Text("Cargando…")
+                } else {
+                    Column(Modifier.verticalScroll(androidx.compose.foundation.rememberScrollState())) {
+                        pistas.forEach { p ->
+                            TextButton(onClick = { pista = p; musica = null; nombreMusica = ""; verLista = false }) {
+                                Column(Modifier.fillMaxWidth()) {
+                                    Text("🎵 " + p.titulo)
+                                    if (p.autor.isNotBlank()) Text(p.autor, fontSize = 11.sp)
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = { TextButton(onClick = { verLista = false }) { Text("Cerrar") } },
+        )
     }
     AlertDialog(
         onDismissRequest = onCerrar,
@@ -1071,15 +1152,21 @@ private fun NuevoEstadoDialogo(
                     placeholder = { Text("Escribe tu estado") },
                     modifier = Modifier.fillMaxWidth(),
                 )
+                TextButton(onClick = { verLista = true }) {
+                    Text(pista?.let { "🎵 ${it.titulo} (cambiar)" } ?: "🎵 Elegir música de la lista")
+                }
                 TextButton(onClick = { selectorMusica.launch("audio/*") }) {
-                    Text(if (musica == null) "🎵 Agregar música (máx. 15 MB)" else "🎵 $nombreMusica (cambiar)")
+                    Text(if (musica == null) "🎵 Usar un audio de mi teléfono (máx. 15 MB)" else "🎵 $nombreMusica (cambiar)")
                 }
             } else {
                 Column {
-                    TextButton(onClick = { selectorMusica.launch("audio/*") }) {
-                        Text(if (musica == null) "🎵 Agregar música (texto o foto, máx. 15 MB)" else "🎵 $nombreMusica (cambiar)")
+                    TextButton(onClick = { verLista = true }) {
+                        Text(pista?.let { "🎵 ${it.titulo} (cambiar)" } ?: "🎵 Elegir música de la lista")
                     }
-                    if (musica != null) TextButton(onClick = { musica = null; nombreMusica = "" }) { Text("Quitar música") }
+                    TextButton(onClick = { selectorMusica.launch("audio/*") }) {
+                        Text(if (musica == null) "🎵 Usar un audio de mi teléfono (máx. 15 MB)" else "🎵 $nombreMusica (cambiar)")
+                    }
+                    if (musica != null || pista != null) TextButton(onClick = { musica = null; nombreMusica = ""; pista = null }) { Text("Quitar música") }
                     TextButton(onClick = {
                         selector.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo))
                     }) { Text("Foto o video (video: máx. 60 s, lo puedes recortar)") }
@@ -1109,7 +1196,7 @@ private fun NuevoEstadoDialogo(
         confirmButton = {
             if (modoTexto) {
                 TextButton(onClick = {
-                    if (texto.isNotBlank()) onTexto(texto.trim(), musica)
+                    if (texto.isNotBlank()) onTexto(texto.trim(), musica, pista)
                     onCerrar()
                 }) { Text("Publicar") }
             }
@@ -1238,6 +1325,14 @@ private fun PaginaEstado(
                 }
                 if (entrada.tipo != TipoEstado.VIDEO && entrada.musica.isNotBlank()) {
                     MusicaEstado(entrada.musica, activo && !pausa)
+                    if (entrada.musicaTitulo.isNotBlank()) {
+                        Text(
+                            "♪ " + entrada.musicaTitulo,
+                            color = Color.White.copy(alpha = 0.85f),
+                            fontSize = 11.sp,
+                            modifier = Modifier.align(Alignment.BottomStart).padding(start = 16.dp, bottom = 20.dp),
+                        )
+                    }
                 }
                 if (entrada.tipo != TipoEstado.VIDEO) {
                     val anim = remember { Animatable(0f) }
