@@ -589,7 +589,7 @@ async function bots(){
   if(!r.ok)return;
   const a=document.getElementById('app');
   const old=document.getElementById('botsbox');if(old)old.remove();
-  a.insertAdjacentHTML('beforeend','<div id="botsbox"><h2>Bots ('+(d.activos?'ACTIVOS':'APAGADOS')+' · Pexels '+(d.pexels?'sí':'no')+' · B2 '+(d.b2?'sí':'no')+')</h2><div class="sc"><table><tr><th>Bot</th><th>Cuenta</th><th>Hoy</th><th>Últimos</th><th>Probar</th></tr>'+
+  a.insertAdjacentHTML('beforeend','<div id="botsbox"><h2>Bots ('+(d.activos?'ACTIVOS':'APAGADOS')+' · Videos: '+(d.videos||'sin clave')+' · B2 '+(d.b2?'sí':'no')+')</h2><div class="sc"><table><tr><th>Bot</th><th>Cuenta</th><th>Hoy</th><th>Últimos</th><th>Probar</th></tr>'+
    d.bots.map(b=>'<tr><td>'+esc(b.nombre)+'</td><td>'+(b.cuenta?'sí':'FALTA')+'</td><td>'+b.hoy+'</td><td>'+b.ultimos.map(u=>fmt(u.ts)+' '+u.modo+' '+(u.ok?'OK':'ERROR')+' '+esc(u.nota)).join('<br>')+'</td><td><button data-b="'+b.id+'" data-m="muro" onclick="probar(this)">Muro</button>'+(b.video?' <button data-b="'+b.id+'" data-m="reel" onclick="probar(this)">Video</button>':'')+'</td></tr>').join('')+'</table></div><p id="botres"></p></div>');
 }
 async function probar(el){
@@ -716,7 +716,7 @@ async function videoVer(request, env, url) {
 
 // ───────────────────────── Bots de Chamos ─────────────────────────
 // Cuentas temáticas (siempre marcadas como bot) que publican en el Muro y en Chamos Videos.
-// Secretos: BOTS_ACTIVOS=1 (interruptor), BOTS_CUENTAS="maria usuario clave;baul usuario clave;..." y PEXELS_KEY (opcional, videos).
+// Secretos: BOTS_ACTIVOS=1, BOTS_CUENTAS y PIXABAY_KEY o PEXELS_KEY (videos).
 // Necesita un Cron Trigger de cada hora ("0 * * * *"). Límite duro: BOT_MAX_DIA publicaciones por bot y día.
 const MS_API = "https://matrix-client.matrix.org/_matrix/client/v3";
 const MS_MEDIA = "https://matrix-client.matrix.org/_matrix/media/v3";
@@ -1032,32 +1032,52 @@ async function botHacerNoticias(env, bot, cuentas) {
   return { clave: nuevas[0].titulo.slice(0, 120), nota: NOTICIAS_TEMAS[tema] + " · " + nuevas.length + " titulares" };
 }
 
-// Video de Pexels (licencia libre) → Backblaze/KV → Chamos Videos.
+// Video de Pixabay o Pexels (licencia libre) → Backblaze/KV → Chamos Videos.
+// Pixabay: PIXABAY_KEY (clave gratis al registrarse). Pexels: PEXELS_KEY (ahora pausa nuevas claves). Se usa la que esté.
+async function botBuscarVideo(env, q, vistos) {
+  const ua = { "user-agent": UA_BOT };
+  if (env.PIXABAY_KEY) {
+    const r = await fetch("https://pixabay.com/api/videos/?key=" + encodeURIComponent(String(env.PIXABAY_KEY).trim()) + "&safesearch=true&per_page=30&q=" + encodeURIComponent(q), { headers: ua });
+    if (!r.ok) throw new Error("Pixabay " + r.status);
+    const j = await r.json();
+    const lista = [];
+    for (const h of j.hits || []) {
+      if (!h.duration || h.duration > 45 || vistos.has("x" + h.id)) continue;
+      const opc = ["medium", "small", "tiny"].map((k) => h.videos && h.videos[k]).filter((v) => v && v.url && v.size && v.size <= BOT_VIDEO_MAX && v.width <= 1100);
+      if (opc.length) lista.push({ clave: "x" + h.id, url: opc[0].url, autor: h.user, fuente: "Pixabay" });
+    }
+    return lista;
+  }
+  if (env.PEXELS_KEY) {
+    const r = await fetch("https://api.pexels.com/videos/search?per_page=20&orientation=portrait&query=" + encodeURIComponent(q), { headers: { authorization: String(env.PEXELS_KEY).trim(), ...ua } });
+    if (!r.ok) throw new Error("Pexels " + r.status);
+    const j = await r.json();
+    const lista = [];
+    for (const v of j.videos || []) {
+      if (v.duration > 45 || vistos.has("p" + v.id)) continue;
+      const f = (v.video_files || []).filter((x) => x.file_type === "video/mp4" && x.width && x.width <= 1100).sort((x, y) => y.width - x.width)[0];
+      if (f) lista.push({ clave: "p" + v.id, url: f.link, autor: v.user && v.user.name, fuente: "Pexels" });
+    }
+    return lista;
+  }
+  throw new Error("Falta el secreto PIXABAY_KEY (o PEXELS_KEY)");
+}
 async function botHacerReel(env, bot, cuentas) {
   const b = BOTS[bot];
-  if (!env.PEXELS_KEY) throw new Error("Falta el secreto PEXELS_KEY");
   if (!b.busca.length) throw new Error("Este bot no publica videos");
   const q = b.busca[Math.floor(Math.random() * b.busca.length)];
-  const r = await fetch("https://api.pexels.com/videos/search?per_page=20&orientation=portrait&query=" + encodeURIComponent(q), { headers: { authorization: String(env.PEXELS_KEY).trim(), "user-agent": UA_BOT } });
-  if (!r.ok) throw new Error("Pexels " + r.status);
-  const j = await r.json();
   const vistos = new Set(
     ((await env.DB.prepare("SELECT clave FROM bots_log WHERE bot=?1 AND modo='reel' AND ok=1 ORDER BY id DESC LIMIT 200").bind(bot).all()).results || []).map((x) => x.clave),
   );
-  const cand = (j.videos || []).filter((v) => v.duration <= 45 && !vistos.has("p" + v.id));
-  if (!cand.length) throw new Error("Pexels no trajo videos nuevos para '" + q + "'");
+  const cand = await botBuscarVideo(env, q, vistos);
+  if (!cand.length) throw new Error("No hay videos nuevos que quepan para '" + q + "'");
   const v = cand[Math.floor(Math.random() * cand.length)];
-  const archivos = (v.video_files || []).filter((f) => f.file_type === "video/mp4" && f.width && f.width <= 1100).sort((a, c) => c.width - a.width);
-  let buf = null;
-  for (const f of archivos) {
-    const d = await fetch(f.link, { headers: { "user-agent": UA_BOT } });
-    if (!d.ok) continue;
-    const largo = parseInt(d.headers.get("content-length") || "0", 10);
-    if (largo && largo > BOT_VIDEO_MAX) { await d.body.cancel(); continue; }
-    const b2 = await d.arrayBuffer();
-    if (b2.byteLength && b2.byteLength <= BOT_VIDEO_MAX) { buf = b2; break; }
-  }
-  if (!buf) throw new Error("Ningún archivo del video cabe en " + (BOT_VIDEO_MAX / 1048576) + " MB");
+  const d = await fetch(v.url, { headers: { "user-agent": UA_BOT } });
+  if (!d.ok) throw new Error("Descarga del video " + d.status);
+  const largo = parseInt(d.headers.get("content-length") || "0", 10);
+  if (largo && largo > BOT_VIDEO_MAX) throw new Error("Video muy pesado (" + largo + ")");
+  const buf = await d.arrayBuffer();
+  if (!buf.byteLength || buf.byteLength > BOT_VIDEO_MAX) throw new Error("Video muy pesado o vacío (" + buf.byteLength + ")");
   const ses = await botSesion(env, bot, cuentas, false);
   const id = [...crypto.getRandomValues(new Uint8Array(16))].map((x) => x.toString(16).padStart(2, "0")).join("");
   const exp = Date.now() + BOT_VIDEO_HORAS * 3600000;
@@ -1073,10 +1093,10 @@ async function botHacerReel(env, bot, cuentas) {
   } else throw new Error("No hay dónde guardar el video (ni B2 ni KV)");
   const enlace = BOT_URL + "/v/" + id + ".mp4";
   const emoji = b.tema === "belleza" ? "💅" : b.tema === "comida" ? "🍳" : "✈️";
-  const desc = emoji + " " + (v.user && v.user.name ? "Video de " + v.user.name + " · " : "") + "Pexels · " + b.nombre + " · cuenta automática de Chamos";
+  const desc = emoji + " " + (v.autor ? "Video de " + v.autor + " · " : "") + v.fuente + " · " + b.nombre + " · cuenta automática de Chamos";
   const sala = await botSala(env, bot, cuentas, "reels");
   await botEnviar(env, bot, cuentas, sala, { msgtype: "m.text", body: M_VIDEO + enlace + "\n" + desc });
-  return { clave: "p" + v.id, nota: Math.round(buf.byteLength / 1024) + " KB · " + q };
+  return { clave: v.clave, nota: Math.round(buf.byteLength / 1024) + " KB · " + q + " · " + v.fuente };
 }
 
 async function botEjecutar(env, bot, modo, forzar) {
@@ -1129,7 +1149,7 @@ async function botsEstado(request, env) {
     const ult = (await env.DB.prepare("SELECT ts, modo, ok, nota FROM bots_log WHERE bot=?1 AND nota!='pagina no valida' ORDER BY id DESC LIMIT 3").bind(id).all()).results || [];
     bots.push({ id, nombre: BOTS[id].nombre, cuenta: !!cuentas[id], video: BOTS[id].reel !== null, hoy, ultimos: ult });
   }
-  return jsonCors({ activos: String(env.BOTS_ACTIVOS || "").trim() === "1", pexels: !!env.PEXELS_KEY, b2: b2Activo(env), bots });
+  return jsonCors({ activos: String(env.BOTS_ACTIVOS || "").trim() === "1", videos: env.PIXABAY_KEY ? "Pixabay" : env.PEXELS_KEY ? "Pexels" : "", b2: b2Activo(env), bots });
 }
 async function botsAhora(request, env, url) {
   if (!env.DB) return jsonCors({ error: "Base de datos no configurada" }, 503);
