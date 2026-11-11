@@ -295,7 +295,7 @@ jobs:
 
       - name: Reglas de R8 de Chamos (versión minificada)
         if: ${{ inputs.tipo == 'release' && inputs.minificar == true }}
-        run: cp chamos-repo/patches/chamos.pro chamos/app/proguard/common/chamos.pro
+        run: cp chamos-repo/patches/chamos.pro chamos/app/proguard/common/chamos.keep
 
       - name: Paquete release sin minificar (más seguro, evita fallos de R8)
         if: ${{ inputs.tipo == 'release' && inputs.minificar != true }}
