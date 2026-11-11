@@ -41,7 +41,32 @@
     { id: "invertido", n: "Invertido", e: "👽", css: "invert(1) hue-rotate(180deg)" },
     { id: "pixel", n: "Pixelado", e: "👾", pixel: 14 },
     { id: "espejo", n: "Espejo", e: "🪞", espejo: true },
-    { id: "borroso", n: "Suave", e: "☁️", css: "blur(3px) brightness(1.08) saturate(1.2)" }
+    { id: "borroso", n: "Suave", e: "☁️", css: "blur(3px) brightness(1.08) saturate(1.2)" },
+    { id: "calido", n: "Cálido", e: "🌅", css: "sepia(.35) saturate(1.5) hue-rotate(-12deg) brightness(1.06)" },
+    { id: "atardecer", n: "Atardecer", e: "🌇", css: "sepia(.5) saturate(1.9) hue-rotate(-20deg) contrast(1.08) brightness(1.04)" },
+    { id: "frioAzul", n: "Azulado", e: "🔵", css: "saturate(1.3) hue-rotate(185deg) brightness(1.05)" },
+    { id: "noche", n: "Noche", e: "🌙", css: "brightness(.72) contrast(1.25) hue-rotate(200deg) saturate(1.4)" },
+    { id: "dramatico", n: "Dramático", e: "🎭", css: "grayscale(.35) contrast(1.6) brightness(.92) saturate(1.2)" },
+    { id: "vintage", n: "Vintage", e: "📷", css: "sepia(.7) contrast(.9) brightness(1.05) saturate(1.3)" },
+    { id: "polaroid", n: "Polaroid", e: "🖼️", css: "sepia(.25) contrast(1.15) brightness(1.1) saturate(1.35) hue-rotate(-8deg)" },
+    { id: "cine", n: "Cine", e: "🎬", css: "contrast(1.25) saturate(.85) sepia(.2) hue-rotate(-10deg) brightness(.95)" },
+    { id: "desvanecido", n: "Desvanecido", e: "🌫️", css: "contrast(.8) brightness(1.15) saturate(.7)" },
+    { id: "brillante", n: "Brillante", e: "☀️", css: "brightness(1.25) contrast(1.05) saturate(1.2)" },
+    { id: "oscuro", n: "Oscuro", e: "🖤", css: "brightness(.6) contrast(1.3)" },
+    { id: "altoContraste", n: "Contraste", e: "⚡", css: "contrast(1.8) saturate(1.2)" },
+    { id: "rosa", n: "Rosa", e: "🌷", css: "sepia(.3) saturate(1.8) hue-rotate(-50deg) brightness(1.08)" },
+    { id: "verde", n: "Matrix", e: "🟢", css: "grayscale(1) sepia(1) hue-rotate(60deg) saturate(3) brightness(.95) contrast(1.2)" },
+    { id: "morado", n: "Morado", e: "🟣", css: "hue-rotate(250deg) saturate(1.8) brightness(1.05)" },
+    { id: "rojo", n: "Rojo", e: "🔴", css: "sepia(1) saturate(4) hue-rotate(-50deg) brightness(.95)" },
+    { id: "amarillo", n: "Dorado", e: "🟡", css: "sepia(1) saturate(2.4) brightness(1.1) hue-rotate(-8deg)" },
+    { id: "duotono", n: "Duotono", e: "🎚️", css: "grayscale(1) sepia(1) hue-rotate(190deg) saturate(3.5) contrast(1.15)" },
+    { id: "satura", n: "Colorido", e: "🍭", css: "saturate(2.6) contrast(1.1)" },
+    { id: "bnSuave", n: "B/N suave", e: "⚪", css: "grayscale(1) contrast(.9) brightness(1.1)" },
+    { id: "pixelGrande", n: "Pixel grande", e: "🟦", pixel: 28 },
+    { id: "pixelMini", n: "Pixel fino", e: "🔳", pixel: 7 },
+    { id: "espejoNeon", n: "Espejo neón", e: "🔮", espejo: true, css: "saturate(2.4) contrast(1.25) hue-rotate(-30deg)" },
+    { id: "borrosoFuerte", n: "Sueño", e: "💭", css: "blur(6px) brightness(1.15) saturate(1.4)" },
+    { id: "invertidoBN", n: "Negativo", e: "🔲", css: "invert(1) grayscale(1)" }
   ];
 
   /* ------------------------------------------------------------------ detector de caras */
@@ -417,6 +442,280 @@
     });
   }
 
+  /* ------------------------------------------------------------------ extras estilo Snapchat */
+  function aqui(c, ancla, dx, dy) {
+    var a = c.ang;
+    return { x: ancla.x + (Math.cos(a) * dx - Math.sin(a) * dy) * c.ancho, y: ancla.y + (Math.sin(a) * dx + Math.cos(a) * dy) * c.ancho };
+  }
+  function emo(ctx, c, ch, ancla, dx, dy, tam, voltear) {
+    var p = aqui(c, ancla, dx, dy);
+    ctx.save();
+    ctx.globalCompositeOperation = "source-over"; ctx.globalAlpha = 1; ctx.filter = "none";
+    ctx.translate(p.x, p.y); ctx.rotate(c.ang); if (voltear) ctx.scale(-1, 1);
+    ctx.font = Math.max(8, Math.round(c.ancho * tam)) + "px sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText(ch, 0, 0);
+    ctx.restore();
+  }
+  function emoGlobal(ctx, ch, x, y, tam, rot) {
+    ctx.save(); ctx.translate(x, y); ctx.rotate(rot || 0);
+    ctx.font = Math.round(tam) + "px sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText(ch, 0, 0); ctx.restore();
+  }
+  function elipse(ctx, x, y, rx, ry, color, rot) {
+    ctx.fillStyle = color; ctx.beginPath(); ctx.ellipse(x, y, Math.max(0.5, rx), Math.max(0.5, ry), rot || 0, 0, Math.PI * 2); ctx.fill();
+  }
+  function orejasRedondas(ctx, c, colE, colI, rad, sep, alto) {
+    sobre(ctx, c.frente.x, c.frente.y, c.ang, function () {
+      [-1, 1].forEach(function (s) {
+        var x = s * c.ancho * sep, y = -c.alto * alto;
+        elipse(ctx, x, y, c.ancho * rad, c.ancho * rad, colE);
+        elipse(ctx, x, y, c.ancho * rad * 0.55, c.ancho * rad * 0.55, colI);
+      });
+    });
+  }
+  function orejasLargas(ctx, c, colE, colI) {
+    sobre(ctx, c.frente.x, c.frente.y, c.ang, function () {
+      [-1, 1].forEach(function (s) {
+        ctx.save(); ctx.translate(s * c.ancho * 0.2, -c.alto * 0.5); ctx.rotate(s * 0.16);
+        elipse(ctx, 0, 0, c.ancho * 0.13, c.alto * 0.44, colE);
+        elipse(ctx, 0, c.alto * 0.02, c.ancho * 0.07, c.alto * 0.32, colI);
+        ctx.restore();
+      });
+    });
+  }
+  function orejasPico(ctx, c, colE, colI, largo) {
+    sobre(ctx, c.frente.x, c.frente.y, c.ang, function () {
+      [-1, 1].forEach(function (s) {
+        ctx.save(); ctx.scale(s, 1);
+        ctx.fillStyle = colE; ctx.beginPath();
+        ctx.moveTo(c.ancho * 0.06, c.alto * 0.04); ctx.lineTo(c.ancho * 0.2, -c.alto * largo); ctx.lineTo(c.ancho * 0.46, c.alto * 0.06); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = colI; ctx.beginPath();
+        ctx.moveTo(c.ancho * 0.14, c.alto * 0.02); ctx.lineTo(c.ancho * 0.22, -c.alto * largo * 0.62); ctx.lineTo(c.ancho * 0.37, c.alto * 0.04); ctx.closePath(); ctx.fill();
+        ctx.restore();
+      });
+    });
+  }
+  function narizAnimal(ctx, c, color, r) {
+    elipse(ctx, c.nariz.x, c.nariz.y, c.ancho * r, c.ancho * r * 0.75, color);
+    elipse(ctx, c.nariz.x - c.ancho * r * 0.3, c.nariz.y - c.ancho * r * 0.3, c.ancho * r * 0.25, c.ancho * r * 0.15, "rgba(255,255,255,.55)");
+  }
+  function cuernos(ctx, c, color) {
+    sobre(ctx, c.frente.x, c.frente.y, c.ang, function () {
+      [-1, 1].forEach(function (s) {
+        ctx.save(); ctx.scale(s, 1);
+        var g = ctx.createLinearGradient(0, 0, c.ancho * 0.25, -c.alto * 0.4);
+        g.addColorStop(0, "#7a0d0d"); g.addColorStop(1, color);
+        ctx.fillStyle = g; ctx.beginPath();
+        ctx.moveTo(c.ancho * 0.1, c.alto * 0.02);
+        ctx.quadraticCurveTo(c.ancho * 0.12, -c.alto * 0.25, c.ancho * 0.3, -c.alto * 0.36);
+        ctx.quadraticCurveTo(c.ancho * 0.26, -c.alto * 0.16, c.ancho * 0.24, c.alto * 0.04);
+        ctx.closePath(); ctx.fill();
+        ctx.restore();
+      });
+    });
+  }
+  function astas(ctx, c) {
+    sobre(ctx, c.frente.x, c.frente.y, c.ang, function () {
+      ctx.strokeStyle = "#7a4a22"; ctx.lineWidth = Math.max(3, c.ancho * 0.03); ctx.lineCap = "round";
+      [-1, 1].forEach(function (s) {
+        ctx.save(); ctx.scale(s, 1);
+        ctx.beginPath(); ctx.moveTo(c.ancho * 0.1, 0); ctx.quadraticCurveTo(c.ancho * 0.2, -c.alto * 0.25, c.ancho * 0.3, -c.alto * 0.5); ctx.stroke();
+        [[0.16, -0.15, 0.3, -0.2], [0.22, -0.3, 0.36, -0.34], [0.27, -0.42, 0.4, -0.5]].forEach(function (r) {
+          ctx.beginPath(); ctx.moveTo(c.ancho * r[0], c.alto * r[1]); ctx.lineTo(c.ancho * r[2], c.alto * r[3]); ctx.stroke();
+        });
+        ctx.restore();
+      });
+    });
+  }
+  function aureola(ctx, c, t) {
+    sobre(ctx, c.frente.x, c.frente.y - c.alto * 0.04 * Math.sin(t / 400), c.ang, function () {
+      ctx.strokeStyle = "#ffd84a"; ctx.lineWidth = Math.max(3, c.ancho * 0.035);
+      ctx.shadowColor = "rgba(255,230,120,.9)"; ctx.shadowBlur = c.ancho * 0.08;
+      ctx.beginPath(); ctx.ellipse(0, -c.alto * 0.26, c.ancho * 0.26, c.alto * 0.07, 0, 0, Math.PI * 2); ctx.stroke();
+    });
+  }
+  function bigote(ctx, c) {
+    sobre(ctx, c.nariz.x, c.nariz.y + c.alto * 0.1, c.ang, function () {
+      ctx.fillStyle = "#2a1a10";
+      [-1, 1].forEach(function (s) {
+        ctx.save(); ctx.scale(s, 1);
+        ctx.beginPath(); ctx.moveTo(0, -c.alto * 0.01);
+        ctx.bezierCurveTo(c.ancho * 0.08, -c.alto * 0.06, c.ancho * 0.22, -c.alto * 0.03, c.ancho * 0.3, c.alto * 0.04);
+        ctx.bezierCurveTo(c.ancho * 0.2, c.alto * 0.0, c.ancho * 0.1, c.alto * 0.07, 0, c.alto * 0.04);
+        ctx.closePath(); ctx.fill(); ctx.restore();
+      });
+    });
+  }
+  function parche(ctx, c) {
+    var p = c.e1.centro;
+    ctx.save();
+    ctx.strokeStyle = "#111"; ctx.lineWidth = Math.max(2, c.ancho * 0.015);
+    var f = aqui(c, c.frente, 0.28, 0.06);
+    ctx.beginPath(); ctx.moveTo(c.ore1.x, c.ore1.y); ctx.lineTo(p.x, p.y); ctx.lineTo(f.x, f.y); ctx.stroke();
+    ctx.restore();
+    elipse(ctx, p.x, p.y, c.ew * 0.95, c.ew * 0.8, "#111", c.ang);
+  }
+  function antifaz(ctx, c, color) {
+    var p1 = M(c, c.e1.centro), p2 = M(c, c.e2.centro), r = c.ew;
+    sobre(ctx, (p1.x + p2.x) / 2, (p1.y + p2.y) / 2, c.ang, function () {
+      var d = c.entre / 2;
+      ctx.fillStyle = color; ctx.beginPath();
+      ctx.moveTo(-d - r * 1.25, -r * 0.2);
+      ctx.quadraticCurveTo(-d - r * 0.6, -r * 1.2, 0, -r * 0.45);
+      ctx.quadraticCurveTo(d + r * 0.6, -r * 1.2, d + r * 1.25, -r * 0.2);
+      ctx.quadraticCurveTo(d + r * 0.9, r * 1.2, d, r * 0.9);
+      ctx.quadraticCurveTo(0, r * 0.1, -d, r * 0.9);
+      ctx.quadraticCurveTo(-d - r * 0.9, r * 1.2, -d - r * 1.25, -r * 0.2);
+      ctx.closePath();
+      [-1, 1].forEach(function (s) {
+        ctx.moveTo(s * d + r * 0.62, 0);
+        ctx.ellipse(s * d, 0, r * 0.62, r * 0.4, 0, 0, Math.PI * 2, true);
+      });
+      ctx.fill("evenodd");
+    });
+  }
+  function calavera(ctx, c) {
+    piel(ctx, c, "#f2f2ec", "source-over", 0.9, 2);
+    var p1 = M(c, c.e1.centro), p2 = M(c, c.e2.centro);
+    elipse(ctx, p1.x, p1.y, c.ew * 0.95, c.ew * 0.85, "#111", c.ang);
+    elipse(ctx, p2.x, p2.y, c.ew * 0.95, c.ew * 0.85, "#111", c.ang);
+    sobre(ctx, c.nariz.x, c.nariz.y, c.ang, function () {
+      ctx.fillStyle = "#111"; ctx.beginPath();
+      ctx.moveTo(0, -c.ancho * 0.07); ctx.lineTo(-c.ancho * 0.05, c.ancho * 0.04); ctx.lineTo(c.ancho * 0.05, c.ancho * 0.04); ctx.closePath(); ctx.fill();
+    });
+    sobre(ctx, c.boca.x, c.boca.y, c.ang, function () {
+      var a = dist(c.comA, c.comB) * 0.55, h = c.ancho * 0.07;
+      ctx.strokeStyle = "#111"; ctx.lineWidth = Math.max(2, c.ancho * 0.012);
+      ctx.strokeRect(-a, -h, a * 2, h * 2);
+      for (var i = -3; i <= 3; i++) { ctx.beginPath(); ctx.moveTo(i * a / 3.4, -h); ctx.lineTo(i * a / 3.4, h); ctx.stroke(); }
+    });
+  }
+  function robot(ctx, c, t) {
+    piel(ctx, c, "#9fb0c0", "overlay", 0.8, 3);
+    piel(ctx, c, "#c6d2de", "multiply", 0.35, 4);
+    sobre(ctx, c.frente.x, c.frente.y, c.ang, function () {
+      ctx.strokeStyle = "#7d8794"; ctx.lineWidth = Math.max(3, c.ancho * 0.02);
+      ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, -c.alto * 0.3); ctx.stroke();
+      elipse(ctx, 0, -c.alto * 0.32, c.ancho * 0.04, c.ancho * 0.04, (Math.floor(t / 500) % 2) ? "#ff3b3b" : "#7a1b1b");
+    });
+    [c.ore1, c.ore2].forEach(function (p) { elipse(ctx, p.x, p.y, c.ancho * 0.03, c.ancho * 0.03, "#5d6672"); });
+    var p1 = M(c, c.e1.centro), p2 = M(c, c.e2.centro);
+    [p1, p2].forEach(function (p) { elipse(ctx, p.x, p.y, c.ew * 0.45, c.ew * 0.45, "rgba(40,255,200,.55)"); });
+  }
+  function banderaCara(ctx, c) {
+    ctx.save();
+    trazoOval(ctx, ovalM(c)); ctx.clip();
+    ctx.translate(c.centro.x, c.centro.y); ctx.rotate(c.ang);
+    var h = c.alto;
+    ctx.globalAlpha = 0.6;
+    ctx.fillStyle = "#ffcc00"; ctx.fillRect(-c.ancho, -h * 0.75, c.ancho * 2, h * 0.5);
+    ctx.fillStyle = "#0033a0"; ctx.fillRect(-c.ancho, -h * 0.25, c.ancho * 2, h * 0.5);
+    ctx.fillStyle = "#cf142b"; ctx.fillRect(-c.ancho, h * 0.25, c.ancho * 2, h * 0.5);
+    ctx.globalAlpha = 0.95; ctx.fillStyle = "#fff"; ctx.font = Math.round(c.ancho * 0.07) + "px sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    for (var i = 0; i < 8; i++) {
+      var a = Math.PI * (1.15 + i * 0.1);
+      ctx.fillText("★", Math.cos(a) * c.ancho * 0.28, -h * 0.02 + Math.sin(a) * h * 0.18 + h * 0.12);
+    }
+    ctx.restore();
+  }
+  function pecas(ctx, c) {
+    ctx.save(); ctx.fillStyle = "rgba(120,62,30,.62)";
+    for (var i = 0; i < 26; i++) {
+      var lado = i % 2 ? 1 : -1;
+      var x = c.nariz.x + lado * (0.04 + rnd(i * 3) * 0.2) * c.ancho, y = c.nariz.y - c.ancho * 0.06 + rnd(i * 3 + 1) * c.ancho * 0.12;
+      var q = aqui(c, c.nariz, lado * (0.04 + rnd(i * 3) * 0.2), -0.06 + rnd(i * 3 + 1) * 0.12);
+      ctx.beginPath(); ctx.arc(q.x, q.y, Math.max(1, c.ancho * (0.005 + rnd(i * 3 + 2) * 0.005)), 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.restore();
+  }
+  function labial(ctx, c, color) {
+    ctx.save(); ctx.filter = "blur(1px)"; ctx.globalAlpha = 0.72;
+    sobre(ctx, c.boca.x, c.boca.y, c.ang, function () {
+      var a = dist(c.comA, c.comB) / 2;
+      ctx.fillStyle = color; ctx.beginPath();
+      ctx.moveTo(-a, 0);
+      ctx.quadraticCurveTo(-a * 0.45, -c.ancho * 0.075, 0, -c.ancho * 0.05);
+      ctx.quadraticCurveTo(a * 0.45, -c.ancho * 0.075, a, 0);
+      ctx.quadraticCurveTo(a * 0.5, c.ancho * 0.085, 0, c.ancho * 0.085);
+      ctx.quadraticCurveTo(-a * 0.5, c.ancho * 0.085, -a, 0);
+      ctx.fill();
+    });
+    ctx.restore();
+  }
+  function sombraOjos(ctx, c, color) {
+    ctx.save(); ctx.filter = "blur(3px)"; ctx.globalAlpha = 0.55;
+    [c.e1, c.e2].forEach(function (e) {
+      var p = M(c, e.centro), q = { x: p.x - Math.sin(c.ang) * c.ew * 0.0, y: p.y };
+      sobre(ctx, q.x, q.y, c.ang, function () { elipse(ctx, 0, -c.ew * 0.32, c.ew * 0.78, c.ew * 0.32, color); });
+    });
+    ctx.restore();
+  }
+  function lagrimas(ctx, c, t) {
+    [c.e1, c.e2].forEach(function (e, i) {
+      var p = M(c, e.centro), k = ((t / 900) + i * 0.5) % 1;
+      var x = p.x + (i ? 1 : -1) * c.ew * 0.1, y = p.y + c.ew * 0.5 + k * c.alto * 0.4;
+      ctx.save(); ctx.globalAlpha = 1 - k * 0.8;
+      var g = ctx.createLinearGradient(x, y - c.ew * 0.4, x, y + c.ew * 0.2);
+      g.addColorStop(0, "#e6f6ff"); g.addColorStop(1, "#5ab6f0"); ctx.fillStyle = g;
+      ctx.beginPath(); ctx.moveTo(x, y - c.ew * 0.45);
+      ctx.bezierCurveTo(x + c.ew * 0.3, y - c.ew * 0.05, x + c.ew * 0.25, y + c.ew * 0.25, x, y + c.ew * 0.25);
+      ctx.bezierCurveTo(x - c.ew * 0.25, y + c.ew * 0.25, x - c.ew * 0.3, y - c.ew * 0.05, x, y - c.ew * 0.45); ctx.fill();
+      ctx.restore();
+    });
+  }
+  function neonCara(ctx, c, color) {
+    ctx.save();
+    ctx.strokeStyle = color; ctx.lineWidth = Math.max(2, c.ancho * 0.015); ctx.shadowColor = color; ctx.shadowBlur = c.ancho * 0.08; ctx.lineJoin = "round";
+    trazoOval(ctx, ovalM(c)); ctx.stroke();
+    ctx.restore();
+  }
+  function gorroNavidad(ctx, c) {
+    sobre(ctx, c.frente.x, c.frente.y, c.ang, function () {
+      ctx.fillStyle = "#d62828"; ctx.beginPath();
+      ctx.moveTo(-c.ancho * 0.42, c.alto * 0.04);
+      ctx.quadraticCurveTo(-c.ancho * 0.3, -c.alto * 0.55, c.ancho * 0.28, -c.alto * 0.5);
+      ctx.quadraticCurveTo(c.ancho * 0.45, -c.alto * 0.3, c.ancho * 0.42, c.alto * 0.04);
+      ctx.closePath(); ctx.fill();
+      ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.roundRect(-c.ancho * 0.46, -c.alto * 0.04, c.ancho * 0.92, c.alto * 0.1, c.alto * 0.05); ctx.fill();
+      elipse(ctx, c.ancho * 0.3, -c.alto * 0.5, c.ancho * 0.07, c.ancho * 0.07, "#fff");
+    });
+  }
+  function sombreroBruja(ctx, c) {
+    sobre(ctx, c.frente.x, c.frente.y, c.ang, function () {
+      ctx.fillStyle = "#1c1327";
+      ctx.beginPath(); ctx.ellipse(0, c.alto * 0.02, c.ancho * 0.62, c.alto * 0.07, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(-c.ancho * 0.32, 0); ctx.quadraticCurveTo(-c.ancho * 0.05, -c.alto * 0.4, c.ancho * 0.18, -c.alto * 0.72);
+      ctx.quadraticCurveTo(c.ancho * 0.12, -c.alto * 0.3, c.ancho * 0.32, 0); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = "#7b3fc4"; ctx.fillRect(-c.ancho * 0.3, -c.alto * 0.07, c.ancho * 0.6, c.alto * 0.07);
+    });
+  }
+  function cuernoUnicornio(ctx, c) {
+    sobre(ctx, c.frente.x, c.frente.y, c.ang, function () {
+      var g = ctx.createLinearGradient(0, 0, 0, -c.alto * 0.5);
+      g.addColorStop(0, "#ff9ad5"); g.addColorStop(0.5, "#ffe27a"); g.addColorStop(1, "#8fd3ff");
+      ctx.fillStyle = g; ctx.beginPath();
+      ctx.moveTo(-c.ancho * 0.07, c.alto * 0.03); ctx.lineTo(0, -c.alto * 0.5); ctx.lineTo(c.ancho * 0.07, c.alto * 0.03); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = "rgba(255,255,255,.7)"; ctx.lineWidth = Math.max(1.5, c.ancho * 0.008);
+      for (var i = 1; i < 5; i++) { ctx.beginPath(); ctx.moveTo(-c.ancho * 0.06 * (1 - i / 5), -c.alto * 0.1 * i); ctx.lineTo(c.ancho * 0.06 * (1 - i / 5), -c.alto * 0.1 * i + c.alto * 0.02); ctx.stroke(); }
+    });
+  }
+  function colmillos(ctx, c) {
+    ctx.fillStyle = "#fff"; ctx.strokeStyle = "rgba(0,0,0,.3)"; ctx.lineWidth = 1;
+    [c.comA, c.comB].forEach(function (p, i) {
+      var s = i ? -1 : 1, q = aqui(c, p, s * 0.03, 0.0);
+      ctx.beginPath(); ctx.moveTo(q.x, q.y); ctx.lineTo(q.x + s * c.ancho * 0.045, q.y); ctx.lineTo(q.x + s * c.ancho * 0.022, q.y + c.ancho * 0.075); ctx.closePath(); ctx.fill(); ctx.stroke();
+    });
+  }
+  function flotantes(ctx, w, h, t, lista, n, tam, sube) {
+    for (var i = 0; i < n; i++) {
+      var v = 0.5 + rnd(i * 7 + 3), k = ((t / (sube ? 5200 : 6500)) * v + rnd(i)) % 1;
+      var x = rnd(i * 5 + 1) * w + Math.sin(t / 700 + i) * w * 0.02, y = sube ? h * (1.05 - k * 1.15) : h * (-0.05 + k * 1.15);
+      ctx.save(); ctx.globalAlpha = Math.min(1, Math.min(k, 1 - k) * 5);
+      emoGlobal(ctx, lista[i % lista.length], x, y, tam * (0.7 + rnd(i * 11) * 0.7), Math.sin(t / 900 + i) * 0.4);
+      ctx.restore();
+    }
+  }
+
   /* ------------------------------------------------------------------ efectos de cara */
   function ojosGrandes(c, f, r) { return [W(c.e1.centro, c.ew * r, f), W(c.e2.centro, c.ew * r, f)]; }
 
@@ -521,7 +820,231 @@
       warps: function (c) { return [W(c.nariz, c.ancho * 0.42, 0.82)]; } },
     { id: "sapo", n: "Boca de sapo", e: "🐸", grupo: "Deformes",
       warps: function (c) { return [W(c.boca, c.ancho * 0.52, 0.66), W(c.mej1, c.ancho * 0.3, 0.3), W(c.mej2, c.ancho * 0.3, 0.3)].concat(ojosGrandes(c, 0.3, 0.9)); },
-      dibujar: function (ctx, c) { piel(ctx, c, "#9ad04a", "multiply", 0.55, 4); } }
+      dibujar: function (ctx, c) { piel(ctx, c, "#9ad04a", "multiply", 0.55, 4); } },
+    /* ---- Animales ---- */
+    { id: "perro", n: "Perrito", e: "🐶", grupo: "Animales",
+      warps: function (c) { return ojosGrandes(c, 0.18, 1.0); },
+      dibujar: function (ctx, c, t) {
+        sobre(ctx, c.frente.x, c.frente.y, c.ang, function () {
+          [-1, 1].forEach(function (s) {
+            ctx.save(); ctx.translate(s * c.ancho * 0.42, -c.alto * 0.06); ctx.rotate(s * 0.25);
+            elipse(ctx, 0, c.alto * 0.12, c.ancho * 0.11, c.alto * 0.24, "#7b4a26");
+            ctx.restore();
+          });
+        });
+        narizAnimal(ctx, c, "#1a1a1a", 0.07);
+        var lengua = (Math.sin(t / 220) + 1) / 2;
+        elipse(ctx, c.boca.x, c.boca.y + c.ancho * 0.07 + lengua * c.ancho * 0.02, c.ancho * 0.06, c.ancho * (0.07 + lengua * 0.04), "#ff6f91");
+      } },
+    { id: "conejo", n: "Conejito", e: "🐰", grupo: "Animales",
+      warps: function (c) { return ojosGrandes(c, 0.2, 1.0); },
+      css: "brightness(1.06)",
+      dibujar: function (ctx, c) {
+        orejasLargas(ctx, c, "#f4f0f2", "#ffb3cf");
+        rubor(ctx, c, 0.9);
+        narizAnimal(ctx, c, "#ff8fb4", 0.045);
+        ctx.fillStyle = "#fff"; ctx.strokeStyle = "rgba(0,0,0,.25)"; ctx.lineWidth = 1;
+        ctx.fillRect(c.boca.x - c.ancho * 0.045, c.boca.y + c.ancho * 0.015, c.ancho * 0.04, c.ancho * 0.085);
+        ctx.strokeRect(c.boca.x - c.ancho * 0.045, c.boca.y + c.ancho * 0.015, c.ancho * 0.04, c.ancho * 0.085);
+        ctx.fillRect(c.boca.x + c.ancho * 0.005, c.boca.y + c.ancho * 0.015, c.ancho * 0.04, c.ancho * 0.085);
+        ctx.strokeRect(c.boca.x + c.ancho * 0.005, c.boca.y + c.ancho * 0.015, c.ancho * 0.04, c.ancho * 0.085);
+      } },
+    { id: "oso", n: "Osito", e: "🐻", grupo: "Animales",
+      dibujar: function (ctx, c) {
+        orejasRedondas(ctx, c, "#8a5a33", "#d9a877", 0.1, 0.34, 0.05);
+        narizAnimal(ctx, c, "#2b1a10", 0.065);
+        rubor(ctx, c, 0.7);
+      } },
+    { id: "panda", n: "Panda", e: "🐼", grupo: "Animales",
+      css: "brightness(1.08)",
+      dibujar: function (ctx, c) {
+        orejasRedondas(ctx, c, "#1b1b1b", "#333", 0.1, 0.34, 0.05);
+        piel(ctx, c, "#fafafa", "source-over", 0.35, 6);
+        [c.e1, c.e2].forEach(function (e, i) {
+          var p = M(c, e.centro);
+          sobre(ctx, p.x, p.y, c.ang + (i ? -0.5 : 0.5), function () { elipse(ctx, 0, 0, c.ew * 0.95, c.ew * 1.25, "rgba(20,20,20,.88)"); });
+        });
+        narizAnimal(ctx, c, "#111", 0.06);
+      } },
+    { id: "zorro", n: "Zorrito", e: "🦊", grupo: "Animales",
+      dibujar: function (ctx, c) {
+        orejasPico(ctx, c, "#e8721c", "#fff2e0", 0.62);
+        piel(ctx, c, "#f08a2e", "multiply", 0.35, 5);
+        narizAnimal(ctx, c, "#111", 0.05);
+        ctx.fillStyle = "rgba(255,255,255,.92)";
+        [c.mej1, c.mej2].forEach(function (p, i) {
+          var s = i ? 1 : -1, q = aqui(c, p, s * 0.02, 0.0);
+          ctx.beginPath(); ctx.moveTo(q.x - s * c.ancho * 0.1, q.y - c.ancho * 0.04); ctx.lineTo(q.x + s * c.ancho * 0.04, q.y + c.ancho * 0.02); ctx.lineTo(q.x - s * c.ancho * 0.08, q.y + c.ancho * 0.1); ctx.closePath(); ctx.fill();
+        });
+      } },
+    { id: "reno", n: "Reno", e: "🦌", grupo: "Animales",
+      dibujar: function (ctx, c) {
+        astas(ctx, c);
+        elipse(ctx, c.nariz.x, c.nariz.y, c.ancho * 0.065, c.ancho * 0.065, "#ff2a2a");
+        elipse(ctx, c.nariz.x - c.ancho * 0.02, c.nariz.y - c.ancho * 0.02, c.ancho * 0.02, c.ancho * 0.015, "rgba(255,255,255,.7)");
+      } },
+    { id: "mariposa", n: "Mariposas", e: "🦋", grupo: "Animales",
+      global: function (ctx, w, h, t) { flotantes(ctx, w, h, t, ["🦋", "🦋", "🌸"], 9, h * 0.07, true); },
+      dibujar: function (ctx, c, t) { emo(ctx, c, "🦋", c.frente, 0.28 + Math.sin(t / 500) * 0.02, -0.16, 0.3); } },
+    { id: "pajaritos", n: "Pajaritos", e: "🐤", grupo: "Animales",
+      dibujar: function (ctx, c, t) {
+        for (var i = 0; i < 4; i++) {
+          var a = t / 600 + i * Math.PI / 2;
+          emo(ctx, c, "🐤", c.frente, Math.cos(a) * 0.36, -0.22 + Math.sin(a) * 0.05, 0.14 + 0.04 * Math.sin(a));
+        }
+      } },
+
+    /* ---- Accesorios ---- */
+    { id: "corona", n: "Corona", e: "👑", grupo: "Accesorios",
+      dibujar: function (ctx, c) { emo(ctx, c, "👑", c.frente, 0, -0.14, 0.55); } },
+    { id: "gorra", n: "Gorra al revés", e: "🧢", grupo: "Accesorios",
+      dibujar: function (ctx, c) { emo(ctx, c, "🧢", c.frente, 0.02, -0.12, 0.66, true); } },
+    { id: "sombrero", n: "Sombrero", e: "🎩", grupo: "Accesorios",
+      dibujar: function (ctx, c) { emo(ctx, c, "🎩", c.frente, 0, -0.16, 0.62); } },
+    { id: "paja", n: "Sombrero de paja", e: "👒", grupo: "Accesorios",
+      dibujar: function (ctx, c) { emo(ctx, c, "👒", c.frente, 0, -0.1, 0.9); } },
+    { id: "graduado", n: "Graduado", e: "🎓", grupo: "Accesorios",
+      dibujar: function (ctx, c) { emo(ctx, c, "🎓", c.frente, 0, -0.12, 0.7); } },
+    { id: "casco", n: "Casco", e: "🪖", grupo: "Accesorios",
+      dibujar: function (ctx, c) { emo(ctx, c, "🪖", c.frente, 0, -0.12, 0.72); } },
+    { id: "lazo", n: "Lazo", e: "🎀", grupo: "Accesorios",
+      dibujar: function (ctx, c) { emo(ctx, c, "🎀", c.frente, 0.26, -0.1, 0.34); } },
+    { id: "flores", n: "Corona de flores", e: "🌸", grupo: "Accesorios",
+      dibujar: function (ctx, c) {
+        var fl = ["🌸", "🌼", "🌺", "🌼", "🌸"];
+        for (var i = 0; i < 5; i++) emo(ctx, c, fl[i], c.frente, (i - 2) * 0.17, -0.06 - (i === 2 ? 0.04 : 0), 0.2);
+      } },
+    { id: "gafasSol", n: "Lentes de sol", e: "🕶️", grupo: "Accesorios",
+      dibujar: function (ctx, c) { emo(ctx, c, "🕶️", M(c, c.ojos), 0, 0.01, c.entre / c.ancho * 2.3); } },
+    { id: "gafas", n: "Lentes", e: "👓", grupo: "Accesorios",
+      dibujar: function (ctx, c) { emo(ctx, c, "👓", M(c, c.ojos), 0, 0.01, c.entre / c.ancho * 2.3); } },
+    { id: "goggles", n: "Gafas de buceo", e: "🥽", grupo: "Accesorios",
+      dibujar: function (ctx, c) { emo(ctx, c, "🥽", M(c, c.ojos), 0, 0.01, c.entre / c.ancho * 2.4); } },
+    { id: "bigote", n: "Bigote", e: "👨", grupo: "Accesorios",
+      dibujar: function (ctx, c) { bigote(ctx, c); } },
+    { id: "pirata", n: "Pirata", e: "🏴‍☠️", grupo: "Accesorios",
+      dibujar: function (ctx, c) { parche(ctx, c); bigote(ctx, c); } },
+    { id: "heroe", n: "Antifaz de héroe", e: "🦸", grupo: "Accesorios",
+      dibujar: function (ctx, c) { antifaz(ctx, c, "#1a1a2e"); } },
+    { id: "navidad", n: "Gorro de Navidad", e: "🎅", grupo: "Accesorios",
+      global: function (ctx, w, h, t) { flotantes(ctx, w, h, t, ["❄️", "❄️", "✨"], 14, h * 0.05, false); },
+      dibujar: function (ctx, c) { gorroNavidad(ctx, c); } },
+    { id: "bruja", n: "Sombrero de bruja", e: "🧙", grupo: "Accesorios",
+      dibujar: function (ctx, c) { sombreroBruja(ctx, c); } },
+
+    /* ---- Fantasía ---- */
+    { id: "diablo", n: "Diablito", e: "😈", grupo: "Fantasía",
+      css: "saturate(1.2)",
+      dibujar: function (ctx, c) { piel(ctx, c, "#d62828", "multiply", 0.55, 4); cuernos(ctx, c, "#ff3b3b"); colmillos(ctx, c); } },
+    { id: "angel", n: "Ángel", e: "😇", grupo: "Fantasía",
+      css: "brightness(1.1) saturate(.95)",
+      global: function (ctx, w, h) { vineta(ctx, w, h, "rgba(255,245,200,.35)"); },
+      dibujar: function (ctx, c, t) { aureola(ctx, c, t); rubor(ctx, c, 0.7); } },
+    { id: "vampiro", n: "Vampiro", e: "🧛", grupo: "Fantasía",
+      css: "contrast(1.15) saturate(.8)",
+      dibujar: function (ctx, c) { piel(ctx, c, "#e9e4ee", "screen", 0.4, 4); colmillos(ctx, c); [c.e1, c.e2].forEach(function (e) { var p = M(c, e.centro); elipse(ctx, p.x, p.y, c.ew * 0.22, c.ew * 0.22, "rgba(220,20,40,.8)"); }); } },
+    { id: "zombie", n: "Zombi", e: "🧟", grupo: "Fantasía",
+      css: "contrast(1.15) saturate(.7)",
+      dibujar: function (ctx, c) {
+        piel(ctx, c, "#7f9a6a", "multiply", 0.75, 3);
+        ctx.strokeStyle = "rgba(60,20,20,.75)"; ctx.lineWidth = Math.max(2, c.ancho * 0.012);
+        var a = aqui(c, c.mej1, 0.0, -0.1), b = aqui(c, c.mej1, 0.1, 0.0);
+        ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+        for (var i = 0; i < 5; i++) { var p = { x: a.x + (b.x - a.x) * i / 4, y: a.y + (b.y - a.y) * i / 4 }; ctx.beginPath(); ctx.moveTo(p.x - 4, p.y - 6); ctx.lineTo(p.x + 4, p.y + 6); ctx.stroke(); }
+        [c.e1, c.e2].forEach(function (e) { var p = M(c, e.centro); sobre(ctx, p.x, p.y + c.ew * 0.45, c.ang, function () { elipse(ctx, 0, 0, c.ew * 0.7, c.ew * 0.25, "rgba(60,30,60,.45)"); }); });
+      } },
+    { id: "calavera", n: "Calavera", e: "💀", grupo: "Fantasía",
+      dibujar: function (ctx, c) { calavera(ctx, c); } },
+    { id: "robot", n: "Robot", e: "🤖", grupo: "Fantasía",
+      dibujar: function (ctx, c, t) { robot(ctx, c, t); } },
+    { id: "alien", n: "Alien", e: "👽", grupo: "Fantasía",
+      warps: function (c) { return ojosGrandes(c, 0.95, 1.25).concat([W(c.barbilla, c.ancho * 0.7, -0.25), W(c.nariz, c.ancho * 0.3, -0.35)]); },
+      dibujar: function (ctx, c) {
+        piel(ctx, c, "#7fd66a", "multiply", 0.85, 3);
+        piel(ctx, c, "#b6ff9a", "overlay", 0.4, 5);
+        sobre(ctx, c.frente.x, c.frente.y, c.ang, function () {
+          ctx.strokeStyle = "#5fb04a"; ctx.lineWidth = Math.max(3, c.ancho * 0.02); ctx.lineCap = "round";
+          [-1, 1].forEach(function (s) { ctx.beginPath(); ctx.moveTo(s * c.ancho * 0.1, 0); ctx.quadraticCurveTo(s * c.ancho * 0.18, -c.alto * 0.22, s * c.ancho * 0.26, -c.alto * 0.3); ctx.stroke(); elipse(ctx, s * c.ancho * 0.26, -c.alto * 0.31, c.ancho * 0.035, c.ancho * 0.035, "#c9ff7a"); });
+        });
+        [c.e1, c.e2].forEach(function (e) { var p = M(c, e.centro); sobre(ctx, p.x, p.y, c.ang, function () { elipse(ctx, 0, 0, c.ew * 0.7, c.ew * 0.95, "#0b0b12"); elipse(ctx, -c.ew * 0.2, -c.ew * 0.3, c.ew * 0.15, c.ew * 0.22, "rgba(255,255,255,.7)"); }); });
+      } },
+    { id: "unicornio", n: "Unicornio", e: "🦄", grupo: "Fantasía",
+      css: "saturate(1.2) brightness(1.06)",
+      global: function (ctx, w, h, t) { flotantes(ctx, w, h, t, ["✨", "🌈", "⭐", "💖"], 10, h * 0.06, true); },
+      dibujar: function (ctx, c) { orejasPico(ctx, c, "#ffe3f1", "#ffb3d9", 0.34); cuernoUnicornio(ctx, c); rubor(ctx, c, 1.1); } },
+    { id: "elfo", n: "Elfo", e: "🧝", grupo: "Fantasía",
+      dibujar: function (ctx, c) {
+        [[c.ore1, -1], [c.ore2, 1]].forEach(function (par) {
+          var p = par[0], s = par[1];
+          ctx.fillStyle = "#f0c9a8"; ctx.strokeStyle = "rgba(120,70,40,.5)"; ctx.lineWidth = 1.5;
+          ctx.beginPath(); ctx.moveTo(p.x, p.y + c.alto * 0.08); ctx.lineTo(p.x + s * c.ancho * 0.28, p.y - c.alto * 0.2); ctx.lineTo(p.x, p.y - c.alto * 0.06); ctx.closePath(); ctx.fill(); ctx.stroke();
+        });
+        piel(ctx, c, "#fff4e0", "screen", 0.2, 5);
+      } },
+    { id: "payaso", n: "Payaso", e: "🤡", grupo: "Fantasía",
+      dibujar: function (ctx, c) {
+        sobre(ctx, c.frente.x, c.frente.y, c.ang, function () {
+          [-1, 1].forEach(function (s) { elipse(ctx, s * c.ancho * 0.34, -c.alto * 0.05, c.ancho * 0.16, c.ancho * 0.16, "#ff6a00"); elipse(ctx, s * c.ancho * 0.3, -c.alto * 0.22, c.ancho * 0.1, c.ancho * 0.1, "#ff6a00"); });
+        });
+        piel(ctx, c, "#fff", "screen", 0.45, 3);
+        [c.mej1, c.mej2].forEach(function (p) { elipse(ctx, p.x, p.y, c.ancho * 0.05, c.ancho * 0.05, "rgba(255,40,80,.5)"); });
+        labial(ctx, c, "#e8142a");
+        elipse(ctx, c.nariz.x, c.nariz.y, c.ancho * 0.075, c.ancho * 0.075, "#e8142a");
+        elipse(ctx, c.nariz.x - c.ancho * 0.02, c.nariz.y - c.ancho * 0.02, c.ancho * 0.02, c.ancho * 0.015, "rgba(255,255,255,.7)");
+      } },
+    { id: "bandera", n: "Venezuela", e: "🇻🇪", grupo: "Fantasía",
+      dibujar: function (ctx, c) { banderaCara(ctx, c); emo(ctx, c, "🇻🇪", c.frente, 0.3, -0.12, 0.2); } },
+
+    /* ---- Maquillaje ---- */
+    { id: "pecas", n: "Pecas", e: "🟤", grupo: "Maquillaje",
+      dibujar: function (ctx, c) { pecas(ctx, c); rubor(ctx, c, 0.5); } },
+    { id: "labialRojo", n: "Labial rojo", e: "💄", grupo: "Maquillaje",
+      dibujar: function (ctx, c) { labial(ctx, c, "#d1122b"); } },
+    { id: "labialRosa", n: "Labial rosa", e: "💋", grupo: "Maquillaje",
+      dibujar: function (ctx, c) { labial(ctx, c, "#ff5fa2"); rubor(ctx, c, 0.9); } },
+    { id: "sombraAzul", n: "Sombra azul", e: "💙", grupo: "Maquillaje",
+      dibujar: function (ctx, c) { sombraOjos(ctx, c, "#2f6bff"); } },
+    { id: "sombraMorada", n: "Sombra morada", e: "💜", grupo: "Maquillaje",
+      dibujar: function (ctx, c) { sombraOjos(ctx, c, "#9b3fd6"); labial(ctx, c, "#a02a8a"); } },
+    { id: "glitter", n: "Brillitos", e: "✨", grupo: "Maquillaje",
+      dibujar: function (ctx, c, t) { destellos(ctx, c, t, 14, "rgba(255,240,170,.95)"); sombraOjos(ctx, c, "#ffd84a"); } },
+    { id: "lagrimas", n: "Llorón", e: "😭", grupo: "Maquillaje",
+      dibujar: function (ctx, c, t) { lagrimas(ctx, c, t); rubor(ctx, c, 0.8); } },
+    { id: "neonCian", n: "Contorno neón", e: "🔷", grupo: "Maquillaje",
+      dibujar: function (ctx, c) { neonCara(ctx, c, "#22f0ff"); } },
+    { id: "neonRosa", n: "Contorno rosa", e: "🩷", grupo: "Maquillaje",
+      dibujar: function (ctx, c) { neonCara(ctx, c, "#ff3cac"); } },
+
+    /* ---- Cariñosas ---- */
+    { id: "ojosCorazon", n: "Ojos de corazón", e: "😍", grupo: "Cariñosas",
+      global: function (ctx, w, h, t) { flotantes(ctx, w, h, t, ["💗", "💖", "❤️"], 12, h * 0.06, true); },
+      dibujar: function (ctx, c, t) { var k = 1 + 0.12 * Math.sin(t / 180); emo(ctx, c, "❤️", M(c, c.e1.centro), 0, 0, c.ew / c.ancho * 1.9 * k); emo(ctx, c, "❤️", M(c, c.e2.centro), 0, 0, c.ew / c.ancho * 1.9 * k); } },
+    { id: "ojosEstrella", n: "Ojos de estrella", e: "🤩", grupo: "Cariñosas",
+      dibujar: function (ctx, c, t) { emo(ctx, c, "⭐", M(c, c.e1.centro), 0, 0, c.ew / c.ancho * 1.9); emo(ctx, c, "⭐", M(c, c.e2.centro), 0, 0, c.ew / c.ancho * 1.9); destellos(ctx, c, t, 6, "rgba(255,240,160,.95)"); } },
+    { id: "enamorado", n: "Enamorado", e: "🥰", grupo: "Cariñosas",
+      global: function (ctx, w, h, t) { flotantes(ctx, w, h, t, ["💕", "💗", "💘"], 10, h * 0.055, true); },
+      dibujar: function (ctx, c, t) { rubor(ctx, c, 1.2); for (var i = 0; i < 3; i++) { var a = t / 700 + i * 2.1; emo(ctx, c, "💕", c.frente, Math.cos(a) * 0.4, -0.2 + Math.sin(a) * 0.06, 0.12); } } },
+    { id: "lluviaEstrellas", n: "Estrellitas", e: "🌟", grupo: "Cariñosas",
+      global: function (ctx, w, h, t) { flotantes(ctx, w, h, t, ["⭐", "🌟", "✨"], 16, h * 0.05, false); },
+      dibujar: function (ctx, c, t) { destellos(ctx, c, t, 8, "rgba(255,250,200,.95)"); } },
+
+    /* ---- Más deformes ---- */
+    { id: "chiquito", n: "Ojitos", e: "🥺", grupo: "Más deformes",
+      warps: function (c) { return ojosGrandes(c, -0.55, 1.0); } },
+    { id: "cachetes", n: "Cachetón", e: "😚", grupo: "Más deformes",
+      warps: function (c) { return [W(c.mej1, c.ancho * 0.32, 0.6), W(c.mej2, c.ancho * 0.32, 0.6)]; } },
+    { id: "bocona", n: "Bocón", e: "😮", grupo: "Más deformes",
+      warps: function (c) { return [W(c.boca, c.ancho * 0.5, 0.85)]; } },
+    { id: "frentona", n: "Frentón", e: "🧠", grupo: "Más deformes",
+      warps: function (c) { var f = { x: (c.frente.x + c.ojos.x) / 2, y: (c.frente.y + c.ojos.y) / 2 }; return [W(f, c.alto * 0.55, 0.8)]; } },
+    { id: "barbilla", n: "Barbilludo", e: "🦷", grupo: "Más deformes",
+      warps: function (c) { return [W(c.barbilla, c.ancho * 0.55, 0.85)]; } },
+    { id: "cabecita", n: "Cabecita", e: "🔬", grupo: "Más deformes",
+      warps: function (c) { return [W(c.centro, c.alto * 0.8, -0.55)]; } },
+    { id: "gemelos", n: "Ojos distintos", e: "🤪", grupo: "Más deformes",
+      warps: function (c) { return [W(c.e1.centro, c.ew * 1.5, 0.85), W(c.e2.centro, c.ew * 1.2, -0.45)]; } },
+    { id: "alargada", n: "Cara larga", e: "🐴", grupo: "Más deformes",
+      warps: function (c) { return [W(c.centro, c.alto * 0.9, -0.35), W(c.nariz, c.ancho * 0.45, 0.45), W(c.barbilla, c.ancho * 0.5, 0.5)]; } }
   ];
   /* ------------------------------------------------------------------ memes */
   var MEMES = [
