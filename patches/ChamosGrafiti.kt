@@ -62,7 +62,15 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -330,6 +338,36 @@ private class ElemGrafiti(var texto: String, estilo0: Int, cx0: Float, cy0: Floa
     }
 }
 
+
+private val NEON_AZUL = Color(0xFF29C5FF)
+private val NEON_FUCSIA = Color(0xFFFF2DD1)
+
+/** Texto de los menús del grafiti: letras azul y fucsia alternadas con brillo de luz de neón, legibles sobre el fondo oscuro. */
+@Composable
+private fun NeonTexto(
+    texto: String,
+    modifier: Modifier = Modifier,
+    fontWeight: FontWeight = FontWeight.Bold,
+    fontSize: TextUnit = 15.sp,
+    textAlign: TextAlign? = null,
+) {
+    val cuerpo = remember(texto) {
+        buildAnnotatedString {
+            var n = 0
+            texto.forEach { ch ->
+                if (ch.isWhitespace()) {
+                    append(ch)
+                } else {
+                    val col = if (n % 2 == 0) NEON_AZUL else NEON_FUCSIA
+                    withStyle(SpanStyle(color = col, shadow = Shadow(color = col.copy(alpha = 0.9f), offset = Offset.Zero, blurRadius = 14f))) { append(ch) }
+                    n++
+                }
+            }
+        }
+    }
+    Text(cuerpo, modifier = modifier, fontWeight = fontWeight, fontSize = fontSize, textAlign = textAlign, style = TextStyle(shadow = Shadow(color = Color.White.copy(alpha = 0.25f), blurRadius = 2f)))
+}
+
 /** Editor de grafiti: fondo de pared o cuaderno, textos con distintas letras, colores y tamaños, y dibujo a mano. */
 @Composable
 fun ChamosGrafitiEditor(onListo: (Uri) -> Unit, onCancelar: () -> Unit) {
@@ -377,8 +415,8 @@ fun ChamosGrafitiEditor(onListo: (Uri) -> Unit, onCancelar: () -> Unit) {
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                TextButton(onClick = onCancelar) { Text("Cancelar") }
-                Text("Grafiti", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp, modifier = Modifier.weight(1f), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                TextButton(onClick = onCancelar) { NeonTexto("Cancelar") }
+                NeonTexto("Grafiti", fontWeight = FontWeight.Bold, fontSize = 18.sp, modifier = Modifier.weight(1f), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
                 TextButton(
                     enabled = !guardando,
                     onClick = {
@@ -409,7 +447,7 @@ fun ChamosGrafitiEditor(onListo: (Uri) -> Unit, onCancelar: () -> Unit) {
                             onListo(uri)
                         }
                     },
-                ) { Text(if (guardando) "Guardando…" else "Listo", fontWeight = FontWeight.Bold) }
+                ) { NeonTexto(if (guardando) "Guardando…" else "Listo", fontWeight = FontWeight.Bold) }
             }
 
             // Lienzo
@@ -482,18 +520,18 @@ fun ChamosGrafitiEditor(onListo: (Uri) -> Unit, onCancelar: () -> Unit) {
 
             // Acciones
             Row(modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.Center) {
-                TextButton(onClick = { dialogoTexto = 1 }) { Text("+ Texto") }
+                TextButton(onClick = { dialogoTexto = 1 }) { NeonTexto("+ Texto") }
                 if (!dibujando && elegido != null) {
-                    TextButton(onClick = { dialogoTexto = 2 }) { Text("Cambiar texto") }
+                    TextButton(onClick = { dialogoTexto = 2 }) { NeonTexto("Cambiar texto") }
                     TextButton(onClick = {
                         elegido?.let { elementos.remove(it) }
                         elegido = null
-                    }) { Text("Quitar texto") }
+                    }) { NeonTexto("Quitar texto") }
                 }
-                TextButton(onClick = { dibujando = !dibujando }) { Text(if (dibujando) "Volver a textos" else "✏️ Dibujar") }
+                TextButton(onClick = { dibujando = !dibujando }) { NeonTexto(if (dibujando) "Volver a textos" else "✏️ Dibujar") }
                 if (dibujando) {
-                    TextButton(onClick = { if (trazos.isNotEmpty()) trazos.removeAt(trazos.lastIndex) }) { Text("Deshacer") }
-                    TextButton(onClick = { trazos.clear() }) { Text("Borrar dibujo") }
+                    TextButton(onClick = { if (trazos.isNotEmpty()) trazos.removeAt(trazos.lastIndex) }) { NeonTexto("Deshacer") }
+                    TextButton(onClick = { trazos.clear() }) { NeonTexto("Borrar dibujo") }
                 }
             }
 
@@ -515,10 +553,10 @@ fun ChamosGrafitiEditor(onListo: (Uri) -> Unit, onCancelar: () -> Unit) {
                 }
                 Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.Center) {
                     listOf("Fino" to 10f, "Medio" to 24f, "Grueso" to 50f).forEach { (n, a) ->
-                        TextButton(onClick = { anchoTrazo = a }) { Text(n, fontWeight = if (anchoTrazo == a) FontWeight.Bold else FontWeight.Normal) }
+                        TextButton(onClick = { anchoTrazo = a }) { NeonTexto(n, fontWeight = if (anchoTrazo == a) FontWeight.Bold else FontWeight.Normal) }
                     }
-                    TextButton(onClick = { spray = false }) { Text("Marcador", fontWeight = if (!spray) FontWeight.Bold else FontWeight.Normal) }
-                    TextButton(onClick = { spray = true }) { Text("Spray", fontWeight = if (spray) FontWeight.Bold else FontWeight.Normal) }
+                    TextButton(onClick = { spray = false }) { NeonTexto("Marcador", fontWeight = if (!spray) FontWeight.Bold else FontWeight.Normal) }
+                    TextButton(onClick = { spray = true }) { NeonTexto("Spray", fontWeight = if (spray) FontWeight.Bold else FontWeight.Normal) }
                 }
             } else {
                 // Tabla de estilos de letra (se desplaza)
@@ -563,12 +601,12 @@ fun ChamosGrafitiEditor(onListo: (Uri) -> Unit, onCancelar: () -> Unit) {
                 }
                 val e = elegido
                 if (e != null) {
-                    Text("Relleno", color = Color(0xFFCCCCCC), fontSize = 14.sp, modifier = Modifier.padding(top = 6.dp))
+                    NeonTexto("Relleno", fontSize = 14.sp, modifier = Modifier.padding(top = 6.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(vertical = 4.dp),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        TextButton(onClick = { e.relleno = null; e.actualizar() }) { Text("Original") }
+                        TextButton(onClick = { e.relleno = null; e.actualizar() }) { NeonTexto("Original") }
                         PALETA_GRAFITI.forEach { col ->
                             Box(
                                 modifier = Modifier
@@ -580,12 +618,12 @@ fun ChamosGrafitiEditor(onListo: (Uri) -> Unit, onCancelar: () -> Unit) {
                             )
                         }
                     }
-                    Text("Contorno", color = Color(0xFFCCCCCC), fontSize = 14.sp)
+                    NeonTexto("Contorno", fontSize = 14.sp)
                     Row(
                         modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(vertical = 4.dp),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        TextButton(onClick = { e.contorno = null; e.actualizar() }) { Text("Original") }
+                        TextButton(onClick = { e.contorno = null; e.actualizar() }) { NeonTexto("Original") }
                         PALETA_GRAFITI.forEach { col ->
                             Box(
                                 modifier = Modifier
@@ -598,8 +636,8 @@ fun ChamosGrafitiEditor(onListo: (Uri) -> Unit, onCancelar: () -> Unit) {
                         }
                     }
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-                        TextButton(onClick = { e.escala = (e.escala / 1.2f).coerceAtLeast(0.1f) }) { Text("Letra más chica") }
-                        TextButton(onClick = { e.escala = (e.escala * 1.2f).coerceAtMost(4f) }) { Text("Letra más grande") }
+                        TextButton(onClick = { e.escala = (e.escala / 1.2f).coerceAtLeast(0.1f) }) { NeonTexto("Letra más chica") }
+                        TextButton(onClick = { e.escala = (e.escala * 1.2f).coerceAtMost(4f) }) { NeonTexto("Letra más grande") }
                     }
                 }
             }
