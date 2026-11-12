@@ -390,7 +390,7 @@ fun rememberChamosReels(
                     }
                     val eid = ev.eventId?.value ?: continue
                     val perfil = ev.senderProfile as? ProfileDetails.Ready
-                    val nombre = perfil?.displayName ?: ev.sender.value.substringBefore(":").removePrefix("@")
+                    val nombre = ev.sender.value.substringBefore(":").removePrefix("@")
                     when (val t = c.type) {
                         is VideoMessageType -> {
                             val corazon = ev.reactions.firstOrNull { it.key.startsWith("❤") }
@@ -530,7 +530,7 @@ fun rememberChamosReels(
             baseLocal[idLocal] = reels.count { it.propio } + locales.size
             locales = listOf(
                 ReelItem(
-                    id = idLocal, timestamp = marca, autorId = yo.value, autor = "Tú", autorAvatar = null, descripcion = desc,
+                    id = idLocal, timestamp = marca, autorId = yo.value, autor = yo.value.substringBefore(":").removePrefix("@"), autorAvatar = null, descripcion = desc,
                     fuente = MediaSource("local"), mime = mime, nombreArchivo = "$idLocal.mp4",
                     likes = 0, yoLike = false, comentarios = 0, propio = false, rutaLocal = copia.absolutePath, subiendo = true,
                 ),
