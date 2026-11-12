@@ -726,19 +726,27 @@ const M_POST = "⁣";
 const M_VIDEO = "⁥";
 const UA_BOT = "ChamosBot/1.0 (https://siervobenshalyahu-ship-it.github.io/Chamos-apk-web/)";
 const BOT_URL = "https://chamos-push.siervodeyhwh57.workers.dev";
-const BOT_MAX_DIA = 4;
-const BOT_MAX_FORZADO = 12;
+const BOT_MAX_DIA = 8;
+const BOT_MAX_FORZADO = 16;
 const BOT_VIDEO_MAX = 12 * 1024 * 1024;
 const BOT_VIDEO_HORAS = 48;
 
-const BOTS = {
-  maria: { nombre: "María Chamos 🤖", tema: "belleza", horas: [9, 18], reel: 15, busca: ["makeup tutorial", "skincare routine", "hair care", "beauty tips"] },
-  baul: { nombre: "Chamo del Baúl 🤖", tema: "salsa", horas: [12, 20], reel: null, busca: [] },
-  sazon: { nombre: "Sazón Chamos 🤖", tema: "comida", horas: [8, 13, 19], reel: 17, busca: ["cooking food", "street food", "baking", "kitchen recipe"] },
-  viajero: { nombre: "Chamo Viajero 🤖", tema: "lugares", horas: [10, 16], reel: 14, busca: ["travel landscape", "city travel", "beach island", "mountain nature"] },
-  solidarios: { nombre: "Chamos Solidarios 🤖", tema: "social", horas: [11], reel: null, busca: [] },
-  noticias: { nombre: "Chamos Noticias 🤖", tema: "noticias", horas: [7, 12, 17], reel: null, busca: [] },
+const BUSCAS = {
+  belleza: ["makeup tutorial", "skincare routine", "hair care", "beauty tips"],
+  comida: ["cooking food", "street food", "baking", "kitchen recipe"],
+  lugares: ["travel landscape", "city travel", "beach island", "mountain nature"],
 };
+// Dos bots, varios temas: muro = { hora: tema }, reel = { hora: tema }.
+const BOTS = {
+  maria: { nombre: "María Chamos 🤖", muro: { 8: "comida", 9: "belleza", 11: "social", 16: "lugares", 19: "comida" }, reel: { 14: "lugares", 15: "belleza", 17: "comida" } },
+  baul: { nombre: "Chamo del Baúl 🤖", muro: { 7: "noticias", 12: "noticias", 14: "salsa", 17: "noticias", 20: "salsa" }, reel: {} },
+};
+function botTema(bot, modo) {
+  const m = BOTS[bot][modo], { hora } = botHoy();
+  if (m[hora]) return m[hora];
+  const v = Object.values(m);
+  return v[Math.floor(Math.random() * v.length)];
+}
 
 const BELLEZA = [
   "Protector solar todos los días, aunque esté nublado. Es lo que más ayuda a cuidar la piel con los años. Ponte una cantidad generosa en cara y cuello y repite cada 2 a 3 horas si estás al sol.",
@@ -951,7 +959,7 @@ const yt = (q) => "https://www.youtube.com/results?search_query=" + encodeURICom
 
 // Arma y publica una entrada en el Muro. Devuelve { clave, nota }.
 async function botHacerMuro(env, bot, cuentas) {
-  const b = BOTS[bot];
+  const b = { ...BOTS[bot], tema: botTema(bot, "muro") };
   if (b.tema === "belleza") {
     const i = await botElegir(env, bot, "muro", BELLEZA.map((_, k) => "b" + k));
     const texto = "💄 Consejo de belleza\n\n" + BELLEZA[parseInt(i.slice(1), 10)] + "\n\n— " + b.nombre + " · cuenta automática de Chamos";
@@ -1063,7 +1071,8 @@ async function botBuscarVideo(env, q, vistos) {
   throw new Error("Falta el secreto PIXABAY_KEY (o PEXELS_KEY)");
 }
 async function botHacerReel(env, bot, cuentas) {
-  const b = BOTS[bot];
+  const tema = Object.keys(BOTS[bot].reel).length ? botTema(bot, "reel") : "";
+  const b = { ...BOTS[bot], tema, busca: BUSCAS[tema] || [] };
   if (!b.busca.length) throw new Error("Este bot no publica videos");
   const q = b.busca[Math.floor(Math.random() * b.busca.length)];
   const vistos = new Set(
@@ -1125,7 +1134,7 @@ async function botsCron(env) {
   for (const bot of Object.keys(BOTS)) {
     if (!cuentas[bot]) continue;
     for (const modo of ["muro", "reel"]) {
-      const toca = modo === "muro" ? BOTS[bot].horas.includes(hora) : BOTS[bot].reel === hora;
+      const toca = modo === "muro" ? BOTS[bot].muro[hora] : BOTS[bot].reel[hora];
       if (!toca) continue;
       const ya = await env.DB.prepare("SELECT COUNT(*) AS n FROM bots_log WHERE bot=?1 AND dia=?2 AND hora=?3 AND modo=?4").bind(bot, dia, hora, modo).first();
       if (ya.n > 0) continue;
@@ -1147,7 +1156,7 @@ async function botsEstado(request, env) {
   for (const id of Object.keys(BOTS)) {
     const hoy = (await env.DB.prepare("SELECT COUNT(*) AS n FROM bots_log WHERE bot=?1 AND dia=?2 AND ok=1").bind(id, dia).first()).n;
     const ult = (await env.DB.prepare("SELECT ts, modo, ok, nota FROM bots_log WHERE bot=?1 AND nota!='pagina no valida' ORDER BY id DESC LIMIT 3").bind(id).all()).results || [];
-    bots.push({ id, nombre: BOTS[id].nombre, cuenta: !!cuentas[id], video: BOTS[id].reel !== null, hoy, ultimos: ult });
+    bots.push({ id, nombre: BOTS[id].nombre, cuenta: !!cuentas[id], video: Object.keys(BOTS[id].reel).length > 0, hoy, ultimos: ult });
   }
   return jsonCors({ activos: String(env.BOTS_ACTIVOS || "").trim() === "1", videos: env.PIXABAY_KEY ? "Pixabay" : env.PEXELS_KEY ? "Pexels" : "", b2: b2Activo(env), bots });
 }
