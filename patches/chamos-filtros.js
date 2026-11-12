@@ -715,6 +715,189 @@
     }
   }
 
+  /* ------------------------------------------------------------------ lentes 2: bebé, mapache, barba, gym, taller */
+  function elipse(ctx, x, y, rx, ry, fill, stroke, lw) {
+    ctx.beginPath(); ctx.ellipse(x, y, Math.max(0.1, rx), Math.max(0.1, ry), 0, 0, TAU);
+    if (fill) { ctx.fillStyle = fill; ctx.fill(); }
+    if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = lw || 2; ctx.stroke(); }
+  }
+  function lentesBebeCara(ctx, c, t) {
+    var u = arriba(c), r = der(c);
+    piel(ctx, c, "#ffd9d0", "screen", 0.3, 8);
+    rubor(ctx, c, 1.5);
+    // gorrito con moño
+    var hx = c.frente.x + u.x * c.alto * 0.04, hy = c.frente.y + u.y * c.alto * 0.04;
+    sobre(ctx, hx, hy, c.ang, function () {
+      var a = c.ancho;
+      ctx.fillStyle = "#bfe6ff"; ctx.strokeStyle = "#7fb7e0"; ctx.lineWidth = Math.max(2, a * 0.015);
+      ctx.beginPath(); ctx.moveTo(-a * 0.52, a * 0.05); ctx.quadraticCurveTo(-a * 0.5, -a * 0.62, 0, -a * 0.62); ctx.quadraticCurveTo(a * 0.5, -a * 0.62, a * 0.52, a * 0.05);
+      ctx.quadraticCurveTo(0, -a * 0.1, -a * 0.52, a * 0.05); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = "#ff8fb8"; ctx.beginPath(); ctx.arc(-a * 0.08, -a * 0.58, a * 0.07, 0, TAU); ctx.arc(a * 0.08, -a * 0.58, a * 0.07, 0, TAU); ctx.fill();
+      ctx.fillStyle = "#ff5c9a"; ctx.beginPath(); ctx.arc(0, -a * 0.58, a * 0.04, 0, TAU); ctx.fill();
+    });
+    // chupón
+    var b = M(c, c.boca), s = c.ancho * 0.13;
+    sobre(ctx, b.x, b.y + c.alto * 0.03, c.ang, function () {
+      elipse(ctx, 0, 0, s * 1.5, s * 1.1, "#ffe6f0", "#ff8fb8", Math.max(2, s * 0.16));
+      elipse(ctx, 0, 0, s * 0.55, s * 0.45, "#ff8fb8");
+      ctx.strokeStyle = "#ff8fb8"; ctx.lineWidth = s * 0.28; ctx.beginPath(); ctx.arc(0, s * 1.65, s * 0.5, 0, TAU); ctx.stroke();
+    });
+    destellos(ctx, c, t, 4, "rgba(255,255,255,.9)");
+  }
+  function lentesMapacheCara(ctx, c, t) {
+    var u = arriba(c), r = der(c), a = c.ancho;
+    piel(ctx, c, "#b9b9c2", "multiply", 0.55, 6);
+    // antifaz oscuro
+    [c.e1, c.e2].forEach(function (o, i) {
+      var p = M(c, o.centro), dir = i ? 1 : -1;
+      sobre(ctx, p.x, p.y, c.ang + dir * 0.28, function () {
+        ctx.save(); ctx.filter = "blur(" + Math.max(1, a * 0.012) + "px)";
+        elipse(ctx, dir * a * 0.02, a * 0.01, a * 0.2, a * 0.13, "rgba(28,26,34,.92)");
+        ctx.restore();
+      });
+    });
+    // orejas
+    [-1, 1].forEach(function (d) {
+      var x = c.frente.x + r.x * d * a * 0.4 + u.x * c.alto * 0.07, y = c.frente.y + r.y * d * a * 0.4 + u.y * c.alto * 0.07;
+      elipse(ctx, x, y, a * 0.13, a * 0.15, "#8d8d97", "#3a3a44", Math.max(2, a * 0.012));
+      elipse(ctx, x, y + a * 0.01, a * 0.07, a * 0.09, "#e9b5bd");
+    });
+    // hocico y nariz
+    var n = M(c, c.nariz);
+    sobre(ctx, n.x, n.y + c.alto * 0.02, c.ang, function () {
+      elipse(ctx, 0, a * 0.02, a * 0.17, a * 0.11, "rgba(235,235,240,.55)");
+      ctx.fillStyle = "#1f1b22"; ctx.beginPath(); ctx.ellipse(0, -a * 0.01, a * 0.085, a * 0.06, 0, 0, TAU); ctx.fill();
+      elipse(ctx, -a * 0.025, -a * 0.03, a * 0.025, a * 0.014, "rgba(255,255,255,.7)");
+      // bigotes
+      ctx.strokeStyle = "rgba(245,245,250,.9)"; ctx.lineWidth = Math.max(1.5, a * 0.008); ctx.lineCap = "round";
+      [-1, 1].forEach(function (d) { for (var i = 0; i < 3; i++) { ctx.beginPath(); ctx.moveTo(d * a * 0.14, a * (0.03 + i * 0.025)); ctx.lineTo(d * a * 0.5, a * (0.0 + i * 0.07)); ctx.stroke(); } });
+    });
+  }
+  function lentesBarbaCara(ctx, c, t) {
+    var u = arriba(c), r = der(c), a = c.ancho, h = c.alto;
+    function P(k, d) { return { x: c.centro.x + r.x * k * a + u.x * d * h, y: c.centro.y + r.y * k * a + u.y * d * h }; }
+    var bm = M(c, c.barbilla);
+    var pts = c.oval.slice(); // contorno de la cara
+    // barba: desde las patillas por la mandíbula hasta la barbilla, con mechones hacia abajo
+    ctx.save();
+    var ia = [], iz = [];
+    var mA = M(c, c.mej1), mB = M(c, c.mej2);
+    var sh = "rgba(0,0,0,.25)";
+    ctx.shadowColor = sh; ctx.shadowBlur = a * 0.05; ctx.shadowOffsetY = a * 0.02;
+    var g = ctx.createLinearGradient(bm.x - u.x * h * 0.5, bm.y - u.y * h * 0.5, bm.x - u.x * h * -0.4, bm.y - u.y * h * -0.4);
+    g.addColorStop(0, "#ffffff"); g.addColorStop(1, "#d6dbe2");
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.moveTo(c.ore1.x + r.x * a * 0.02, c.ore1.y + r.y * a * 0.02);
+    ctx.quadraticCurveTo(mA.x - r.x * a * 0.18, mA.y - u.y * h * 0.1 - u.y * 0, bm.x - r.x * a * 0.5 + u.x * -h * 0.25, bm.y - u.y * -h * 0.25);
+    ctx.quadraticCurveTo(bm.x - r.x * a * 0.2 - u.x * h * 0.25, bm.y - u.y * h * 0.25 + h * 0.22, bm.x - u.x * h * 0.22, bm.y - u.y * h * 0.22 + h * 0.2);
+    ctx.quadraticCurveTo(bm.x + r.x * a * 0.2 - u.x * h * 0.25, bm.y - u.y * h * 0.25 + h * 0.22, bm.x + r.x * a * 0.5 + u.x * -h * 0.25, bm.y - u.y * -h * 0.25);
+    ctx.quadraticCurveTo(mB.x + r.x * a * 0.18, mB.y, c.ore2.x - r.x * a * 0.02, c.ore2.y - r.y * a * 0.02);
+    // borde interior (más cerca de la boca)
+    var l = M(c, c.comA), rr = M(c, c.comB), lab = M(c, c.labio);
+    ctx.quadraticCurveTo(rr.x + r.x * a * 0.12, rr.y - u.y * h * 0.02, rr.x, rr.y + h * 0.05);
+    ctx.quadraticCurveTo(lab.x, lab.y + h * 0.08, l.x, l.y + h * 0.05);
+    ctx.quadraticCurveTo(l.x - r.x * a * 0.12, l.y, c.ore1.x + r.x * a * 0.02, c.ore1.y + r.y * a * 0.02);
+    ctx.closePath(); ctx.fill();
+    ctx.restore();
+    // textura de mechones
+    ctx.save(); ctx.strokeStyle = "rgba(170,178,190,.55)"; ctx.lineWidth = Math.max(1, a * 0.006); ctx.lineCap = "round";
+    for (var i = 0; i < 26; i++) {
+      var k = (i / 25) * 2 - 1, x0 = bm.x + r.x * k * a * 0.42, y0 = bm.y + r.y * k * a * 0.42 - h * 0.12 * (1 - Math.abs(k)) * 0 - h * (0.18 - 0.1 * Math.abs(k));
+      ctx.beginPath(); ctx.moveTo(x0, y0); ctx.quadraticCurveTo(x0 + k * a * 0.03, y0 + h * 0.1, x0 + k * a * 0.05, y0 + h * (0.2 + 0.05 * Math.sin(i)));
+      ctx.stroke();
+    }
+    ctx.restore();
+    // bigote
+    var lb = M(c, c.labio);
+    sobre(ctx, lb.x - u.x * h * 0.015, lb.y - u.y * h * 0.015 - h * 0.005, c.ang, function () {
+      ctx.fillStyle = "#f6f7fa"; ctx.strokeStyle = "rgba(150,158,170,.6)"; ctx.lineWidth = Math.max(1.5, a * 0.01);
+      ctx.beginPath(); ctx.moveTo(0, -a * 0.03);
+      ctx.bezierCurveTo(a * 0.1, -a * 0.09, a * 0.28, -a * 0.04, a * 0.3, a * 0.07);
+      ctx.bezierCurveTo(a * 0.2, a * 0.03, a * 0.1, a * 0.06, 0, a * 0.04);
+      ctx.bezierCurveTo(-a * 0.1, a * 0.06, -a * 0.2, a * 0.03, -a * 0.3, a * 0.07);
+      ctx.bezierCurveTo(-a * 0.28, -a * 0.04, -a * 0.1, -a * 0.09, 0, -a * 0.03);
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+    });
+    // cejas canosas
+    [[c.ce1, -1], [c.ce2, 1]].forEach(function (z) {
+      var pts2 = z[0].map(function (p) { return M(c, p); });
+      ctx.save(); ctx.strokeStyle = "#f3f4f8"; ctx.lineWidth = Math.max(4, a * 0.04); ctx.lineCap = "round"; ctx.lineJoin = "round";
+      ctx.shadowColor = "rgba(0,0,0,.3)"; ctx.shadowBlur = 3;
+      ctx.beginPath(); pts2.forEach(function (p, i) { i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y); }); ctx.stroke(); ctx.restore();
+    });
+  }
+  function musculos(ctx, c, t) {
+    var u = arriba(c), r = der(c), a = c.ancho, h = c.alto;
+    var bm = c.barbilla, w = a * 1.55, resp = 1 + 0.015 * Math.sin(t / 420);
+    sobre(ctx, bm.x - u.x * h * 0.02, bm.y - u.y * h * 0.02, c.ang, function () {
+      var piel0 = "#d9a07a", piel1 = "#b9795a";
+      var gp = ctx.createLinearGradient(-w, 0, w, 0); gp.addColorStop(0, piel1); gp.addColorStop(0.5, piel0); gp.addColorStop(1, piel1);
+      // cuello
+      ctx.fillStyle = gp; ctx.beginPath(); ctx.moveTo(-a * 0.32, -h * 0.1); ctx.lineTo(-a * 0.42, h * 0.32); ctx.lineTo(a * 0.42, h * 0.32); ctx.lineTo(a * 0.32, -h * 0.1); ctx.fill();
+      // hombros/brazos
+      [-1, 1].forEach(function (d) {
+        ctx.fillStyle = gp;
+        ctx.beginPath(); ctx.ellipse(d * w * 0.58, h * 0.55, a * 0.4 * resp, h * 0.36, d * 0.25, 0, TAU); ctx.fill();   // deltoides
+        ctx.beginPath(); ctx.ellipse(d * w * 0.8, h * 1.3, a * 0.36 * resp, h * 0.75, -d * 0.1, 0, TAU); ctx.fill();    // brazo
+        ctx.fillStyle = "rgba(0,0,0,.14)"; ctx.beginPath(); ctx.ellipse(d * w * 0.74, h * 1.28, a * 0.12, h * 0.4, -d * 0.1, 0, TAU); ctx.fill();
+      });
+      // torso con camiseta sin mangas
+      var ancho1 = w * 0.62, tw = ctx.createLinearGradient(0, 0, 0, h * 2.4); tw.addColorStop(0, "#ffffff"); tw.addColorStop(1, "#dfe3ea");
+      ctx.fillStyle = tw; ctx.strokeStyle = "rgba(0,0,0,.25)"; ctx.lineWidth = Math.max(1.5, a * 0.01);
+      ctx.beginPath(); ctx.moveTo(-ancho1 * 0.92, h * 0.28); ctx.quadraticCurveTo(-a * 0.5, h * 0.3, -a * 0.34, h * 0.14);
+      ctx.quadraticCurveTo(0, h * 0.78, a * 0.34, h * 0.14); ctx.quadraticCurveTo(a * 0.5, h * 0.3, ancho1 * 0.92, h * 0.28);
+      ctx.lineTo(ancho1 * 0.78, h * 3); ctx.lineTo(-ancho1 * 0.78, h * 3); ctx.closePath(); ctx.fill(); ctx.stroke();
+      // pectorales marcados
+      ctx.strokeStyle = "rgba(60,70,90,.22)"; ctx.lineWidth = Math.max(2, a * 0.02);
+      ctx.beginPath(); ctx.moveTo(0, h * 0.62); ctx.quadraticCurveTo(0, h * 1.1, 0, h * 1.6); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(-ancho1 * 0.55, h * 0.85); ctx.quadraticCurveTo(-a * 0.35, h * 1.0, -a * 0.04, h * 0.9); ctx.moveTo(ancho1 * 0.55, h * 0.85); ctx.quadraticCurveTo(a * 0.35, h * 1.0, a * 0.04, h * 0.9); ctx.stroke();
+    });
+  }
+  function gorraAzul(ctx, c) {
+    var a = c.ancho, u = arriba(c);
+    sobre(ctx, c.frente.x + u.x * c.alto * 0.03, c.frente.y + u.y * c.alto * 0.03, c.ang, function () {
+      ctx.fillStyle = "#1d3c87"; ctx.strokeStyle = "#102656"; ctx.lineWidth = Math.max(2, a * 0.012);
+      ctx.beginPath(); ctx.moveTo(-a * 0.56, a * 0.08); ctx.quadraticCurveTo(-a * 0.55, -a * 0.62, 0, -a * 0.64); ctx.quadraticCurveTo(a * 0.55, -a * 0.62, a * 0.56, a * 0.08); ctx.quadraticCurveTo(0, -a * 0.02, -a * 0.56, a * 0.08); ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(-a * 0.56, a * 0.08); ctx.quadraticCurveTo(0, a * 0.2, a * 0.8, a * 0.1); ctx.quadraticCurveTo(a * 0.2, -a * 0.04, -a * 0.56, a * 0.02); ctx.fill(); ctx.stroke();
+    });
+  }
+  function lentesGymCara(ctx, c, t) { musculos(ctx, c, t); piel(ctx, c, "#e0a98a", "overlay", 0.25, 6); gorraAzul(ctx, c); }
+  function lentesGymGlobal(ctx, w, h, t) {
+    var g = ctx.createRadialGradient(w / 2, h * 0.4, h * 0.2, w / 2, h / 2, h * 0.8); g.addColorStop(0, "rgba(0,0,0,0)"); g.addColorStop(1, "rgba(15,10,30,.55)");
+    ctx.save(); ctx.fillStyle = g; ctx.fillRect(0, 0, w, h); ctx.restore();
+  }
+  function lentesTaller(ctx, w, h, t) {
+    ctx.save(); ctx.globalCompositeOperation = "multiply"; ctx.fillStyle = "rgba(255,196,120,.38)"; ctx.fillRect(0, 0, w, h); ctx.restore();
+    ctx.save(); ctx.globalCompositeOperation = "soft-light"; ctx.fillStyle = "rgba(255,170,70,.55)"; ctx.fillRect(0, 0, w, h); ctx.restore();
+    vineta(ctx, w, h, "rgba(60,25,5,.5)");
+    // aserrín cayendo
+    ctx.save();
+    for (var i = 0; i < 60; i++) {
+      var x = (rnd(i) * w + Math.sin(t / 900 + i) * 14) % w, y = ((rnd(i + 50) * h + t * (0.04 + rnd(i + 9) * 0.05)) % h);
+      ctx.fillStyle = "rgba(240,200,140," + (0.35 + rnd(i + 3) * 0.4) + ")"; ctx.beginPath(); ctx.arc(x, y, 1.5 + rnd(i + 7) * 2.5, 0, TAU); ctx.fill();
+    }
+    // caja de madera flotando
+    var bw = w * 0.5, bh = bw * 0.28, bx = w * 0.5, by = h * 0.76 + Math.sin(t / 700) * h * 0.01, d = bh * 0.9;
+    ctx.translate(bx, by);
+    function cara(pts, col) { ctx.fillStyle = col; ctx.strokeStyle = "rgba(90,45,10,.9)"; ctx.lineWidth = Math.max(2, w * 0.004); ctx.beginPath(); pts.forEach(function (p, i) { i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]); }); ctx.closePath(); ctx.fill(); ctx.stroke(); }
+    cara([[-bw / 2, 0], [-bw / 2 + d, -d * 0.6], [bw / 2 + d, -d * 0.6], [bw / 2, 0]], "#e4a25a");           // tapa
+    cara([[-bw / 2, 0], [bw / 2, 0], [bw / 2, bh], [-bw / 2, bh]], "#c97d38");                              // frente
+    cara([[bw / 2, 0], [bw / 2 + d, -d * 0.6], [bw / 2 + d, bh - d * 0.6], [bw / 2, bh]], "#a8612a");       // lado
+    ctx.strokeStyle = "rgba(100,50,10,.55)"; ctx.lineWidth = 2;
+    for (var j = 1; j < 4; j++) { ctx.beginPath(); ctx.moveTo(-bw / 2, bh * j / 4); ctx.lineTo(bw / 2, bh * j / 4 + (j % 2) * 2); ctx.stroke(); }
+    for (var k = 1; k < 5; k++) { ctx.beginPath(); ctx.moveTo(-bw / 2 + d * k / 5, -d * 0.6 * k / 5); ctx.lineTo(bw / 2 + d * k / 5, -d * 0.6 * k / 5); ctx.stroke(); }
+    ctx.restore();
+  }
+  function lentesTallerCara(ctx, c, t) {
+    // gorro de carpintero (lápiz detrás de la oreja)
+    var u = arriba(c), a = c.ancho;
+    sobre(ctx, c.ore2.x, c.ore2.y - a * 0.06, c.ang - 0.5, function () {
+      ctx.fillStyle = "#f5c518"; ctx.strokeStyle = "#7a5a00"; ctx.lineWidth = 2; ctx.fillRect(-a * 0.02, -a * 0.3, a * 0.045, a * 0.34); ctx.strokeRect(-a * 0.02, -a * 0.3, a * 0.045, a * 0.34);
+      ctx.fillStyle = "#222"; ctx.beginPath(); ctx.moveTo(-a * 0.02, -a * 0.3); ctx.lineTo(a * 0.025, -a * 0.3); ctx.lineTo(a * 0.0, -a * 0.34); ctx.fill();
+    });
+  }
+
   /* ------------------------------------------------------------------ efectos de cara */
   function ojosGrandes(c, f, r) { return [W(c.e1.centro, c.ew * r, f), W(c.e2.centro, c.ew * r, f)]; }
 
@@ -736,6 +919,18 @@
       global: function (ctx, w, h, t) { lentesNieve(ctx, w, h, t); }, dibujar: function (ctx, c, t) { lentesNieveCara(ctx, c, t); } },
     { id: "l-venezuela", n: "Venezuela", e: "🇻🇪", grupo: "Lentes", css: "saturate(1.2) contrast(1.05)",
       global: function (ctx, w, h, t) { lentesVenezuela(ctx, w, h, t); }, dibujar: function (ctx, c, t) { lentesVenezuelaCara(ctx, c, t); } },
+    { id: "l-bebe", n: "Bebé", e: "👶", grupo: "Lentes", css: "brightness(1.08) saturate(1.1) contrast(.95)",
+      warps: function (c) { return ojosGrandes(c, 0.4, 1.2).concat([W(c.mej1, c.ancho * 0.34, 0.4), W(c.mej2, c.ancho * 0.34, 0.4), W(c.barbilla, c.ancho * 0.5, 0.25), W(c.nariz, c.ancho * 0.25, -0.2)]); },
+      dibujar: function (ctx, c, t) { lentesBebeCara(ctx, c, t); } },
+    { id: "l-mapache", n: "Mapache", e: "🦝", grupo: "Lentes", css: "saturate(.9) contrast(1.05)",
+      warps: function (c) { return [W(c.nariz, c.ancho * 0.3, 0.3)]; },
+      dibujar: function (ctx, c, t) { lentesMapacheCara(ctx, c, t); } },
+    { id: "l-barba", n: "Barba blanca", e: "🧓", grupo: "Lentes", css: "contrast(1.05)",
+      dibujar: function (ctx, c, t) { lentesBarbaCara(ctx, c, t); } },
+    { id: "l-gym", n: "Gym Hero", e: "💪", grupo: "Lentes", css: "contrast(1.12) saturate(1.1)",
+      global: function (ctx, w, h, t) { lentesGymGlobal(ctx, w, h, t); }, dibujar: function (ctx, c, t) { lentesGymCara(ctx, c, t); } },
+    { id: "l-taller", n: "Taller", e: "🪵", grupo: "Lentes", css: "saturate(1.1)",
+      global: function (ctx, w, h, t) { lentesTaller(ctx, w, h, t); }, dibujar: function (ctx, c, t) { lentesTallerCara(ctx, c, t); } },
     { id: "kawaii", n: "Kawaii", e: "🌸", grupo: "Manga",
       warps: function (c) { return ojosGrandes(c, 0.5, 1.15).concat([W(c.barbilla, c.ancho * 0.5, -0.1)]); },
       css: "brightness(1.07) saturate(1.12) contrast(.97)",
