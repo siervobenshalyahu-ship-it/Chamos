@@ -248,6 +248,9 @@ jobs:
       - name: Filtros de cara, de color y memes en videollamadas
         run: python3 chamos-repo/patches/filtros.py chamos chamos-repo/patches mediapipe
 
+      - name: Colgar la llamada al salir con el botón atrás
+        run: python3 chamos-repo/patches/colgar_al_salir.py chamos
+
       - name: Vincular número de teléfono (Chamos Cuentas)
         run: python3 chamos-repo/patches/numero.py chamos chamos-repo/patches "$(head -n1 chamos-repo/cuentas/servicio-url.txt 2>/dev/null || true)"
 
