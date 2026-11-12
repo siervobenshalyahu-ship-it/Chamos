@@ -254,6 +254,9 @@ jobs:
       - name: Interruptor de búsqueda (solo Chamos / todos)
         run: python3 chamos-repo/patches/buscador.py chamos
 
+      - name: Iniciar chat - lista de contactos (sin Nueva sala, Directorio, Invitar ni Unirse)
+        run: python3 chamos-repo/patches/contactos.py chamos
+
       - name: Ajustes de pantalla (stickers pequeños, barra de abajo)
         run: python3 chamos-repo/patches/ajustes_ui.py chamos
 
