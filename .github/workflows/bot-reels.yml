@@ -3,9 +3,7 @@ name: Bot de Reels de Chamos
 # Publica videos de bot/cola.json en los Reels. Corre dos veces al día (12:00 y 19:00 hora de Venezuela)
 # o a mano desde Actions. Tres cuentas (raul, nery, maria), cada una con su secreto MATRIX_TOKEN_*.
 on:
-  schedule:
-    - cron: "0 16 * * *"
-    - cron: "0 23 * * *"
+  # Pausado: ya no se publican videos automáticos (solo a mano con workflow_dispatch).
   workflow_dispatch:
     inputs:
       cuantos:

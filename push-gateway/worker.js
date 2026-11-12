@@ -738,7 +738,7 @@ const BUSCAS = {
 };
 // Dos bots, varios temas: muro = { hora: tema }, reel = { hora: tema }.
 const BOTS = {
-  maria: { nombre: "María Chamos 🤖", muro: { 8: "comida", 9: "belleza", 11: "social", 16: "lugares", 19: "comida" }, reel: { 14: "lugares", 15: "belleza", 17: "comida" } },
+  maria: { nombre: "María Chamos 🤖", muro: { 8: "comida", 9: "belleza", 11: "social", 16: "lugares", 19: "comida" }, reel: {} },
   baul: { nombre: "Chamo del Baúl 🤖", muro: { 7: "noticias", 12: "noticias", 14: "salsa", 17: "noticias", 20: "salsa" }, reel: {} },
 };
 function botTema(bot, modo) {
@@ -929,6 +929,24 @@ async function botMuroFoto(env, bot, cuentas, texto, fotoUrl) {
 }
 
 // Una página de Wikipedia: título, texto corto, foto y enlace. null si no sirve.
+// Foto libre de Pixabay para el muro (usa PIXABAY_KEY; si no hay o falla, se publica solo el texto).
+async function botFotoPixabay(env, consultas) {
+  if (!env.PIXABAY_KEY) return null;
+  const q = consultas[Math.floor(Math.random() * consultas.length)];
+  const r = await fetch("https://pixabay.com/api/?key=" + encodeURIComponent(String(env.PIXABAY_KEY).trim()) + "&image_type=photo&orientation=horizontal&safesearch=true&per_page=40&q=" + encodeURIComponent(q), { headers: { "user-agent": UA_BOT } });
+  if (!r.ok) return null;
+  const j = await r.json().catch(() => null);
+  const h = j && j.hits && j.hits.length ? j.hits[Math.floor(Math.random() * j.hits.length)] : null;
+  return h && h.webformatURL ? { url: h.webformatURL, autor: h.user } : null;
+}
+async function botPublicar(env, bot, cuentas, texto, foto) {
+  if (foto) {
+    try { await botMuroFoto(env, bot, cuentas, texto, foto); return "foto"; }
+    catch (e) { await botMuroTexto(env, bot, cuentas, texto); return "texto (foto fallo: " + e.message + ")"; }
+  }
+  await botMuroTexto(env, bot, cuentas, texto);
+  return "texto";
+}
 async function wikiResumen(titulo) {
   const r = await fetch("https://es.wikipedia.org/api/rest_v1/page/summary/" + encodeURIComponent(titulo), { headers: { "user-agent": UA_BOT, accept: "application/json" } });
   if (!r.ok) return null;
@@ -962,22 +980,23 @@ async function botHacerMuro(env, bot, cuentas) {
   const b = { ...BOTS[bot], tema: botTema(bot, "muro") };
   if (b.tema === "belleza") {
     const i = await botElegir(env, bot, "muro", BELLEZA.map((_, k) => "b" + k));
-    const texto = "💄 Consejo de belleza\n\n" + BELLEZA[parseInt(i.slice(1), 10)] + "\n\n— " + b.nombre + " · cuenta automática de Chamos";
-    await botMuroTexto(env, bot, cuentas, texto);
-    return { clave: i, nota: "texto" };
+    const f = await botFotoPixabay(env, ["skincare", "makeup", "beauty hair", "cosmetics spa"]).catch(() => null);
+    const texto = "💄 Consejo de belleza\n\n" + BELLEZA[parseInt(i.slice(1), 10)] + (f ? "\n\nFoto: " + f.autor + " (Pixabay)" : "") + "\n\n— " + b.nombre + " · cuenta automática de Chamos";
+    return { clave: i, nota: await botPublicar(env, bot, cuentas, texto, f && f.url) };
   }
   if (b.tema === "salsa") {
     const i = await botElegir(env, bot, "muro", SALSA.map((_, k) => "s" + k));
     const s = SALSA[parseInt(i.slice(1), 10)];
     const texto = "🎺 " + s[0] + "\n\n" + s[1] + "\n\n🎧 Escúchala aquí: " + yt(s[2]) + "\n\n— " + b.nombre + " · cuenta automática de Chamos";
-    await botMuroTexto(env, bot, cuentas, texto);
-    return { clave: i, nota: "texto" };
+    const w = await wikiResumen(s[0].split(",")[0]).catch(() => null);
+    return { clave: i, nota: await botPublicar(env, bot, cuentas, texto + (w && w.foto ? "\nFoto: Wikipedia (licencia libre)" : ""), w && w.foto) };
   }
   if (b.tema === "social") {
     const i = await botElegir(env, bot, "muro", SOCIAL.map((_, k) => "c" + k));
-    const texto = "🤝 Para cuidarnos entre todos\n\n" + SOCIAL[parseInt(i.slice(1), 10)] + SOCIAL_PIE + "\n\n— " + b.nombre + " · cuenta automática de Chamos";
-    await botMuroTexto(env, bot, cuentas, texto);
-    return { clave: i, nota: "texto" };
+    const texto = "🤝 Para cuidarnos entre todos\n\n" + SOCIAL[parseInt(i.slice(1), 10)] + SOCIAL_PIE;
+    const f = await botFotoPixabay(env, ["friends helping", "community support", "volunteers", "family together"]).catch(() => null);
+    const texto2 = texto + (f ? "\n\nFoto: " + f.autor + " (Pixabay)" : "") + "\n\n— " + b.nombre + " · cuenta automática de Chamos";
+    return { clave: i, nota: await botPublicar(env, bot, cuentas, texto2, f && f.url) };
   }
   if (b.tema === "noticias") return botHacerNoticias(env, bot, cuentas);
   // comida y lugares: Wikipedia (texto y foto libres)
