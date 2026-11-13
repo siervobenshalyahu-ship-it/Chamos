@@ -1277,7 +1277,7 @@ async function webRegistro(request, env) {
   if (ERRATAS[dom]) return jsonCors({ error: "¿Quisiste escribir " + email.split("@")[0] + "@" + ERRATAS[dom] + "?" }, 400);
   if (DESECHABLES.has(dom)) return jsonCors({ error: "Usa un correo real, no uno temporal" }, 400);
   if (!(await dominioRecibeCorreo(dom))) return jsonCors({ error: "Ese correo no existe, revisa cómo lo escribiste" }, 400);
-  if (!env.BREVO_KEY || !env.MAIL_FROM) return jsonCors({ error: "Falta configurar el correo (BREVO_KEY y MAIL_FROM)" }, 503);
+  if (!((env.MAILJET_KEY && env.MAILJET_SECRET) || env.BREVO_KEY) || !env.MAIL_FROM) return jsonCors({ error: "Falta configurar el correo (MAILJET_KEY, MAILJET_SECRET y MAIL_FROM)" }, 503);
   const exp = Date.now() + 15 * 60 * 1000;
   const carga = exp + "." + btoa(unescape(encodeURIComponent(email)));
   const firma = await webFirma(env, carga);
@@ -1297,12 +1297,19 @@ async function webRegistro(request, env) {
     '<p style="font-size:38px;letter-spacing:10px;font-weight:bold;color:#9b5cff;margin:18px 0">' + codigo + '</p>' +
     '<p style="color:#b8c0ff">Escríbelo en la página. Sirve por 10 minutos.</p>' +
     '<p style="color:#8890c8;font-size:12px">Si no pediste esto, ignora este correo.</p></div>';
-  const r = await fetch("https://api.brevo.com/v3/smtp/email", {
-    method: "POST",
-    headers: { "api-key": env.BREVO_KEY, "content-type": "application/json", accept: "application/json" },
-    body: JSON.stringify({ sender: { name: "Chamos", email: env.MAIL_FROM }, to: [{ email, name: nombre }], subject: "Tu código de Chamos: " + codigo, htmlContent: html }),
-  });
-  if (!r.ok) { console.error("brevo", r.status, await r.text()); return jsonCors({ error: "No pudimos enviar el correo. Revisa que esté bien escrito." }, 502); }
+  const asunto = "Tu código de Chamos: " + codigo;
+  const r = env.MAILJET_KEY && env.MAILJET_SECRET
+    ? await fetch("https://api.mailjet.com/v3.1/send", {
+        method: "POST",
+        headers: { authorization: "Basic " + btoa(env.MAILJET_KEY + ":" + env.MAILJET_SECRET), "content-type": "application/json" },
+        body: JSON.stringify({ Messages: [{ From: { Email: env.MAIL_FROM, Name: "Chamos" }, To: [{ Email: email, Name: nombre }], Subject: asunto, HTMLPart: html }] }),
+      })
+    : await fetch("https://api.brevo.com/v3/smtp/email", {
+        method: "POST",
+        headers: { "api-key": env.BREVO_KEY, "content-type": "application/json", accept: "application/json" },
+        body: JSON.stringify({ sender: { name: "Chamos", email: env.MAIL_FROM }, to: [{ email, name: nombre }], subject: asunto, htmlContent: html }),
+      });
+  if (!r.ok) { console.error("correo", r.status, await r.text()); return jsonCors({ error: "No pudimos enviar el correo. Revisa que esté bien escrito." }, 502); }
   await env.DB.prepare(
     "INSERT INTO web_registros (email, nombre, pais, primera, ultima, ip) VALUES (?1,?2,?3,?4,?4,?5) ON CONFLICT(email) DO UPDATE SET nombre=?2, pais=?3, ultima=?4, ip=?5",
   ).bind(email, nombre, corto(request.cf && request.cf.country, 4), ahora, corto(request.headers.get("cf-connecting-ip"), 64)).run();
