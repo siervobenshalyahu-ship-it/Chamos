@@ -1248,6 +1248,23 @@ async function webFirma(env, texto) {
   if (!k) return null;
   return _hexW(await _hmac(k, texto));
 }
+const DESECHABLES = new Set(["mailinator.com","guerrillamail.com","10minutemail.com","tempmail.com","temp-mail.org","yopmail.com","trashmail.com","sharklasers.com","getnada.com","dispostable.com","maildrop.cc","throwawaymail.com","fakeinbox.com","mohmal.com","emailondeck.com","moakt.com","tempail.com","mintemail.com","spamgourmet.com","example.com","test.com"]);
+const ERRATAS = { "gmial.com": "gmail.com", "gmai.com": "gmail.com", "gamil.com": "gmail.com", "gmail.con": "gmail.com", "gmail.co": "gmail.com", "gmail.cm": "gmail.com", "hotmial.com": "hotmail.com", "hotmail.con": "hotmail.com", "hotmai.com": "hotmail.com", "yahooo.com": "yahoo.com", "yaho.com": "yahoo.com", "yahoo.con": "yahoo.com", "outlok.com": "outlook.com", "outlook.con": "outlook.com" };
+// Revisa que el dominio del correo exista y reciba correo (registro MX o A) usando DNS de Cloudflare.
+async function dominioRecibeCorreo(dom) {
+  const pedir = async (tipo) => {
+    const r = await fetch("https://cloudflare-dns.com/dns-query?name=" + encodeURIComponent(dom) + "&type=" + tipo, { headers: { accept: "application/dns-json" } });
+    if (!r.ok) throw new Error("dns");
+    return r.json();
+  };
+  try {
+    const mx = await pedir("MX");
+    if (mx.Answer && mx.Answer.some((a) => a.type === 15 && a.data && a.data.trim() !== "0 .")) return true;
+    if (mx.Status === 3) return false;
+    const a = await pedir("A");
+    return !!(a.Answer && a.Answer.some((x) => x.type === 1));
+  } catch (_) { return true; }
+}
 async function webRegistro(request, env) {
   if (!env.DB) return jsonCors({ error: "Base de datos no configurada" }, 503);
   let d;
@@ -1256,6 +1273,10 @@ async function webRegistro(request, env) {
   const email = corto(d.email, 120).trim().toLowerCase();
   if (nombre.length < 2) return jsonCors({ error: "Escribe tu nombre" }, 400);
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) return jsonCors({ error: "Escribe un correo válido" }, 400);
+  const dom = email.split("@")[1];
+  if (ERRATAS[dom]) return jsonCors({ error: "¿Quisiste escribir " + email.split("@")[0] + "@" + ERRATAS[dom] + "?" }, 400);
+  if (DESECHABLES.has(dom)) return jsonCors({ error: "Usa un correo real, no uno temporal" }, 400);
+  if (!(await dominioRecibeCorreo(dom))) return jsonCors({ error: "Ese correo no existe, revisa cómo lo escribiste" }, 400);
   if (!env.BREVO_KEY || !env.MAIL_FROM) return jsonCors({ error: "Falta configurar el correo (BREVO_KEY y MAIL_FROM)" }, 503);
   const exp = Date.now() + 24 * 60 * 60 * 1000;
   const carga = exp + "." + btoa(unescape(encodeURIComponent(email)));
