@@ -1,0 +1,79 @@
+/*
+ * Copyright (c) 2025 Element Creations Ltd.
+ * Copyright 2023-2025 New Vector Ltd.
+ *
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial.
+ * Please see LICENSE files in the repository root for full details.
+ */
+
+package io.element.android.libraries.designsystem.atomic.atoms
+
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import io.element.android.compound.theme.ElementTheme
+import io.element.android.libraries.designsystem.preview.ElementPreview
+import io.element.android.libraries.designsystem.preview.PreviewsDayNight
+
+/**
+ * A small indicator to show the number of unread messages or notifications.
+ *
+ * @param count The number of unread messages or notifications. If null, the indicator will be hidden, if 0, a notification dot will be shown.
+ * @param modifier The modifier to be applied to the indicator.
+ * @param dotIndicatorSize The size of the dot indicator.
+ * @param color The background color of the indicator.
+ * @param contentDescription The content description for accessibility.
+ * @param border The border to be applied to the indicator.
+ * @param contentPadding The padding inside the indicator.
+ */
+@Composable
+fun UnreadIndicatorAtom(
+    count: Long?,
+    modifier: Modifier = Modifier,
+    dotIndicatorSize: Dp = 12.dp,
+    color: Color = ElementTheme.colors.iconAccentPrimary,
+    contentDescription: String? = null,
+    border: BorderStroke? = null,
+    contentPadding: PaddingValues = PaddingValues.Zero,
+) {
+    count?.let {
+        CounterAtom(
+            count = count.toInt(),
+            modifier = modifier
+                .semantics {
+                    contentDescription?.let { this.contentDescription = it }
+                }
+                .then(if (count == 0L) Modifier.size(dotIndicatorSize) else Modifier)
+                .then(if (border != null) Modifier.border(border, RoundedCornerShape(percent = 100)) else Modifier),
+            containerColor = color,
+            contentColor = ElementTheme.colors.bgCanvasDefault,
+            textStyle = ElementTheme.typography.fontBodySmMedium,
+            contentPadding = contentPadding,
+        )
+    }
+}
+
+@PreviewsDayNight
+@Composable
+internal fun UnreadIndicatorAtomPreview() = ElementPreview {
+    Row(horizontalArrangement = Arrangement.spacedBy(2.dp), verticalAlignment = Alignment.CenterVertically) {
+        UnreadIndicatorAtom(count = null)
+        UnreadIndicatorAtom(count = 0)
+        UnreadIndicatorAtom(count = 1)
+        UnreadIndicatorAtom(count = 20)
+        UnreadIndicatorAtom(count = 99)
+        UnreadIndicatorAtom(count = 999)
+    }
+}

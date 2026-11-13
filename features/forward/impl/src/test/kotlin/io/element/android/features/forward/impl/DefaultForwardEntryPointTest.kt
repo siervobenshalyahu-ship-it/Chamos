@@ -1,0 +1,71 @@
+/*
+ * Copyright (c) 2025 Element Creations Ltd.
+ * Copyright 2025 New Vector Ltd.
+ *
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial.
+ * Please see LICENSE files in the repository root for full details.
+ */
+
+package io.element.android.features.forward.impl
+
+import androidx.arch.core.executor.testing.InstantTaskExecutorRule
+import com.bumble.appyx.core.modality.BuildContext
+import com.bumble.appyx.testing.junit4.util.MainDispatcherRule
+import com.google.common.truth.Truth.assertThat
+import io.element.android.features.forward.api.ForwardEntryPoint
+import io.element.android.libraries.matrix.api.core.RoomId
+import io.element.android.libraries.matrix.test.AN_EVENT_ID
+import io.element.android.libraries.matrix.test.A_ROOM_ID
+import io.element.android.libraries.matrix.test.A_SESSION_ID
+import io.element.android.libraries.matrix.test.timeline.FakeTimelineProvider
+import io.element.android.libraries.roomselect.test.FakeRoomSelectEntryPoint
+import io.element.android.tests.testutils.lambda.lambdaError
+import io.element.android.tests.testutils.node.TestParentNode
+import kotlinx.coroutines.test.runTest
+import org.junit.Rule
+import org.junit.Test
+
+class DefaultForwardEntryPointTest {
+    @get:Rule
+    val instantTaskExecutorRule = InstantTaskExecutorRule()
+
+    @get:Rule
+    val mainDispatcherRule = MainDispatcherRule()
+
+    @Test
+    fun `test node builder`() = runTest {
+        val entryPoint = DefaultForwardEntryPoint()
+        val parentNode = TestParentNode.create { buildContext, plugins ->
+            ForwardMessagesNode(
+                buildContext = buildContext,
+                plugins = plugins,
+                presenterFactory = { _, _ -> createForwardMessagesPresenter() },
+                roomSelectEntryPoint = FakeRoomSelectEntryPoint(),
+                sessionId = A_SESSION_ID,
+            )
+        }
+        val callback = object : ForwardEntryPoint.Callback {
+            override fun onDone(roomIds: List<RoomId>) = lambdaError()
+        }
+        val params = ForwardEntryPoint.Params(
+            eventIds = listOf(AN_EVENT_ID),
+            timelineProvider = FakeTimelineProvider(),
+            fromRoomId = A_ROOM_ID,
+        )
+        val result = entryPoint.createNode(
+            parentNode = parentNode,
+            buildContext = BuildContext.root(null),
+            params = params,
+            callback = callback,
+        )
+        assertThat(result).isInstanceOf(ForwardMessagesNode::class.java)
+        assertThat(result.plugins).contains(
+            ForwardMessagesNode.Inputs(
+                eventIds = params.eventIds,
+                timelineProvider = params.timelineProvider,
+                fromRoomId = params.fromRoomId,
+            )
+        )
+        assertThat(result.plugins).contains(callback)
+    }
+}

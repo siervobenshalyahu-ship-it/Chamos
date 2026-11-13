@@ -1,0 +1,203 @@
+/*
+ * Copyright (c) 2025 Element Creations Ltd.
+ * Copyright 2023-2025 New Vector Ltd.
+ *
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial.
+ * Please see LICENSE files in the repository root for full details.
+ */
+
+package io.element.android.libraries.featureflag.api
+
+import io.element.android.libraries.core.meta.BuildMeta
+import io.element.android.libraries.core.meta.BuildType
+
+/**
+ * To enable or disable a FeatureFlags, change the `defaultValue` value.
+ */
+enum class FeatureFlags(
+    override val key: String,
+    override val title: String,
+    override val description: String? = null,
+    override val defaultValue: (BuildMeta) -> Boolean,
+    override val isFinished: Boolean,
+    override val isInLabs: Boolean = false,
+) : Feature {
+    ShowBlockedUsersDetails(
+        key = "feature.showBlockedUsersDetails",
+        title = "Show blocked users details",
+        description = "Show the name and avatar of blocked users in the blocked users list",
+        defaultValue = { false },
+        isFinished = false,
+    ),
+    SyncOnPush(
+        key = "feature.syncOnPush",
+        title = "Sync on push",
+        description = "Subscribe to room sync when a push is received",
+        defaultValue = { true },
+        isFinished = false,
+    ),
+    OnlySignedDeviceIsolationMode(
+        key = "feature.onlySignedDeviceIsolationMode",
+        title = "Exclude insecure devices when sending/receiving messages",
+        description = "This setting controls how end-to-end encryption (E2E) keys are shared." +
+            " Enabling it will prevent the inclusion of devices that have not been explicitly verified by their owners." +
+            " You'll have to stop and re-open the app manually for that setting to take effect.",
+        defaultValue = { false },
+        isFinished = false,
+    ),
+    PrintLogsToLogcat(
+        key = "feature.print_logs_to_logcat",
+        title = "Print logs to logcat",
+        description = "Print logs to logcat in addition to log files. Requires an app restart to take effect." +
+            "\n\nWARNING: this will make the logs visible in the device logs and may affect performance. " +
+            "It's not intended for daily usage in release builds.",
+        defaultValue = { buildMeta -> buildMeta.buildType != BuildType.RELEASE },
+        // False so it's displayed in the developer options screen
+        isFinished = false,
+    ),
+    SelectableMediaQuality(
+        key = "feature.selectable_media_quality",
+        title = "Select media quality per upload",
+        description = "You can select the media quality for each attachment you upload.",
+        defaultValue = { false },
+        // False so it's displayed in the developer options screen
+        isFinished = false,
+    ),
+    Threads(
+        key = "feature.thread_timeline",
+        title = "Threads",
+        description = "Renders thread messages as a dedicated timeline. Restarting the app is required for this setting to fully take effect.",
+        defaultValue = { false },
+        isFinished = false,
+        isInLabs = true,
+    ),
+    MultiAccount(
+        key = "feature.multi_account",
+        title = "Multi accounts",
+        description = "Allow the application to connect to multiple accounts at the same time." +
+            "\n\nWARNING: this feature is EXPERIMENTAL and UNSTABLE.",
+        defaultValue = { false },
+        isFinished = false,
+    ),
+    QrCodeLogin(
+        key = "feature.qr_code_login",
+        title = "QR Code Login",
+        description = "Allow logging in on other devices using a QR code.",
+        defaultValue = { false },
+        isFinished = false,
+    ),
+    AllowBlackTheme(
+        key = "feature.allow_black_theme",
+        title = "Black theme",
+        description = "Allow selecting the black appearance theme for battery saving on OLED.",
+        defaultValue = { false },
+        isFinished = false,
+    ),
+    ValidateNetworkWhenSchedulingNotificationFetching(
+        key = "feature.validate_network_when_scheduling_notification_fetching",
+        title = "Validate internet connectivity when scheduling notification fetching",
+        description = "Only fetch events for push notifications when the device has internet connectivity. " +
+            "Enabling this can be problematic in air-gapped environments.",
+        defaultValue = { true },
+        isFinished = false,
+    ),
+    JumpToUnread(
+        key = "feature.jump_to_unread",
+        title = "Jump to unread messages",
+        description = "Show a button to jump to the read marker, plus a count badge on the scroll-to-bottom button " +
+            "when new messages arrive while scrolled away.",
+        defaultValue = { false },
+        isFinished = false,
+    ),
+    SlashCommand(
+        key = "feature.slash_command",
+        title = "Parse slash commands in the message composer",
+        description = "Allow parsing slash commands in the message composer and perform action.",
+        defaultValue = { false },
+        isFinished = false,
+    ),
+    AutomaticBackPagination(
+        key = "feature.automatic_back_pagination",
+        title = "Automatic back pagination of rooms",
+        description = "Allow the app to automatically back paginate in rooms to pre-fetch older messages in background." +
+            "\nRequires an app restart to take effect.",
+        defaultValue = { true },
+        isFinished = false,
+    ),
+    UnreadIndicatorCount(
+        key = "feature.unread_indicator_count",
+        title = "Unread indicator count",
+        description = "Show the number of unread messages on the unread indicator in the room list.",
+        defaultValue = { true },
+        isFinished = false,
+    ),
+    SendGalleryMessages(
+        key = "feature.send_gallery_messages",
+        title = "Send gallery messages",
+        description = "Allow sending multiple media items in a single message.",
+        defaultValue = { false },
+        isFinished = false,
+        isInLabs = true,
+    ),
+    Knock(
+        key = "feature.knock",
+        title = "Ask to join",
+        description = "Allow creating rooms which users can request access to.",
+        defaultValue = { false },
+        isFinished = false,
+        isInLabs = true,
+    ),
+    MessageSearch(
+        key = "feature.message_search",
+        title = "Message search",
+        description = "Index messages locally so they can be searched. Only messages received while enabled are indexed.",
+        defaultValue = { true },
+        isFinished = false,
+    ),
+    MessageMultiSelect(
+        key = "feature.message_multi_select",
+        title = "Multi-select messages",
+        description = "The Forward action enters a selection mode, to pick and forward up to 10 messages at once.",
+        defaultValue = { false },
+        isFinished = false,
+        isInLabs = false,
+    ),
+    NewTimelineEventRenderer(
+        key = "feature.new_timeline_event_renderer",
+        title = "New timeline event renderer",
+        description = "Render formatted message bodies natively with Jetpack Compose instead of the rich text editor view.",
+        defaultValue = { false },
+        isFinished = false,
+        isInLabs = false,
+    ),
+    NativeCall(
+        key = "feature.native_call",
+        title = "Native calls (experimental)",
+        description = "Place calls with the native MatrixRTC stack instead of the Element Call WebView.",
+        defaultValue = { false },
+        isFinished = false,
+    ),
+    ReceiveNotificationsFromOtherSignedInAccounts(
+        key = "feature.receive_notifications_from_other_signed_in_accounts",
+        title = "Receive notifications from other signed-in accounts",
+        description = "Receive push notifications for events sent from other signed-in accounts on this device. " +
+            "Note this may result in duplicate notifications if you have multiple accounts signed in on the same device, it should only be used for testing.",
+        defaultValue = { false },
+        isFinished = false,
+    )
+}
+
+/**
+ * Feature flag to show all activity indicators in the room list, using unread messages instead of notifications.
+ *
+ * This is separate from the [FeatureFlags] enum because it is not a feature flag that can be toggled in developer options,
+ * but rather a setting that can be toggled in the app settings.
+ */
+object ShowAllActivityInRoomListFeature : Feature {
+    override val key: String = "feature.show_all_activity_in_room_list"
+    override val title: String = "Show all activity in room list"
+    override val description: String = "Show all activity indicators in the room list, using unread messages instead of notifications."
+    override val defaultValue: (BuildMeta) -> Boolean = { true }
+    override val isFinished: Boolean = false
+    override val isInLabs: Boolean = false
+}
