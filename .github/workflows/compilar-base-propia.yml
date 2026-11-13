@@ -1,0 +1,216 @@
+name: Chamos (compilar desde la base propia)
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Versión de Chamos (por ejemplo 2.0.2). Tiene que ser mayor que la anterior para que las apps instaladas ofrezcan actualizar."
+        default: "2.0.1"
+        required: true
+      publicar:
+        description: "Publicar el APK en Releases (así las apps instaladas se actualizan solas)"
+        type: boolean
+        default: true
+      tipo:
+        description: "Tipo de paquete: release (com.chamos.app, el oficial) o debug (solo para pruebas, no se puede publicar)"
+        type: choice
+        options:
+          - release
+          - debug
+        default: release
+      minificar:
+        description: "Solo con release: minificar con R8 (APK más liviano y ofuscado; probar bien antes de publicar). Guarda mapping.txt"
+        type: boolean
+        default: false
+      aab:
+        description: "Generar también el paquete AAB (para APKPure u otras tiendas que lo pidan)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+env:
+  APP_VERSION: ${{ inputs.version || '2.0.1' }}
+  GRADLE_OPTS: -Dorg.gradle.jvmargs=-Xmx6g -XX:MaxMetaspaceSize=512m -Dfile.encoding=UTF-8 -XX:+UseG1GC -Dkotlin.daemon.jvm.options=-Xmx3g
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Seguro - no se publica un paquete debug
+        if: ${{ inputs.tipo == 'debug' && inputs.publicar != false }}
+        run: |
+          echo "::error::Un paquete debug (com.chamos.app.debug) no se puede publicar en Releases. Usa tipo release, o desmarca publicar."
+          exit 1
+
+      - name: Tipo de paquete (debug o release)
+        run: |
+          if [ "${{ inputs.tipo }}" = "release" ]; then
+            echo "TIPO_DIR=release" >> "$GITHUB_ENV"
+            echo "TIPO_TASK=Release" >> "$GITHUB_ENV"
+            echo "CHAMOS_PKG=com.chamos.app" >> "$GITHUB_ENV"
+          else
+            echo "TIPO_DIR=debug" >> "$GITHUB_ENV"
+            echo "TIPO_TASK=Debug" >> "$GITHUB_ENV"
+            echo "CHAMOS_PKG=com.chamos.app.debug" >> "$GITHUB_ENV"
+          fi
+
+      - uses: actions/checkout@v4
+        with:
+          path: chamos-repo
+
+      - name: Descargar la base propia de Chamos (rama base-propia)
+        uses: actions/checkout@v4
+        with:
+          ref: base-propia
+          path: chamos
+
+      - name: Versión de esta compilación
+        working-directory: chamos
+        run: |
+          sed -i "s/^    val VERSION_NAME = .*/    val VERSION_NAME = \"$APP_VERSION\"/" plugins/src/main/kotlin/Versions.kt
+          sed -i "s/^    const val VERSION_CODE = .*/    const val VERSION_CODE = $((20263000 + GITHUB_RUN_NUMBER))/" plugins/src/main/kotlin/Versions.kt
+          grep -n 'VERSION_CODE = \|VERSION_NAME = ' plugins/src/main/kotlin/Versions.kt
+
+      - name: Firma propia de Chamos (si está configurada)
+        env:
+          CHAMOS_KEYSTORE_B64: ${{ secrets.CHAMOS_KEYSTORE_B64 }}
+          CHAMOS_KEY_ALIAS: ${{ secrets.CHAMOS_KEY_ALIAS }}
+          CHAMOS_KEY_PASSWORD: ${{ secrets.CHAMOS_KEY_PASSWORD }}
+          CHAMOS_STORE_PASSWORD: ${{ secrets.CHAMOS_STORE_PASSWORD }}
+        run: python3 chamos-repo/patches/firma.py chamos
+
+      - name: Notificaciones push (Firebase) si ya están configuradas
+        run: |
+          if [ -f chamos-repo/firebase/google-services.json ] && [ -s chamos-repo/firebase/gateway-url.txt ]; then
+            CHAMOS_PKG="$CHAMOS_PKG" python3 chamos-repo/patches/push_firebase.py chamos chamos-repo/firebase/google-services.json "$(head -n1 chamos-repo/firebase/gateway-url.txt)"
+            echo "FLAVOR=Gplay" >> "$GITHUB_ENV"
+            echo "FLAVOR_DIR=gplay" >> "$GITHUB_ENV"
+          else
+            echo "Firebase todavía no está configurado: se compila la versión sin Google (solo UnifiedPush)."
+            echo "FLAVOR=FDroid" >> "$GITHUB_ENV"
+            echo "FLAVOR_DIR=fdroid" >> "$GITHUB_ENV"
+          fi
+
+      - name: Reglas de R8 de Chamos (versión minificada)
+        if: ${{ inputs.tipo == 'release' && inputs.minificar == true }}
+        run: cp chamos-repo/patches/chamos.pro chamos/app/proguard/common/chamos.keep
+
+      - name: Paquete release sin minificar (más seguro, evita fallos de R8)
+        if: ${{ inputs.tipo == 'release' && inputs.minificar != true }}
+        working-directory: chamos
+        run: |
+          python3 - <<'PYEOF'
+          p = "app/build.gradle.kts"
+          t = open(p, encoding="utf-8").read()
+          a = "optimization {\n                enable = true"
+          assert t.count(a) == 1, "no se encontró el bloque optimization del release"
+          open(p, "w", encoding="utf-8").write(t.replace(a, "optimization {\n                enable = false"))
+          print("Release sin optimización R8")
+          PYEOF
+
+      - name: Compilar APK
+        working-directory: chamos
+        env:
+          # Mapas para compartir ubicación (y en tiempo real). Sin la clave, esa función queda oculta.
+          ELEMENT_ANDROID_MAPTILER_API_KEY: ${{ secrets.MAPTILER_API_KEY }}
+          ELEMENT_ANDROID_MAPTILER_LIGHT_MAP_ID: streets-v2
+          ELEMENT_ANDROID_MAPTILER_DARK_MAP_ID: streets-v2-dark
+        run: |
+          set -o pipefail
+          ./gradlew :app:assemble${FLAVOR}${TIPO_TASK} -PuseLegacyPackaging=true --stacktrace --no-configuration-cache 2>&1 | tee ../gradle.log
+
+      - name: Mostrar errores de compilación
+        if: failure()
+        run: |
+          grep -E "^e: |What went wrong|FAILED|Execution failed|Could not" -A3 gradle.log | head -60 | while IFS= read -r l; do echo "::error::${l:0:900}"; done
+
+      - name: Guardar mapping.txt (para leer los errores de una versión minificada)
+        if: ${{ inputs.tipo == 'release' && inputs.minificar == true }}
+        run: |
+          M=$(find chamos/app/build/outputs/mapping -name mapping.txt | head -1)
+          echo "mapping: $M"
+          mkdir -p mapping && cp "$M" "mapping/mapping-V${APP_VERSION}.txt"
+
+      - name: Subir mapping.txt
+        if: ${{ inputs.tipo == 'release' && inputs.minificar == true }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: chamos-mapping
+          path: mapping/*.txt
+          retention-days: 365
+
+      - name: Huella de la firma del APK
+        run: |
+          APK=$(ls chamos/app/build/outputs/apk/${FLAVOR_DIR}/${TIPO_DIR}/*.apk | head -1)
+          AS=$(ls -d $ANDROID_HOME/build-tools/*/apksigner | sort -V | tail -1)
+          echo "APK: $APK"
+          "$AS" verify --print-certs "$APK" | tee cert.txt
+          SHA=$(grep -i "SHA-256 digest" cert.txt | head -1 | awk '{print $NF}')
+          echo "::notice::Huella SHA-256 del APK: $SHA"
+          if [ "$SHA" = "7c13b8f28ea511a38ece5bdefdf91072e8a584cde92b96a7162907a48fee6931" ] || [ "$SHA" = "67b0771894605d9a978599287ba6755f039f1882891afdbc1557c71cc81d551f" ]; then
+            echo "::notice::FIRMA OFICIAL DE CHAMOS: correcta"
+          else
+            echo "::warning::LA FIRMA NO ES LA OFICIAL DE CHAMOS"
+          fi
+
+      - name: Ver los APK generados
+        run: ls -la chamos/app/build/outputs/apk/${FLAVOR_DIR}/${TIPO_DIR}/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: chamos-2-0-apk
+          path: chamos/app/build/outputs/apk/${{ env.FLAVOR_DIR }}/${{ env.TIPO_DIR }}/*arm64-v8a-${{ env.TIPO_DIR }}.apk
+
+      - name: Publicar en Releases (para que la app se actualice sola)
+        if: ${{ inputs.publicar != false }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          APK=$(ls chamos/app/build/outputs/apk/${FLAVOR_DIR}/${TIPO_DIR}/*arm64-v8a-${TIPO_DIR}.apk | head -1)
+          cp "$APK" Chamos.apk
+          gh release create "V$APP_VERSION" Chamos.apk --repo "$GITHUB_REPOSITORY" --title "Chamos $APP_VERSION" --notes "Chamos $APP_VERSION" --latest \
+            || gh release upload "V$APP_VERSION" Chamos.apk --repo "$GITHUB_REPOSITORY" --clobber
+
+      - name: Generar el paquete AAB (opcional)
+        if: ${{ inputs.aab == true }}
+        working-directory: chamos
+        env:
+          ELEMENT_ANDROID_MAPTILER_API_KEY: ${{ secrets.MAPTILER_API_KEY }}
+          ELEMENT_ANDROID_MAPTILER_LIGHT_MAP_ID: streets-v2
+          ELEMENT_ANDROID_MAPTILER_DARK_MAP_ID: streets-v2-dark
+        run: |
+          set -o pipefail
+          ./gradlew :app:bundle${FLAVOR}${TIPO_TASK} --stacktrace --no-configuration-cache 2>&1 | tee ../gradle-aab.log
+          AAB=$(find app/build/outputs/bundle -name "*.aab" | head -1)
+          echo "AAB: $AAB"
+          ls -la "$AAB"
+          cp "$AAB" ../Chamos.aab
+          jarsigner -verify -verbose -certs ../Chamos.aab | tail -5 || true
+
+      - name: Mostrar errores del AAB
+        if: ${{ failure() && inputs.aab == true }}
+        run: |
+          grep -E "^e: |What went wrong|FAILED|Execution failed|Could not" -A3 gradle-aab.log | head -40 | while IFS= read -r l; do echo "::error::${l:0:900}"; done
+
+      - name: Guardar el AAB
+        if: ${{ inputs.aab == true }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: chamos-aab
+          path: Chamos.aab
+
+      - name: Publicar el AAB en Releases
+        if: ${{ inputs.aab == true && inputs.publicar != false }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "V$APP_VERSION" Chamos.aab --repo "$GITHUB_REPOSITORY" --clobber
