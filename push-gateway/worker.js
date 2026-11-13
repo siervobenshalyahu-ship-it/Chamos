@@ -1238,11 +1238,75 @@ function soloRelease(request, env, url) {
   const deApp = (p.startsWith("/v/") && m === "POST") || p === "/seguir" || p.startsWith("/video/") || p.startsWith("/estado/");
   return deApp && request.headers.get("x-chamos-app") !== "com.chamos.app";
 }
+
+// Registro de la página web: nombre + correo para poder descargar la app. El enlace de descarga pasa por aquí
+// (firmado y con vencimiento) y el Worker entrega el APK de GitHub. Secreto: WEB_SECRET (o ADMIN_KEY si no existe).
+const APK_URL = "https://github.com/siervobenshalyahu-ship-it/Chamos/releases/latest/download/Chamos.apk";
+const _hexW = (b) => [...new Uint8Array(b)].map((x) => x.toString(16).padStart(2, "0")).join("");
+async function webFirma(env, texto) {
+  const k = env.WEB_SECRET || env.ADMIN_KEY;
+  if (!k) return null;
+  return _hexW(await _hmac(k, texto));
+}
+async function webRegistro(request, env) {
+  if (!env.DB) return jsonCors({ error: "Base de datos no configurada" }, 503);
+  let d;
+  try { d = JSON.parse(await request.text()); } catch { return jsonCors({ error: "JSON inválido" }, 400); }
+  const nombre = corto(d.nombre, 80).trim();
+  const email = corto(d.email, 120).trim().toLowerCase();
+  if (nombre.length < 2) return jsonCors({ error: "Escribe tu nombre" }, 400);
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) return jsonCors({ error: "Escribe un correo válido" }, 400);
+  const exp = Date.now() + 15 * 60 * 1000;
+  const carga = exp + "." + btoa(unescape(encodeURIComponent(email)));
+  const firma = await webFirma(env, carga);
+  if (!firma) return jsonCors({ error: "Falta el secreto WEB_SECRET" }, 503);
+  await prepararTablas(env);
+  await env.DB.prepare("CREATE TABLE IF NOT EXISTS web_registros (email TEXT PRIMARY KEY, nombre TEXT, pais TEXT, primera INTEGER, ultima INTEGER, descargas INTEGER DEFAULT 0, ip TEXT)").run();
+  const ahora = Date.now();
+  await env.DB.prepare(
+    "INSERT INTO web_registros (email, nombre, pais, primera, ultima, ip) VALUES (?1,?2,?3,?4,?4,?5) ON CONFLICT(email) DO UPDATE SET nombre=?2, pais=?3, ultima=?4, ip=?5",
+  ).bind(email, nombre, corto(request.cf && request.cf.country, 4), ahora, corto(request.headers.get("cf-connecting-ip"), 64)).run();
+  return jsonCors({ ok: true, url: new URL(request.url).origin + "/web/apk?t=" + encodeURIComponent(carga + "." + firma) });
+}
+async function webApk(request, env) {
+  const t = new URL(request.url).searchParams.get("t") || "";
+  const i = t.lastIndexOf(".");
+  const carga = t.slice(0, i), firma = t.slice(i + 1);
+  const esperada = await webFirma(env, carga);
+  const exp = Number(carga.split(".")[0]);
+  if (!esperada || firma !== esperada || !(exp > Date.now())) return new Response("Enlace vencido. Vuelve a la página de Chamos y regístrate otra vez.", { status: 403, headers: CORS });
+  try {
+    const email = decodeURIComponent(escape(atob(carga.split(".")[1])));
+    await env.DB.prepare("UPDATE web_registros SET descargas = descargas + 1, ultima = ?2 WHERE email = ?1").bind(email, Date.now()).run();
+  } catch (_) {}
+  const r = await fetch(APK_URL, { redirect: "follow" });
+  if (!r.ok) return new Response("No se pudo obtener la app, intenta de nuevo.", { status: 502, headers: CORS });
+  const h = new Headers({ "content-type": "application/vnd.android.package-archive", "content-disposition": 'attachment; filename="Chamos.apk"', ...CORS });
+  const l = r.headers.get("content-length");
+  if (l) h.set("content-length", l);
+  return new Response(r.body, { headers: h });
+}
+async function webLista(request, env) {
+  if (!env.ADMIN_KEY || request.headers.get("x-clave") !== env.ADMIN_KEY) return jsonCors({ error: "Clave incorrecta" }, 401);
+  await prepararTablas(env);
+  await env.DB.prepare("CREATE TABLE IF NOT EXISTS web_registros (email TEXT PRIMARY KEY, nombre TEXT, pais TEXT, primera INTEGER, ultima INTEGER, descargas INTEGER DEFAULT 0, ip TEXT)").run();
+  const r = await env.DB.prepare("SELECT email, nombre, pais, primera, ultima, descargas FROM web_registros ORDER BY primera DESC LIMIT 500").all();
+  return jsonCors({ total: r.results.length, registros: r.results });
+}
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS });
     if (soloRelease(request, env, url)) return jsonCors(CERRADA, 426);
+    if (url.pathname === "/web/registro" && request.method === "POST") {
+      try { return await webRegistro(request, env); } catch (e) { console.error(e); return jsonCors({ error: String(e.message || e) }, 500); }
+    }
+    if (url.pathname === "/web/apk" && request.method === "GET") {
+      try { return await webApk(request, env); } catch (e) { console.error(e); return jsonCors({ error: String(e.message || e) }, 500); }
+    }
+    if (url.pathname === "/web/registros" && request.method === "GET") {
+      try { return await webLista(request, env); } catch (e) { console.error(e); return jsonCors({ error: String(e.message || e) }, 500); }
+    }
     if (url.pathname.startsWith("/v/") && request.method === "POST") {
       try { return await videoSubir(request, env, url); } catch (e) { console.error(e); return jsonCors({ error: String(e.message || e) }, 500); }
     }
