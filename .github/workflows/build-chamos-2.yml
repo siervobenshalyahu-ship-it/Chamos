@@ -12,12 +12,12 @@ on:
         type: boolean
         default: true
       tipo:
-        description: "Tipo de paquete: debug (com.chamos.app.debug, el de ahora) o release (com.chamos.app, sin depuración; se instala aparte)"
+        description: "Tipo de paquete: release (com.chamos.app, el oficial) o debug (solo para pruebas, no se puede publicar)"
         type: choice
         options:
-          - debug
           - release
-        default: debug
+          - debug
+        default: release
       minificar:
         description: "Solo con release: minificar con R8 (APK más liviano y ofuscado; probar bien antes de publicar). Guarda mapping.txt"
         type: boolean
@@ -49,6 +49,12 @@ jobs:
           java-version: 21
 
       - uses: gradle/actions/setup-gradle@v4
+
+      - name: Seguro - no se publica un paquete debug
+        if: ${{ inputs.tipo == 'debug' && inputs.publicar != false }}
+        run: |
+          echo "::error::Un paquete debug (com.chamos.app.debug) no se puede publicar en Releases. Usa tipo release, o desmarca publicar."
+          exit 1
 
       - name: Tipo de paquete (debug o release)
         run: |
