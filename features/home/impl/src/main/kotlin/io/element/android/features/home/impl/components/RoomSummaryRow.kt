@@ -118,21 +118,14 @@ internal fun RoomSummaryRow(
                 }
             }
             RoomSummaryDisplayType.ROOM -> {
-                RoomSummaryScaffoldRow(
+                // Chamos: diseño propio de la fila de chat (ChamosFilaChat.kt)
+                ChamosFilaChat(
                     room = room,
                     onClick = onClick,
-                    onLongClick = {
-                        eventSink(RoomListEvent.ShowContextMenu(room))
-                    },
-                ) {
-                    NameAndTimestampRow(
-                        name = room.name,
-                        timestamp = room.timestamp,
-                        isHighlighted = room.isHighlighted,
-                        dmUserStatus = room.dmUserStatus,
-                    )
-                    MessagePreviewAndIndicatorRow(room = room, showUnreadCount = showUnreadCount, showAllActivity = showAllActivity)
-                }
+                    onLongClick = { eventSink(RoomListEvent.ShowContextMenu(room)) },
+                    showUnreadCount = showUnreadCount,
+                    showAllActivity = showAllActivity,
+                )
             }
             RoomSummaryDisplayType.KNOCKED -> {
                 RoomSummaryScaffoldRow(
