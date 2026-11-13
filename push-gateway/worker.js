@@ -1256,17 +1256,33 @@ async function webRegistro(request, env) {
   const email = corto(d.email, 120).trim().toLowerCase();
   if (nombre.length < 2) return jsonCors({ error: "Escribe tu nombre" }, 400);
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) return jsonCors({ error: "Escribe un correo válido" }, 400);
-  const exp = Date.now() + 15 * 60 * 1000;
+  if (!env.BREVO_KEY || !env.MAIL_FROM) return jsonCors({ error: "Falta configurar el correo (BREVO_KEY y MAIL_FROM)" }, 503);
+  const exp = Date.now() + 24 * 60 * 60 * 1000;
   const carga = exp + "." + btoa(unescape(encodeURIComponent(email)));
   const firma = await webFirma(env, carga);
   if (!firma) return jsonCors({ error: "Falta el secreto WEB_SECRET" }, 503);
   await prepararTablas(env);
   await env.DB.prepare("CREATE TABLE IF NOT EXISTS web_registros (email TEXT PRIMARY KEY, nombre TEXT, pais TEXT, primera INTEGER, ultima INTEGER, descargas INTEGER DEFAULT 0, ip TEXT)").run();
   const ahora = Date.now();
+  const previo = await env.DB.prepare("SELECT ultima FROM web_registros WHERE email = ?1").bind(email).first();
+  if (previo && ahora - previo.ultima < 60000) return jsonCors({ error: "Ya te enviamos un correo, espera un minuto para pedir otro" }, 429);
+  const enlace = new URL(request.url).origin + "/web/apk?t=" + encodeURIComponent(carga + "." + firma);
+  const esc = (x) => x.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+  const html = '<div style="font-family:Arial,sans-serif;background:#0a0e2b;color:#fff;padding:28px;border-radius:16px;max-width:480px;margin:auto">' +
+    '<h2 style="color:#29c5ff;margin:0 0 10px">Hola ' + esc(nombre) + ', ya casi tienes Chamos</h2>' +
+    '<p style="color:#b8c0ff">Toca el botón desde tu teléfono Android para descargar la app. El enlace sirve por 24 horas.</p>' +
+    '<p style="margin:24px 0"><a href="' + enlace + '" style="background:#9b5cff;color:#fff;text-decoration:none;font-weight:bold;padding:14px 22px;border-radius:12px;display:inline-block">Descargar Chamos</a></p>' +
+    '<p style="color:#8890c8;font-size:12px">Si no pediste esto, ignora este correo.</p></div>';
+  const r = await fetch("https://api.brevo.com/v3/smtp/email", {
+    method: "POST",
+    headers: { "api-key": env.BREVO_KEY, "content-type": "application/json", accept: "application/json" },
+    body: JSON.stringify({ sender: { name: "Chamos", email: env.MAIL_FROM }, to: [{ email, name: nombre }], subject: "Tu descarga de Chamos", htmlContent: html }),
+  });
+  if (!r.ok) { console.error("brevo", r.status, await r.text()); return jsonCors({ error: "No pudimos enviar el correo. Revisa que esté bien escrito." }, 502); }
   await env.DB.prepare(
     "INSERT INTO web_registros (email, nombre, pais, primera, ultima, ip) VALUES (?1,?2,?3,?4,?4,?5) ON CONFLICT(email) DO UPDATE SET nombre=?2, pais=?3, ultima=?4, ip=?5",
   ).bind(email, nombre, corto(request.cf && request.cf.country, 4), ahora, corto(request.headers.get("cf-connecting-ip"), 64)).run();
-  return jsonCors({ ok: true, url: new URL(request.url).origin + "/web/apk?t=" + encodeURIComponent(carga + "." + firma) });
+  return jsonCors({ ok: true });
 }
 async function webApk(request, env) {
   const t = new URL(request.url).searchParams.get("t") || "";
