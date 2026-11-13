@@ -85,8 +85,7 @@ internal fun ChamosFilaChat(
                     modifier = Modifier.weight(1f),
                     text = room.name?.toSafeLength(ellipsize = true) ?: stringResource(CommonStrings.common_no_room_name),
                     fontStyle = FontStyle.Italic.takeIf { room.name == null },
-                    fontWeight = if (sinLeer) FontWeight.Bold else FontWeight.SemiBold,
-                    fontSize = 17.sp,
+                    style = estiloChamos(17, if (sinLeer) FontWeight.Bold else FontWeight.SemiBold),
                     color = ElementTheme.colors.textPrimary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -94,8 +93,7 @@ internal fun ChamosFilaChat(
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     text = room.timestamp ?: "",
-                    fontSize = 12.sp,
-                    fontWeight = if (sinLeer) FontWeight.Bold else FontWeight.Normal,
+                    style = estiloChamos(12, if (sinLeer) FontWeight.Bold else FontWeight.Normal),
                     color = if (sinLeer || room.isHighlighted) AmbarChamos else ElementTheme.colors.textSecondary,
                 )
             }
@@ -128,7 +126,7 @@ internal fun ChamosFilaChat(
                         Text(
                             modifier = Modifier.weight(1f),
                             text = texto,
-                            fontSize = 14.sp,
+                            style = estiloChamos(14, FontWeight.Normal),
                             color = if (sinLeer) ElementTheme.colors.textPrimary else ElementTheme.colors.textSecondary,
                             maxLines = 2,
                             overflow = TextOverflow.Ellipsis,
@@ -166,8 +164,7 @@ internal fun ChamosFilaChat(
                                 if (cuenta > 0) {
                                     Text(
                                         text = if (cuenta > 99) "99+" else cuenta.toString(),
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Bold,
+                                        style = estiloChamos(12, FontWeight.Bold),
                                         color = TintaAmbar,
                                     )
                                 } else {
@@ -183,11 +180,14 @@ internal fun ChamosFilaChat(
 }
 
 @Composable
+private fun estiloChamos(tam: Int, peso: FontWeight) = ElementTheme.typography.fontBodyMdRegular.copy(fontSize = tam.sp, fontWeight = peso)
+
+@Composable
 private fun Texto(texto: String, color: Color, modifier: Modifier) {
     Text(
         modifier = modifier,
         text = texto,
-        fontSize = 14.sp,
+        style = estiloChamos(14, FontWeight.Normal),
         color = if (color == Color.Unspecified) ElementTheme.colors.textSecondary else color,
         maxLines = 2,
         overflow = TextOverflow.Ellipsis,
