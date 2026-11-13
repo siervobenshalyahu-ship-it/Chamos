@@ -56,6 +56,7 @@ fun ChooseAccountProviderView(
     onLearnMoreClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    io.element.android.features.login.impl.screens.ChamosLoginTema {
     val isLoading by remember(state.loginModeState.loginMode) {
         derivedStateOf {
             state.loginModeState.loginMode is AsyncData.Loading
@@ -137,6 +138,7 @@ fun ChooseAccountProviderView(
             state.loginModeState.eventSink(LoginModeEvent.DismissLocalNetworkPermission)
         }
     )
+    }
 }
 
 @PreviewsDayNight

@@ -39,18 +39,19 @@ import io.element.android.features.login.impl.R
 import io.element.android.features.login.impl.login.LoginModeEvent
 import io.element.android.features.login.impl.login.LoginModeView
 import io.element.android.libraries.architecture.AsyncData
+import io.element.android.features.login.impl.screens.ChamosBotonContorno
+import io.element.android.features.login.impl.screens.ChamosBotonNeon
+import io.element.android.features.login.impl.screens.ChamosLoginTema
 import io.element.android.libraries.designsystem.atomic.molecules.ButtonColumnMolecule
 import io.element.android.libraries.designsystem.atomic.pages.FlowStepPage
 import io.element.android.libraries.designsystem.atomic.pages.OnBoardingPage
 import io.element.android.libraries.designsystem.components.BigIcon
 import io.element.android.libraries.designsystem.preview.ElementPreview
 import io.element.android.libraries.designsystem.preview.PreviewsDayNight
-import io.element.android.libraries.designsystem.theme.components.Button
 import io.element.android.libraries.designsystem.theme.components.Icon
 import io.element.android.libraries.designsystem.theme.components.IconButton
 import io.element.android.libraries.designsystem.theme.components.IconSource
 import io.element.android.libraries.designsystem.theme.components.Text
-import io.element.android.libraries.designsystem.theme.components.TextButton
 import io.element.android.libraries.matrix.api.auth.OAuthDetails
 import io.element.android.libraries.permissions.api.localnetwork.LocalNetworkPermissionDialogView
 import io.element.android.libraries.testtags.TestTags
@@ -74,6 +75,7 @@ fun OnBoardingView(
     onReportProblem: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    io.element.android.features.login.impl.screens.ChamosLoginTema {
     val loginView = @Composable {
         LoginModeView(
             loginMode = state.loginModeState.loginMode,
@@ -120,6 +122,7 @@ fun OnBoardingView(
             onBackClick = onBackClick,
             onDeveloperSettingsClick = onDeveloperSettingsClick,
         )
+    }
     }
 }
 
@@ -301,16 +304,15 @@ private fun OnBoardingButtons(
             CommonStrings.action_continue
         }
         if (state.canLoginWithQrCode) {
-            Button(
+            ChamosBotonContorno(
                 text = stringResource(id = R.string.screen_onboarding_sign_in_with_qr_code),
-                leadingIcon = IconSource.Vector(CompoundIcons.QrCode()),
                 onClick = onSignInWithQrCode,
                 modifier = Modifier.fillMaxWidth()
             )
         }
         val defaultAccountProvider = state.defaultAccountProvider
         if (defaultAccountProvider == null) {
-            Button(
+            ChamosBotonNeon(
                 text = stringResource(id = signInButtonStringRes),
                 onClick = {
                     onSignIn(state.mustChooseAccountProvider)
@@ -320,7 +322,7 @@ private fun OnBoardingButtons(
                     .testTag(TestTags.onBoardingSignIn)
             )
         } else {
-            Button(
+            ChamosBotonNeon(
                 text = stringResource(id = R.string.screen_onboarding_sign_in_to, defaultAccountProvider.friendlyServerName()),
                 showProgress = isLoading,
                 onClick = {
@@ -332,7 +334,7 @@ private fun OnBoardingButtons(
             )
         }
         if (state.canCreateAccount) {
-            TextButton(
+            ChamosBotonContorno(
                 text = stringResource(id = R.string.screen_onboarding_sign_up),
                 onClick = onCreateAccount,
                 modifier = Modifier

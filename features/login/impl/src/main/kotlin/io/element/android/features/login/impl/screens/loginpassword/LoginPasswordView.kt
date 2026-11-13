@@ -75,6 +75,7 @@ fun LoginPasswordView(
     onBackClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    io.element.android.features.login.impl.screens.ChamosLoginTema {
     val autofillManager = LocalAutofillManager.current
 
     BackHandler {
@@ -168,6 +169,7 @@ fun LoginPasswordView(
                 })
             }
         }
+    }
     }
 }
 

@@ -80,6 +80,7 @@ fun ConfirmAccountProviderView(
     onLearnMoreClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    io.element.android.features.login.impl.screens.ChamosLoginTema {
     val eventSink = state.eventSink
     val focusManager = LocalFocusManager.current
     val focusRequester = remember { FocusRequester() }
@@ -250,6 +251,7 @@ fun ConfirmAccountProviderView(
             state.loginModeState.eventSink(LoginModeEvent.DismissLocalNetworkPermission)
         }
     )
+    }
 }
 
 /**
