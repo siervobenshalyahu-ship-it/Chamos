@@ -1,0 +1,296 @@
+name: Crear base propia (código completo de Chamos)
+
+# Descarga Element X, le aplica TODOS los parches de Chamos una sola vez y guarda el resultado
+# como código fuente propio en la rama "base-propia". No compila ni publica nada, y no sube
+# secretos: la firma y Firebase se siguen aplicando al compilar.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Versión de Chamos que queda escrita en el código (por ejemplo 2.1.20)"
+        default: "2.1.20"
+        required: true
+      tipo:
+        description: "Tipo de paquete para el identificador (release = com.chamos.app)"
+        type: choice
+        options:
+          - release
+          - debug
+        default: release
+
+permissions:
+  contents: write
+
+env:
+  VERSION_BASE: v26.10.1
+  APP_VERSION: ${{ inputs.version }}
+
+jobs:
+  base:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Descargar el código base (Element X Android, licencia AGPL-3.0)
+        run: git clone --depth 1 --branch $VERSION_BASE https://github.com/element-hq/element-x-android chamos
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Tipo de paquete (debug o release)
+        run: |
+          if [ "${{ inputs.tipo }}" = "release" ]; then
+            echo "TIPO_DIR=release" >> "$GITHUB_ENV"
+            echo "TIPO_TASK=Release" >> "$GITHUB_ENV"
+            echo "CHAMOS_PKG=com.chamos.app" >> "$GITHUB_ENV"
+          else
+            echo "TIPO_DIR=debug" >> "$GITHUB_ENV"
+            echo "TIPO_TASK=Debug" >> "$GITHUB_ENV"
+            echo "CHAMOS_PKG=com.chamos.app.debug" >> "$GITHUB_ENV"
+          fi
+
+      - name: Cambiar nombre, textos e identificador a Chamos
+        working-directory: chamos
+        run: |
+          sed -i 's/APPLICATION_ID = "io.element.android.x"/APPLICATION_ID = "com.chamos.app"/' plugins/src/main/kotlin/config/BuildTimeConfig.kt
+          sed -i 's/APPLICATION_NAME = "Element X"/APPLICATION_NAME = "Chamos"/' plugins/src/main/kotlin/config/BuildTimeConfig.kt
+          sed -i 's/"$baseAppName dbg"/baseAppName/' app/build.gradle.kts
+          sed -i "s/^    val VERSION_NAME = .*/    val VERSION_NAME = \"$APP_VERSION\"/" plugins/src/main/kotlin/Versions.kt
+          sed -i "s/^    const val VERSION_CODE = .*/    const val VERSION_CODE = $((20262000 + GITHUB_RUN_NUMBER))/" plugins/src/main/kotlin/Versions.kt
+          grep -n 'VERSION_CODE = ' plugins/src/main/kotlin/Versions.kt
+          grep -n 'VERSION_NAME = ' plugins/src/main/kotlin/Versions.kt
+          grep -n 'com.chamos.app\|"Chamos"' plugins/src/main/kotlin/config/BuildTimeConfig.kt
+          grep -n 'app_name", baseAppName' app/build.gradle.kts
+          grep -rl "Element X" --include=localazy.xml --include=translations.xml . | xargs -r sed -i 's/Element X/Chamos/g'
+
+      - uses: actions/checkout@v4
+        with:
+          path: chamos-repo
+
+      - name: Cambiar el ícono a Chamos
+        run: |
+          pip install pillow
+          cat > rebrand.py <<'EOF'
+          # Ícono de Chamos: los dos chamos chocando puños sobre la bandera de Venezuela.
+          # Usa assets/chamos_icon_fg.png (PNG con fondo transparente).
+          # Uso: python3 rebrand.py RAIZ_DEL_REPO ICONO_PNG
+          import sys, os, re
+          from PIL import Image, ImageDraw
+
+          root, icon_path = sys.argv[1], sys.argv[2]
+          res = os.path.join(root, "appicon/element/src/main/res")
+          BG = "#EAF7EF"
+          dens = {"mdpi": 1, "hdpi": 1.5, "xhdpi": 2, "xxhdpi": 3, "xxxhdpi": 4}
+          CLEAR = (0, 0, 0, 0)
+
+          src = Image.open(icon_path).convert("RGBA")
+          src = src.crop(src.getbbox())
+          side = max(src.size)
+          square = Image.new("RGBA", (side, side), CLEAR)
+          square.alpha_composite(src, ((side - src.width) // 2, (side - src.height) // 2))
+
+          def scene(size, mono=False):
+              img = square.resize((size, size), Image.LANCZOS)
+              if mono:
+                  white = Image.new("RGBA", (size, size), (255, 255, 255, 255))
+                  white.putalpha(img.split()[3])
+                  return white
+              return img
+
+          def tight(img, scale):
+              n = int(img.width * scale)
+              out = Image.new("RGBA", img.size, CLEAR)
+              o = (img.width - n) // 2
+              out.alpha_composite(img.resize((n, n), Image.LANCZOS), (o, o))
+              return out
+
+          def save(img, path):
+              os.makedirs(os.path.dirname(path), exist_ok=True)
+              img.save(path, "WEBP", quality=95)
+
+          for name, k in dens.items():
+              d = os.path.join(res, "mipmap-" + name)
+              fg = int(108 * k)
+              save(tight(scene(fg), 0.62), os.path.join(d, "ic_launcher_foreground.webp"))
+              save(tight(scene(fg, mono=True), 0.62), os.path.join(d, "ic_launcher_monochrome.webp"))
+              lg = int(48 * k)
+              sq = Image.new("RGBA", (lg, lg), BG)
+              sq.alpha_composite(tight(scene(lg), 0.80))
+              save(sq, os.path.join(d, "ic_launcher.webp"))
+              mask = Image.new("L", (lg * 4, lg * 4), 0)
+              ImageDraw.Draw(mask).ellipse((0, 0, lg * 4 - 1, lg * 4 - 1), fill=255)
+              mask = mask.resize((lg, lg), Image.LANCZOS)
+              rnd = Image.new("RGBA", (lg, lg), CLEAR)
+              rnd.paste(sq, (0, 0), mask)
+              save(rnd, os.path.join(d, "ic_launcher_round.webp"))
+
+          for variant in ("debug", "nightly", "release"):
+              p = os.path.normpath(os.path.join(res, "..", "..", variant, "res/drawable/ic_launcher_background.xml"))
+              if os.path.exists(p):
+                  t = open(p).read()
+                  t = re.sub(r'android:fillColor="#[0-9A-Fa-f]{6,8}"', 'android:fillColor="%s"' % BG, t)
+                  open(p, "w").write(t)
+          print("Ícono de Chamos generado")
+          EOF
+          python3 rebrand.py chamos chamos-repo/assets/chamos_icon_fg.png
+
+      - name: Colores y textos de Chamos 2.0 (azul noche, ámbar, venezolano)
+        run: |
+          cat > estilo.py <<'EOF'
+          # Colores (azul noche + ámbar) y textos en venezolano para Chamos 2.0. Uso: python3 estilo.py RAIZ_DEL_REPO
+          import sys, os, re, glob
+          root = sys.argv[1]
+          tok = os.path.join(root, "libraries/compound/src/main/kotlin/io/element/android/compound/tokens/generated/internal")
+          def setcolor(fname, name, hexv):
+              p = os.path.join(tok, fname)
+              t = open(p, encoding="utf8").read()
+              t2, n = re.subn(r"(val %s = Color\()0x[0-9a-fA-F]{8}(\))" % name, lambda m: m.group(1) + "0xff" + hexv + m.group(2), t)
+              open(p, "w", encoding="utf8").write(t2)
+              print(fname, name, n)
+          for f, g in (("DarkColorTokens.kt", ("F4B54A", "FFC766", "FFD48A")), ("DarkHcColorTokens.kt", ("F4B54A", "FFC766", "FFD48A")),
+                       ("LightColorTokens.kt", ("C27A0A", "A86600", "8F5500")), ("LightHcColorTokens.kt", ("C27A0A", "A86600", "8F5500"))):
+              setcolor(f, "colorGreen900", g[0]); setcolor(f, "colorGreen1000", g[1]); setcolor(f, "colorGreen1100", g[2])
+          setcolor("DarkColorTokens.kt", "colorThemeBg", "0B1020")
+          setcolor("DarkHcColorTokens.kt", "colorThemeBg", "0B1020")
+
+          TEXTS = {
+              "screen_onboarding_welcome_title": "Aquí hablamos como somos",
+              "screen_onboarding_welcome_subtitle": "Bienvenido a %1$s. Tu gente, tu barrio, tu idioma.",
+              "screen_onboarding_welcome_message": "Bienvenido a %1$s, la app hecha solo para venezolanos. Sin pedirte tu número de teléfono.",
+              "action_invite_friends": "Invitar a un pana",
+              "invite_friends_text": "Ven a Chamos, la app de mensajes solo para venezolanos. Escríbeme aquí: %2$s\\nDescárgala: https://siervobenshalyahu-ship-it.github.io/Chamos-apk-web/",
+              "invite_friends_rich_title": "Únete a %1$s, solo para venezolanos",
+          }
+          files = [f for f in glob.glob(os.path.join(root, "**/res/values/localazy.xml"), recursive=True)]
+          files += [f for f in glob.glob(os.path.join(root, "**/res/values-es*/translations.xml"), recursive=True)]
+          tot = 0
+          for p in files:
+              t = open(p, encoding="utf8").read()
+              for k, v in TEXTS.items():
+                  t, n = re.subn(r'(<string name="%s">)"[^"]*"(</string>)' % k, lambda m: m.group(1) + '"' + v + '"' + m.group(2), t)
+                  tot += n
+              open(p, "w", encoding="utf8").write(t)
+          print("textos cambiados:", tot)
+          EOF
+          python3 estilo.py chamos
+
+      - name: Chat - quitar mensajes borrados y aro de neón en los audios
+        run: python3 chamos-repo/patches/avisos_chat.py chamos
+
+      - name: Palomitas de neón y luz de neón en los audios enviados
+        run: python3 chamos-repo/patches/palomitas.py chamos chamos-repo/patches
+
+      - name: Todo en español venezolano (sin frases en inglés)
+        run: python3 chamos-repo/patches/espanol.py chamos
+
+      - name: Quitar reacciones (stickers) de las llamadas
+        run: python3 chamos-repo/patches/sin_reacciones.py chamos
+
+      - name: Actualizaciones dentro de la app
+        run: python3 chamos-repo/patches/actualizador.py chamos chamos-repo/patches/ChamosUpdater.kt
+
+      - name: Registro de errores dentro de la app
+        run: python3 chamos-repo/patches/crash.py chamos
+
+      - name: Avisos al grabar notas de voz
+        run: python3 chamos-repo/patches/voz.py chamos
+
+      - name: Pantalla principal con Estados
+        run: python3 chamos-repo/patches/home_estados.py chamos chamos-repo/patches/ChamosEstados.kt
+
+      - name: Reels (videos verticales)
+        run: python3 chamos-repo/patches/reels.py chamos chamos-repo/patches
+
+      - name: Estilos (colores y fondos de chat)
+        run: python3 chamos-repo/patches/estilos.py chamos chamos-repo/patches chamos-repo/assets/fondos
+
+      - name: Marco de neón, fondos propios y dictado por voz
+        run: python3 chamos-repo/patches/neon.py chamos chamos-repo/patches
+
+      - name: Notas de voz (mantén para grabar, suelta para enviar, desliza para fijar)
+        run: python3 chamos-repo/patches/audio_gesto.py chamos
+
+      - name: Fuentes y stickers
+        run: python3 chamos-repo/patches/fuentes_stickers.py chamos chamos-repo/patches
+
+      - name: Descargar el detector de caras (MediaPipe)
+        continue-on-error: true
+        run: |
+          set -e
+          mkdir -p mp-tmp mediapipe/wasm
+          (cd mp-tmp && npm pack @mediapipe/tasks-vision@0.10.14 && tar xzf mediapipe-tasks-vision-*.tgz)
+          cp mp-tmp/package/vision_bundle.cjs mediapipe/
+          cp mp-tmp/package/wasm/* mediapipe/wasm/
+          curl -fL -o mediapipe/face_landmarker.task https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task
+          ls -la mediapipe mediapipe/wasm
+
+      - name: Filtros de cara, de color y memes en videollamadas
+        run: python3 chamos-repo/patches/filtros.py chamos chamos-repo/patches mediapipe
+
+      - name: Colgar la llamada al salir con el botón atrás
+        run: python3 chamos-repo/patches/colgar_al_salir.py chamos
+
+      - name: Vincular número de teléfono (Chamos Cuentas)
+        run: python3 chamos-repo/patches/numero.py chamos chamos-repo/patches "$(head -n1 chamos-repo/cuentas/servicio-url.txt 2>/dev/null || true)"
+
+      - name: Interruptor de búsqueda (solo Chamos / todos)
+        run: python3 chamos-repo/patches/buscador.py chamos
+
+      - name: Iniciar chat - lista de contactos (sin Nueva sala, Directorio, Invitar ni Unirse)
+        run: python3 chamos-repo/patches/contactos.py chamos
+
+      - name: Ajustes de pantalla (stickers pequeños, barra de abajo)
+        run: python3 chamos-repo/patches/ajustes_ui.py chamos
+
+      - name: Barra de abajo con Chamo Muro (el lápiz pasa arriba)
+        run: python3 chamos-repo/patches/barra_muro.py chamos
+
+      - name: Seguir, guardar con marca de agua y estadísticas
+        run: python3 chamos-repo/patches/social.py chamos
+
+      - name: Sonido en las notificaciones de mensajes
+        run: python3 chamos-repo/patches/sonido.py chamos
+
+      - name: Navegador interno de Chamos
+        run: python3 chamos-repo/patches/navegador.py chamos
+      - name: Marca de la app en las llamadas a los servidores
+        run: python3 chamos-repo/patches/marca.py chamos
+      - name: Iconos y engranaje arriba
+        run: python3 chamos-repo/patches/iconos_ui.py chamos chamos-repo/patches
+      - name: Ubicación en tiempo real de Chamos
+        run: python3 chamos-repo/patches/ubicacion_vivo.py chamos chamos-repo/patches
+      - name: Boton para crear grupos
+        run: python3 chamos-repo/patches/grupos.py chamos
+      - name: Barra ovalada plegable
+        run: python3 chamos-repo/patches/barra_oval.py chamos chamos-repo/patches
+      - name: Barra de abajo plegable
+        run: python3 chamos-repo/patches/barra_abajo.py chamos chamos-repo/patches
+      - name: Traductor por sala
+        run: python3 chamos-repo/patches/traductor.py chamos chamos-repo/patches
+
+
+      - name: Guardar el código en la rama base-propia
+        run: |
+          cd chamos
+          rm -rf .git .github
+          cat > LEEME-CHAMOS.md <<'MD'
+          # Chamos - código base propio
+
+          Este es el código completo de Chamos para Android. Nació de Element X Android (v26.10.1,
+          licencia AGPL-3.0, ver LICENSE) y desde aquí se corrige y se mejora directamente,
+          sin parches al compilar. Los créditos a Element se mantienen según la licencia.
+
+          La firma de la app y las notificaciones push (Firebase) no están en este repositorio:
+          se aplican al compilar con los secretos del repositorio.
+          MD
+          git init -q -b base-propia
+          git config user.name "Chamos"
+          git config user.email "chamos@users.noreply.github.com"
+          git add -A
+          git commit -q -m "Base propia de Chamos: Element X v26.10.1 con todos los parches de Chamos aplicados"
+          git remote add origin "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git"
+          git push -f origin base-propia
+          du -sh .git
