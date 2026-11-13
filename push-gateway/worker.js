@@ -1278,7 +1278,7 @@ async function webRegistro(request, env) {
   if (DESECHABLES.has(dom)) return jsonCors({ error: "Usa un correo real, no uno temporal" }, 400);
   if (!(await dominioRecibeCorreo(dom))) return jsonCors({ error: "Ese correo no existe, revisa cómo lo escribiste" }, 400);
   if (!env.BREVO_KEY || !env.MAIL_FROM) return jsonCors({ error: "Falta configurar el correo (BREVO_KEY y MAIL_FROM)" }, 503);
-  const exp = Date.now() + 24 * 60 * 60 * 1000;
+  const exp = Date.now() + 15 * 60 * 1000;
   const carga = exp + "." + btoa(unescape(encodeURIComponent(email)));
   const firma = await webFirma(env, carga);
   if (!firma) return jsonCors({ error: "Falta el secreto WEB_SECRET" }, 503);
@@ -1287,23 +1287,48 @@ async function webRegistro(request, env) {
   const ahora = Date.now();
   const previo = await env.DB.prepare("SELECT ultima FROM web_registros WHERE email = ?1").bind(email).first();
   if (previo && ahora - previo.ultima < 60000) return jsonCors({ error: "Ya te enviamos un correo, espera un minuto para pedir otro" }, 429);
-  const enlace = new URL(request.url).origin + "/web/apk?t=" + encodeURIComponent(carga + "." + firma);
+  const codigo = String(crypto.getRandomValues(new Uint32Array(1))[0] % 1000000).padStart(6, "0");
+  await env.DB.prepare("CREATE TABLE IF NOT EXISTS web_codigos (email TEXT PRIMARY KEY, codigo TEXT, exp INTEGER, intentos INTEGER DEFAULT 0)").run();
+  await env.DB.prepare("INSERT INTO web_codigos (email, codigo, exp, intentos) VALUES (?1,?2,?3,0) ON CONFLICT(email) DO UPDATE SET codigo=?2, exp=?3, intentos=0").bind(email, codigo, ahora + 10 * 60 * 1000).run();
   const esc = (x) => x.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
-  const html = '<div style="font-family:Arial,sans-serif;background:#0a0e2b;color:#fff;padding:28px;border-radius:16px;max-width:480px;margin:auto">' +
-    '<h2 style="color:#29c5ff;margin:0 0 10px">Hola ' + esc(nombre) + ', ya casi tienes Chamos</h2>' +
-    '<p style="color:#b8c0ff">Toca el botón desde tu teléfono Android para descargar la app. El enlace sirve por 24 horas.</p>' +
-    '<p style="margin:24px 0"><a href="' + enlace + '" style="background:#9b5cff;color:#fff;text-decoration:none;font-weight:bold;padding:14px 22px;border-radius:12px;display:inline-block">Descargar Chamos</a></p>' +
+  const html = '<div style="font-family:Arial,sans-serif;background:#0a0e2b;color:#fff;padding:28px;border-radius:16px;max-width:480px;margin:auto;text-align:center">' +
+    '<h2 style="color:#29c5ff;margin:0 0 10px">Hola ' + esc(nombre) + '</h2>' +
+    '<p style="color:#b8c0ff">Tu código para descargar Chamos es:</p>' +
+    '<p style="font-size:38px;letter-spacing:10px;font-weight:bold;color:#9b5cff;margin:18px 0">' + codigo + '</p>' +
+    '<p style="color:#b8c0ff">Escríbelo en la página. Sirve por 10 minutos.</p>' +
     '<p style="color:#8890c8;font-size:12px">Si no pediste esto, ignora este correo.</p></div>';
   const r = await fetch("https://api.brevo.com/v3/smtp/email", {
     method: "POST",
     headers: { "api-key": env.BREVO_KEY, "content-type": "application/json", accept: "application/json" },
-    body: JSON.stringify({ sender: { name: "Chamos", email: env.MAIL_FROM }, to: [{ email, name: nombre }], subject: "Tu descarga de Chamos", htmlContent: html }),
+    body: JSON.stringify({ sender: { name: "Chamos", email: env.MAIL_FROM }, to: [{ email, name: nombre }], subject: "Tu código de Chamos: " + codigo, htmlContent: html }),
   });
   if (!r.ok) { console.error("brevo", r.status, await r.text()); return jsonCors({ error: "No pudimos enviar el correo. Revisa que esté bien escrito." }, 502); }
   await env.DB.prepare(
     "INSERT INTO web_registros (email, nombre, pais, primera, ultima, ip) VALUES (?1,?2,?3,?4,?4,?5) ON CONFLICT(email) DO UPDATE SET nombre=?2, pais=?3, ultima=?4, ip=?5",
   ).bind(email, nombre, corto(request.cf && request.cf.country, 4), ahora, corto(request.headers.get("cf-connecting-ip"), 64)).run();
   return jsonCors({ ok: true });
+}
+async function webVerificar(request, env) {
+  if (!env.DB) return jsonCors({ error: "Base de datos no configurada" }, 503);
+  let d;
+  try { d = JSON.parse(await request.text()); } catch { return jsonCors({ error: "JSON inválido" }, 400); }
+  const email = corto(d.email, 120).trim().toLowerCase();
+  const codigo = corto(d.codigo, 10).replace(/\D/g, "");
+  await prepararTablas(env);
+  await env.DB.prepare("CREATE TABLE IF NOT EXISTS web_codigos (email TEXT PRIMARY KEY, codigo TEXT, exp INTEGER, intentos INTEGER DEFAULT 0)").run();
+  const f = await env.DB.prepare("SELECT codigo, exp, intentos FROM web_codigos WHERE email = ?1").bind(email).first();
+  if (!f || f.exp < Date.now()) return jsonCors({ error: "El código venció, pide uno nuevo" }, 400);
+  if (f.intentos >= 5) return jsonCors({ error: "Demasiados intentos, pide un código nuevo" }, 429);
+  if (codigo !== f.codigo) {
+    await env.DB.prepare("UPDATE web_codigos SET intentos = intentos + 1 WHERE email = ?1").bind(email).run();
+    return jsonCors({ error: "Código incorrecto" }, 400);
+  }
+  await env.DB.prepare("DELETE FROM web_codigos WHERE email = ?1").bind(email).run();
+  const exp = Date.now() + 15 * 60 * 1000;
+  const carga = exp + "." + btoa(unescape(encodeURIComponent(email)));
+  const firma = await webFirma(env, carga);
+  if (!firma) return jsonCors({ error: "Falta el secreto WEB_SECRET" }, 503);
+  return jsonCors({ ok: true, url: new URL(request.url).origin + "/web/apk?t=" + encodeURIComponent(carga + "." + firma) });
 }
 async function webApk(request, env) {
   const t = new URL(request.url).searchParams.get("t") || "";
@@ -1337,6 +1362,9 @@ export default {
     if (soloRelease(request, env, url)) return jsonCors(CERRADA, 426);
     if (url.pathname === "/web/registro" && request.method === "POST") {
       try { return await webRegistro(request, env); } catch (e) { console.error(e); return jsonCors({ error: String(e.message || e) }, 500); }
+    }
+    if (url.pathname === "/web/verificar" && request.method === "POST") {
+      try { return await webVerificar(request, env); } catch (e) { console.error(e); return jsonCors({ error: String(e.message || e) }, 500); }
     }
     if (url.pathname === "/web/apk" && request.method === "GET") {
       try { return await webApk(request, env); } catch (e) { console.error(e); return jsonCors({ error: String(e.message || e) }, 500); }
