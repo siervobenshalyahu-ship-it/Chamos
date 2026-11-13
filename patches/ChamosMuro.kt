@@ -310,10 +310,12 @@ fun rememberChamosMuro(
             val sala = client.getJoinedRoom(id) ?: return@LaunchedEffect
             launch {
                 delay(500)
-                repeat(12) {
+                // Los videos del Muro se ocultan: se sigue cargando hacia atrás hasta tener publicaciones que mostrar.
+                repeat(80) {
                     val r = sala.liveTimeline.paginate(Timeline.PaginationDirection.BACKWARDS)
                     if (r.getOrNull() == true) return@launch
-                    delay(if (r.isFailure) 800 else 300)
+                    if (todos.count { !it.esVideo && it.tipo != 'C' } >= 20) return@launch
+                    delay(if (r.isFailure) 1500 else 250)
                 }
             }
             sala.liveTimeline.timelineItems.collect { items ->
