@@ -10,6 +10,7 @@ package io.element.android.features.login.impl.screens.onboarding
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -31,14 +32,13 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import io.element.android.compound.theme.ElementTheme
 import io.element.android.compound.tokens.generated.CompoundIcons
 import io.element.android.features.login.impl.R
 import io.element.android.features.login.impl.login.LoginModeEvent
 import io.element.android.features.login.impl.login.LoginModeView
 import io.element.android.libraries.architecture.AsyncData
-import io.element.android.libraries.designsystem.atomic.atoms.ElementLogoAtom
-import io.element.android.libraries.designsystem.atomic.atoms.ElementLogoAtomSize
 import io.element.android.libraries.designsystem.atomic.molecules.ButtonColumnMolecule
 import io.element.android.libraries.designsystem.atomic.pages.FlowStepPage
 import io.element.android.libraries.designsystem.atomic.pages.OnBoardingPage
@@ -203,43 +203,57 @@ private fun AddOtherAccountScaffold(
 
 @Composable
 private fun OnBoardingContent(state: OnBoardingState) {
+    // Chamos: bienvenida propia, con el neón azul y violeta de la marca
+    val azul = androidx.compose.ui.graphics.Color(0xFF29C5FF)
+    val violeta = androidx.compose.ui.graphics.Color(0xFF9B5CFF)
+    val degradado = androidx.compose.ui.graphics.Brush.horizontalGradient(listOf(azul, violeta))
     Box(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                androidx.compose.ui.graphics.Brush.verticalGradient(
+                    listOf(
+                        androidx.compose.ui.graphics.Color(0xFF070A1F),
+                        androidx.compose.ui.graphics.Color(0xFF0D1236),
+                        androidx.compose.ui.graphics.Color(0xFF1A0F3D),
+                    )
+                )
+            ),
     ) {
         Box(
             modifier = Modifier.fillMaxSize(),
-            contentAlignment = BiasAlignment(
-                horizontalBias = 0f,
-                verticalBias = -0.4f
-            )
+            contentAlignment = BiasAlignment(horizontalBias = 0f, verticalBias = -0.4f),
         ) {
-            ElementLogoAtom(
-                size = ElementLogoAtomSize.Large,
-                modifier = Modifier.padding(top = ElementLogoAtomSize.Large.shadowRadius / 2)
+            Text(
+                text = "Chamos",
+                style = ElementTheme.typography.fontHeadingXlBold.copy(
+                    fontSize = 60.sp,
+                    brush = degradado,
+                    shadow = androidx.compose.ui.graphics.Shadow(azul, androidx.compose.ui.geometry.Offset.Zero, 28f),
+                ),
+                textAlign = TextAlign.Center,
             )
         }
         Box(
             modifier = Modifier.fillMaxSize(),
-            contentAlignment = BiasAlignment(
-                horizontalBias = 0f,
-                verticalBias = 0.6f
-            )
+            contentAlignment = BiasAlignment(horizontalBias = 0f, verticalBias = 0.6f),
         ) {
             Column(
-                modifier = Modifier
-                    .fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
                 horizontalAlignment = CenterHorizontally,
             ) {
                 Text(
                     text = stringResource(id = R.string.screen_onboarding_welcome_title),
-                    color = ElementTheme.colors.textPrimary,
-                    style = ElementTheme.typography.fontHeadingLgBold,
+                    color = androidx.compose.ui.graphics.Color.White,
+                    style = ElementTheme.typography.fontHeadingLgBold.copy(
+                        shadow = androidx.compose.ui.graphics.Shadow(violeta, androidx.compose.ui.geometry.Offset.Zero, 18f),
+                    ),
                     textAlign = TextAlign.Center,
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
                     text = stringResource(id = R.string.screen_onboarding_welcome_message, state.productionApplicationName),
-                    color = ElementTheme.colors.textPrimary,
+                    color = androidx.compose.ui.graphics.Color(0xFFD7DCFF),
                     style = ElementTheme.typography.fontBodyLgRegular,
                     textAlign = TextAlign.Center,
                 )
