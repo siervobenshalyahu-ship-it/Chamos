@@ -388,9 +388,9 @@ button{padding:0 18px;border-radius:26px;border:0;background:#22D3EE;color:#0F15
 <div class="g">
 <a href="https://www.bibliatodo.com/interlineal/online"><i><img data-e="📖" onerror="this.parentNode.textContent=this.dataset.e" src="https://www.google.com/s2/favicons?domain=bibliatodo.com&sz=128"></i>Biblia interlineal</a>
 <a href="https://m.youtube.com"><i><img data-e="▶️" onerror="this.parentNode.textContent=this.dataset.e" src="https://www.google.com/s2/favicons?domain=youtube.com&sz=128"></i>YouTube</a>
-<a href="https://maps.google.com"><i><img data-e="🗺️" onerror="this.parentNode.textContent=this.dataset.e" src="https://www.google.com/s2/favicons?domain=maps.google.com&sz=128"></i>Mapas</a>
+<a href="https://www.google.com/maps"><i><img data-e="🗺️" onerror="this.parentNode.textContent=this.dataset.e" src="https://www.google.com/s2/favicons?domain=maps.google.com&sz=128"></i>Mapas</a>
 <a href="https://chamos.local/bancos"><i>🏦</i>Bancos</a>
-<a href="https://www.patria.org.ve"><i><img data-e="🇻🇪" onerror="this.parentNode.textContent=this.dataset.e" src="https://www.google.com/s2/favicons?domain=patria.org.ve&sz=128"></i>Patria</a>
+<a href="https://patria.org.ve"><i><img data-e="🇻🇪" onerror="this.parentNode.textContent=this.dataset.e" src="https://www.google.com/s2/favicons?domain=patria.org.ve&sz=128"></i>Patria</a>
 <a href="https://translate.google.com"><i><img data-e="🌍" onerror="this.parentNode.textContent=this.dataset.e" src="https://www.google.com/s2/favicons?domain=translate.google.com&sz=128"></i>Traductor</a>
 <a href="https://news.google.com/?hl=es-419&amp;gl=VE&amp;ceid=VE:es-419"><i><img data-e="📰" onerror="this.parentNode.textContent=this.dataset.e" src="https://www.google.com/s2/favicons?domain=news.google.com&sz=128"></i>Noticias</a>
 <a href="https://www.google.com/search?q=clima"><i>⛅</i>Clima</a>
