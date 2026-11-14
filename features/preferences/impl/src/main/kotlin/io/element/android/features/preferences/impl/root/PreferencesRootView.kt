@@ -362,20 +362,7 @@ private fun ColumnScope.GeneralSection(
         thickness = 1.dp,
         color = ElementTheme.colors.bgSubtleSecondary,
     )
-    if (state.showAnalyticsSettings) {
-        ListItem(
-            content = { Text(stringResource(id = CommonStrings.common_analytics)) },
-            leadingContent = ListItemContent.Icon(IconSource.Vector(CompoundIcons.Chart())),
-            onClick = onOpenAnalytics,
-        )
-    }
-    if (state.showLabsItem) {
-        ListItem(
-            content = { Text(stringResource(id = R.string.screen_labs_title)) },
-            leadingContent = ListItemContent.Icon(IconSource.Vector(CompoundIcons.Labs())),
-            onClick = onOpenLabs,
-        )
-    }
+    // Chamos: sin "Estadísticas" ni "Experimental" en Ajustes
     ListItem(
         content = { Text(stringResource(id = CommonStrings.common_about)) },
         leadingContent = ListItemContent.Icon(IconSource.Vector(CompoundIcons.Info())),
