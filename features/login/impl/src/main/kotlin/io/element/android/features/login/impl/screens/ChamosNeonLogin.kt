@@ -80,7 +80,7 @@ internal fun ChamosBotonNeon(
         if (showProgress) {
             CircularProgressIndicator(modifier = Modifier.size(22.dp), color = Color(0xFF06081A), strokeWidth = 2.5.dp)
         } else {
-            Text(text = text, color = if (enabled) Color(0xFF06081A) else Color(0xFF9AA0D0), fontWeight = FontWeight.Bold, maxLines = 1)
+            Text(text = text, color = if (enabled) Color(0xFF06081A) else Color(0xFF9AA0D0), style = ElementTheme.typography.fontBodyLgMedium.copy(fontWeight = FontWeight.Bold), maxLines = 1)
         }
     }
 }
@@ -101,6 +101,6 @@ internal fun ChamosBotonContorno(
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        Text(text = text, color = Color.White, fontWeight = FontWeight.SemiBold, maxLines = 1)
+        Text(text = text, color = Color.White, style = ElementTheme.typography.fontBodyLgMedium.copy(fontWeight = FontWeight.SemiBold), maxLines = 1)
     }
 }
