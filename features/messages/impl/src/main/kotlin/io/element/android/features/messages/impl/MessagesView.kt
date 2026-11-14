@@ -147,7 +147,7 @@ import timber.log.Timber
 import kotlin.time.Duration.Companion.milliseconds
 
 @Composable
-fun MessagesView(
+fun MessagesViewOriginal(
     state: MessagesState,
     onBackClick: () -> Unit,
     onRoomDetailsClick: () -> Unit,
@@ -742,6 +742,49 @@ private fun SuccessorRoomBanner(
         modifier = modifier,
         submitText = stringResource(R.string.screen_room_timeline_tombstoned_room_action)
     )
+}
+
+/** Chamos: la sala se ve con el tema neón de Chamos. */
+@Composable
+fun MessagesView(
+
+    state: MessagesState,
+    onBackClick: () -> Unit,
+    onRoomDetailsClick: () -> Unit,
+    onEventContentClick: (isLive: Boolean, event: TimelineItem.Event) -> Boolean,
+    onGalleryEventItemClick: (isLive: Boolean, event: TimelineItem.Event, index: Int) -> Boolean,
+    onUserDataClick: (UserId) -> Unit,
+    onLinkClick: (String, Boolean) -> Unit,
+    onSendLocationClick: () -> Unit,
+    onCreatePollClick: () -> Unit,
+    onJoinCallClick: (isAudioCall: Boolean) -> Unit,
+    onViewAllPinnedMessagesClick: () -> Unit,
+    onThreadsListClick: () -> Unit,
+    knockRequestsBannerView: @Composable () -> Unit,
+    modifier: Modifier = Modifier,
+    forceJumpToBottomVisibility: Boolean = false,
+    customReactionBottomSheet: @Composable () -> Unit,
+) {
+    ChamosSalaTema {
+        MessagesViewOriginal(
+            state = state,
+            onBackClick = onBackClick,
+            onRoomDetailsClick = onRoomDetailsClick,
+            onEventContentClick = onEventContentClick,
+            onGalleryEventItemClick = onGalleryEventItemClick,
+            onUserDataClick = onUserDataClick,
+            onLinkClick = onLinkClick,
+            onSendLocationClick = onSendLocationClick,
+            onCreatePollClick = onCreatePollClick,
+            onJoinCallClick = onJoinCallClick,
+            onViewAllPinnedMessagesClick = onViewAllPinnedMessagesClick,
+            onThreadsListClick = onThreadsListClick,
+            knockRequestsBannerView = knockRequestsBannerView,
+            modifier = modifier,
+            forceJumpToBottomVisibility = forceJumpToBottomVisibility,
+            customReactionBottomSheet = customReactionBottomSheet,
+        )
+    }
 }
 
 @PreviewsDayNight

@@ -27,6 +27,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.drawOutline
@@ -106,13 +107,18 @@ fun MessageEventBubble(
                         clip = true,
                     ) {
                         // Draw the background first, so that it's behind the content
-                        drawRect(backgroundBubbleColor)
+                        if (state.isMine && customBackgroundColor == null) {
+                            drawRect(Brush.horizontalGradient(listOf(Color(0xFF1F6FE5), Color(0xFF7A3FE0))))
+                        } else {
+                            drawRect(backgroundBubbleColor)
+                        }
 
                         // Then draw the content on top of it
                         drawContent()
 
                         // Draw border color, if any
-                        updatedBorderColor?.let { drawOutline(outline, it, style = Stroke(width = 1.dp.toPx())) }
+                        (updatedBorderColor ?: if (!state.isMine && customBackgroundColor == null) Color(0x9929C5FF) else null)
+                            ?.let { drawOutline(outline, it, style = Stroke(width = 1.dp.toPx())) }
 
                         // And then clip the top start corner if needed to make room for the avatar
                         if (cutTopStart) {
@@ -182,7 +188,7 @@ object MessageEventBubbleDefaults {
         return if (isMine) {
             ElementTheme.colors.messageFromMeBackground
         } else {
-            ElementTheme.colors.messageFromOtherBackground
+            Color(0xFF1B2358)
         }
     }
 
