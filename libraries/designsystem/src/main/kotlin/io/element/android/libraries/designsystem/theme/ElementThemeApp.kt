@@ -68,22 +68,17 @@ fun ElementThemeApp(
         appPreferencesStore.getThemeFlow().mapToTheme(allowBlackTheme = isBlackThemeAllowed)
     }.collectAsState(initial = Theme.System)
     LaunchedEffect(theme) {
-        AppCompatDelegate.setDefaultNightMode(
-            when (theme) {
-                Theme.System -> AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
-                Theme.Light -> AppCompatDelegate.MODE_NIGHT_NO
-                Theme.Dark, Theme.Black -> AppCompatDelegate.MODE_NIGHT_YES
-            }
-        )
+        // Chamos: la app siempre usa el tema neón oscuro
+        AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
     }
     CompositionLocalProvider(
         LocalBuildMeta provides buildMeta,
     ) {
         ElementTheme(
-            theme = theme,
+            theme = Theme.Dark,
             content = content,
             compoundLight = compoundLight,
-            compoundDark = compoundDark,
+            compoundDark = chamosNeonColors(compoundDark),
         )
     }
 }
