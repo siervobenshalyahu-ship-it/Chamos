@@ -8,7 +8,10 @@
 
 package io.element.android.features.preferences.impl.about
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.PreviewParameter
@@ -27,11 +30,26 @@ fun AboutView(
     onBackClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val context = LocalContext.current
+    fun abrir(url: String) {
+        try { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) } catch (e: Exception) { /* sin navegador */ }
+    }
     PreferencePage(
         modifier = modifier,
         onBackClick = onBackClick,
         title = stringResource(id = CommonStrings.common_about)
     ) {
+        // Chamos: aviso de licencia (AGPL-3.0) con enlace al código fuente
+        ListItem(
+            content = { Text("Código fuente de Chamos") },
+            supportingContent = { Text("Chamos es software libre bajo licencia AGPL-3.0. Toca para ver el código.") },
+            onClick = { abrir("https://github.com/siervobenshalyahu-ship-it/Chamos/tree/base-propia") }
+        )
+        ListItem(
+            content = { Text("Basado en Element X Android") },
+            supportingContent = { Text("© Element Creations Ltd. y colaboradores, licencia AGPL-3.0. Toca para ver el proyecto original.") },
+            onClick = { abrir("https://github.com/element-hq/element-x-android") }
+        )
         state.elementLegals.forEach { elementLegal ->
             ListItem(
                 content = {
