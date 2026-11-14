@@ -51,7 +51,6 @@ import io.element.android.libraries.designsystem.components.avatar.AvatarSize
 import io.element.android.libraries.designsystem.components.avatar.AvatarType
 import io.element.android.libraries.designsystem.components.list.ListItemContent
 import io.element.android.libraries.designsystem.components.preferences.PreferenceCategory
-import io.element.android.libraries.designsystem.components.preferences.PreferenceDropdown
 import io.element.android.libraries.designsystem.components.preferences.PreferencePage
 import io.element.android.libraries.designsystem.preview.ElementPreviewDark
 import io.element.android.libraries.designsystem.preview.ElementPreviewLight
@@ -320,16 +319,7 @@ private fun AppSettingsSection(
     PreferenceCategory(
         title = stringResource(CommonStrings.common_app_settings),
     ) {
-        PreferenceDropdown(
-            icon = CompoundIcons.DarkMode(),
-            dropDownIcon = CompoundIcons.ChevronUpDown(),
-            title = stringResource(id = CommonStrings.common_appearance),
-            selectedOption = state.theme,
-            options = state.availableThemeOptions,
-            onSelectOption = { themeOption ->
-                state.eventSink(PreferencesRootEvent.SetTheme(themeOption))
-            }
-        )
+        // Chamos: sin interruptor de tema, la app siempre usa el tema neón oscuro
         ListItem(
             content = { Text(stringResource(id = CommonStrings.common_media_upload_quality)) },
             leadingContent = ListItemContent.Icon(IconSource.Vector(CompoundIcons.Image())),
