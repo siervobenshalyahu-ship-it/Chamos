@@ -319,7 +319,14 @@ fun rememberChamosReels(
     val scopeReels = rememberCoroutineScope()
     val muro = rememberChamosMuro(client, dataSource, mediaSenderFactory, mediaConfigFactory)
 
-    // 1) Encontrar o crear la sala (solo cuando la persona abre los Reels).
+    // Todos los teléfonos con Chamos entran solos a la sala común de los Videos poco después de abrir la app,
+    // así cada video que se sube le llega a todo el mundo, sean contactos o no.
+    LaunchedEffect(Unit) {
+        delay(15_000)
+        activo = true
+    }
+
+    // 1) Encontrar o crear la sala (al abrir los Reels, o solos poco después de iniciar la app).
     LaunchedEffect(activo) {
         if (!activo || salaId != null) return@LaunchedEffect
         try {

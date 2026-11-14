@@ -152,6 +152,8 @@ data class MuroPost(
     val noMeGusta: Int = 0,
     val yoNoMeGusta: Boolean = false,
     val reposts: Int = 0,
+    val repostAutor: String = "",
+    val repostTexto: String = "",
 )
 
 data class MuroComentario(
@@ -373,6 +375,7 @@ fun rememberChamosMuro(
                                     fuente = t.source, mime = t.info?.mimetype, nombreArchivo = t.filename,
                                     likes = likes, yoLike = yoLike, comentarios = 0, propio = ev.isOwn,
                                     noMeGusta = nogustas, yoNoMeGusta = yoNoGusta, repostDe = if (tipo == 'R') campos.getOrElse(1) { "" } else "",
+                                    repostAutor = if (tipo == 'R') campos.getOrElse(2) { "" } else "", repostTexto = if (tipo == 'R') campos.getOrElse(3) { "" } else "",
                                 )
                             )
                         }
@@ -390,6 +393,7 @@ fun rememberChamosMuro(
                                     esVideo = true, fuente = t.source, mime = t.info?.mimetype, nombreArchivo = t.filename,
                                     likes = likes, yoLike = yoLike, comentarios = 0, propio = ev.isOwn,
                                     noMeGusta = nogustas, yoNoMeGusta = yoNoGusta, repostDe = if (tipo == 'R') campos.getOrElse(1) { "" } else "",
+                                    repostAutor = if (tipo == 'R') campos.getOrElse(2) { "" } else "", repostTexto = if (tipo == 'R') campos.getOrElse(3) { "" } else "",
                                 )
                             )
                         }
@@ -413,6 +417,7 @@ fun rememberChamosMuro(
                                         fuente = urlVideo?.let { MediaSource(it) }, mime = if (urlVideo != null) "video/mp4" else null, nombreArchivo = if (urlVideo != null) "video.mp4" else "",
                                         likes = likes, yoLike = yoLike, comentarios = 0, propio = ev.isOwn,
                                     noMeGusta = nogustas, yoNoMeGusta = yoNoGusta, repostDe = if (tipo == 'R') campos.getOrElse(1) { "" } else "",
+                                    repostAutor = if (tipo == 'R') campos.getOrElse(2) { "" } else "", repostTexto = if (tipo == 'R') campos.getOrElse(3) { "" } else "",
                                     )
                                 )
                             }
@@ -529,7 +534,10 @@ fun rememberChamosMuro(
     }
     val repostear: suspend (MuroPost, String) -> Boolean = { p, comentario ->
         val original = if (p.tipo == 'R') p.repostDe else p.id
-        enviar(null, null, MARCA_POST + "R|" + limpiarCampo(comentario) + "|" + original) == null
+        // Se guarda una copia corta de lo reposteado, para que se vea aunque el original no esté cargado.
+        val autorOrig = if (p.tipo == 'R') p.repostAutor else p.autor
+        val textoOrig = if (p.tipo == 'R') p.repostTexto else p.texto
+        enviar(null, null, MARCA_POST + "R|" + limpiarCampo(comentario) + "|" + original + "|" + limpiarCampo(autorOrig).take(60) + "|" + limpiarCampo(textoOrig).take(300)) == null
     }
     val comentar: suspend (MuroPost, String) -> Boolean = comenta@{ p, texto ->
         val sala = salaId?.let { client.getJoinedRoom(it) } ?: return@comenta false
@@ -1218,7 +1226,12 @@ private fun TarjetaPost(post: MuroPost, state: ChamosMuroState, onPerfil: (Strin
             val orig = state.posts.firstOrNull { it.id == post.repostDe }
             Column(Modifier.fillMaxWidth().padding(top = 8.dp).background(Color(0x22FFFFFF), androidx.compose.foundation.shape.RoundedCornerShape(10.dp)).padding(10.dp)) {
                 if (orig == null) {
-                    Text("La publicación original ya no está disponible.", color = Color(0xFFCFD6E6), fontSize = 13.sp)
+                    if (post.repostTexto.isNotBlank() || post.repostAutor.isNotBlank()) {
+                        if (post.repostAutor.isNotBlank()) Text(post.repostAutor, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                        if (post.repostTexto.isNotBlank()) Text(post.repostTexto, color = Color.White, fontSize = 15.sp)
+                    } else {
+                        Text("La publicación original ya no está disponible.", color = Color(0xFFCFD6E6), fontSize = 13.sp)
+                    }
                 } else {
                     Text(orig.autor, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp, modifier = Modifier.clickable { onPerfil(orig.autorId) })
                     CuerpoPost(orig, state)
