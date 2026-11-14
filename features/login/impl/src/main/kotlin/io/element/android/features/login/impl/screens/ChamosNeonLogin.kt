@@ -5,6 +5,12 @@
 package io.element.android.features.login.impl.screens
 
 import androidx.compose.foundation.BorderStroke
+import io.element.android.libraries.designsystem.theme.ChamosTinta
+import io.element.android.libraries.designsystem.theme.ChamosNeonVioleta
+import io.element.android.libraries.designsystem.theme.ChamosNeonAzul
+import io.element.android.libraries.designsystem.theme.ChamosFondo2
+import io.element.android.libraries.designsystem.theme.ChamosFondo1
+import io.element.android.libraries.designsystem.theme.ChamosFondo0
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -26,10 +32,10 @@ import io.element.android.compound.theme.Theme
 import io.element.android.compound.tokens.generated.compoundColorsDark
 import io.element.android.libraries.designsystem.theme.components.Text
 
-internal val ChamosAzulNeon = Color(0xFF29C5FF)
-internal val ChamosVioletaNeon = Color(0xFF9B5CFF)
-internal val ChamosFondoNoche = Color(0xFF0A0E2B)
-internal val ChamosDegradadoNeon = Brush.horizontalGradient(listOf(ChamosAzulNeon, ChamosVioletaNeon))
+internal val ChamosAzulNeon: Color get() = ChamosNeonAzul
+internal val ChamosVioletaNeon: Color get() = ChamosNeonVioleta
+internal val ChamosFondoNoche: Color get() = ChamosFondo0
+internal val ChamosDegradadoNeon: Brush get() = Brush.horizontalGradient(listOf(ChamosAzulNeon, ChamosVioletaNeon))
 
 /** Tema oscuro con los colores de Chamos: lo usan todas las pantallas de entrada. */
 @Composable
@@ -37,9 +43,9 @@ internal fun ChamosLoginTema(content: @Composable () -> Unit) {
     val c = compoundColorsDark
     val neon = c.copy(
         bgCanvasDefault = ChamosFondoNoche,
-        bgCanvasDefaultLevel1 = Color(0xFF121843),
-        bgSubtleSecondary = Color(0xFF151B4A),
-        bgSubtleSecondaryLevel0 = Color(0xFF121843),
+        bgCanvasDefaultLevel1 = ChamosFondo1,
+        bgSubtleSecondary = ChamosFondo2,
+        bgSubtleSecondaryLevel0 = ChamosFondo1,
         bgActionPrimaryRest = ChamosVioletaNeon,
         bgActionPrimaryPressed = ChamosAzulNeon,
         bgActionPrimaryDisabled = Color(0xFF3A3F6B),
@@ -78,9 +84,9 @@ internal fun ChamosBotonNeon(
         contentAlignment = Alignment.Center,
     ) {
         if (showProgress) {
-            CircularProgressIndicator(modifier = Modifier.size(22.dp), color = Color(0xFF06081A), strokeWidth = 2.5.dp)
+            CircularProgressIndicator(modifier = Modifier.size(22.dp), color = ChamosTinta, strokeWidth = 2.5.dp)
         } else {
-            Text(text = text, color = if (enabled) Color(0xFF06081A) else Color(0xFF9AA0D0), style = ElementTheme.typography.fontBodyLgMedium.copy(fontWeight = FontWeight.Bold), maxLines = 1)
+            Text(text = text, color = if (enabled) ChamosTinta else Color(0xFF9AA0D0), style = ElementTheme.typography.fontBodyLgMedium.copy(fontWeight = FontWeight.Bold), maxLines = 1)
         }
     }
 }

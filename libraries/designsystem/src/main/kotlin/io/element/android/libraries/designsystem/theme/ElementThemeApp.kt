@@ -67,6 +67,8 @@ fun ElementThemeApp(
     val theme by remember(isBlackThemeAllowed) {
         appPreferencesStore.getThemeFlow().mapToTheme(allowBlackTheme = isBlackThemeAllowed)
     }.collectAsState(initial = Theme.System)
+    // Chamos: Eva (fucsia) cuando la opción elegida es "Claro"; todo lo demás es Adán (neón azul y violeta)
+    ChamosModo.eva = theme == Theme.Light
     LaunchedEffect(theme) {
         // Chamos: la app siempre usa el tema neón oscuro
         AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)

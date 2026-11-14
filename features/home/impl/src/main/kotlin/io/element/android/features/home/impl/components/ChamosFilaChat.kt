@@ -6,6 +6,9 @@
 package io.element.android.features.home.impl.components
 
 import androidx.compose.foundation.ExperimentalFoundationApi
+import io.element.android.libraries.designsystem.theme.ChamosTinta
+import io.element.android.libraries.designsystem.theme.ChamosNeonVioleta
+import io.element.android.libraries.designsystem.theme.ChamosNeonAzul
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -51,10 +54,10 @@ import io.element.android.libraries.matrix.api.room.RoomNotificationMode
 import io.element.android.libraries.ui.strings.CommonStrings
 
 // Neón de Chamos: azul y violeta
-private val AzulNeon = Color(0xFF29C5FF)
-private val VioletaNeon = Color(0xFF9B5CFF)
-private val TintaNeon = Color(0xFF06081A)
-private val DegradadoNeon = Brush.horizontalGradient(listOf(AzulNeon, VioletaNeon))
+private val AzulNeon: Color get() = ChamosNeonAzul
+private val VioletaNeon: Color get() = ChamosNeonVioleta
+private val TintaNeon: Color get() = ChamosTinta
+private val DegradadoNeon: Brush get() = Brush.horizontalGradient(listOf(AzulNeon, VioletaNeon))
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable

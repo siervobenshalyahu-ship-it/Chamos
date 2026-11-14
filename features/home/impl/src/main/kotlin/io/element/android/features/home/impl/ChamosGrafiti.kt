@@ -1,6 +1,7 @@
 package io.element.android.features.home.impl
 
 import android.graphics.Bitmap
+import io.element.android.libraries.designsystem.theme.ChamosNeonAzul
 import android.graphics.Canvas
 import android.graphics.Color as AColor
 import android.graphics.LinearGradient
@@ -339,7 +340,7 @@ private class ElemGrafiti(var texto: String, estilo0: Int, cx0: Float, cy0: Floa
 }
 
 
-private val NEON_AZUL = Color(0xFF29C5FF)
+private val NEON_AZUL: Color get() = ChamosNeonAzul
 private val NEON_FUCSIA = Color(0xFFFF2DD1)
 
 /** Texto de los menús del grafiti: letras azul y fucsia alternadas con brillo de luz de neón, legibles sobre el fondo oscuro. */

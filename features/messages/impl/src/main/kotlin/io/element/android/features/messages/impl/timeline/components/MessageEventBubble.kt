@@ -117,7 +117,7 @@ fun MessageEventBubble(
                         drawContent()
 
                         // Draw border color, if any
-                        (updatedBorderColor ?: if (!state.isMine && customBackgroundColor == null) Color(0x9929C5FF) else null)
+                        (updatedBorderColor ?: if (!state.isMine && customBackgroundColor == null) io.element.android.libraries.designsystem.theme.ChamosNeonAzul.copy(alpha = 0.6f) else null)
                             ?.let { drawOutline(outline, it, style = Stroke(width = 1.dp.toPx())) }
 
                         // And then clip the top start corner if needed to make room for the avatar

@@ -5,22 +5,27 @@
 package io.element.android.features.messages.impl
 
 import androidx.compose.runtime.Composable
+import io.element.android.libraries.designsystem.theme.ChamosNeonVioleta
+import io.element.android.libraries.designsystem.theme.ChamosNeonAzul
+import io.element.android.libraries.designsystem.theme.ChamosFondo2
+import io.element.android.libraries.designsystem.theme.ChamosFondo1
+import io.element.android.libraries.designsystem.theme.ChamosFondo0
 import androidx.compose.ui.graphics.Color
 import io.element.android.compound.theme.ElementTheme
 import io.element.android.compound.theme.Theme
 import io.element.android.compound.tokens.generated.compoundColorsDark
 
-internal val ChamosAzulSala = Color(0xFF29C5FF)
-internal val ChamosVioletaSala = Color(0xFF9B5CFF)
+internal val ChamosAzulSala: Color get() = ChamosNeonAzul
+internal val ChamosVioletaSala: Color get() = ChamosNeonVioleta
 
 @Composable
 internal fun ChamosSalaTema(content: @Composable () -> Unit) {
     val c = compoundColorsDark
     val neon = c.copy(
-        bgCanvasDefault = Color(0xFF0A0E2B),
-        bgCanvasDefaultLevel1 = Color(0xFF121843),
-        bgSubtleSecondary = Color(0xFF151B4A),
-        bgSubtleSecondaryLevel0 = Color(0xFF121843),
+        bgCanvasDefault = ChamosFondo0,
+        bgCanvasDefaultLevel1 = ChamosFondo1,
+        bgSubtleSecondary = ChamosFondo2,
+        bgSubtleSecondaryLevel0 = ChamosFondo1,
         bgActionPrimaryRest = ChamosVioletaSala,
         bgActionPrimaryPressed = ChamosAzulSala,
         bgActionPrimaryDisabled = Color(0xFF3A3F6B),

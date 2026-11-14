@@ -112,20 +112,15 @@ class PreferencesRootPresenter(
         val themeOption by remember {
             derivedStateOf {
                 when (theme.value) {
-                    Theme.System -> ThemeOption.System
-                    Theme.Dark -> ThemeOption.Dark
-                    Theme.Black -> ThemeOption.Black
                     Theme.Light -> ThemeOption.Light
+                    else -> ThemeOption.Dark
                 }
             }
         }
 
-        val availableThemeOptions = remember(isBlackThemeAllowed) {
-            if (isBlackThemeAllowed) {
-                ThemeOption.entries
-            } else {
-                ThemeOption.entries.filterNot { it == ThemeOption.Black }
-            }.toImmutableList()
+        // Chamos: dos estilos, Adán (neón azul y violeta) y Eva (fucsia, rosa y violeta)
+        val availableThemeOptions = remember {
+            listOf(ThemeOption.Dark, ThemeOption.Light).toImmutableList()
         }
 
         val snackbarMessage by snackbarDispatcher.collectSnackbarMessageAsState()

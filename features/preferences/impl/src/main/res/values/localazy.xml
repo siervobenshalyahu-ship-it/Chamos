@@ -121,8 +121,8 @@ Si continúas, es posible que algunos de tus ajustes cambien."</string>
   <string name="screen_settings_user_status_on_the_road">"En la carretera"</string>
   <string name="screen_settings_user_status_placeholder">"¿Cuál es tu estado?"</string>
   <string name="theme_black">"Negro"</string>
-  <string name="theme_dark">"Oscuro"</string>
-  <string name="theme_light">"Claro"</string>
+  <string name="theme_dark">"Adán"</string>
+  <string name="theme_light">"Eva"</string>
   <string name="theme_system">"Sistema"</string>
   <string name="troubleshoot_notifications_entry_point_push_history_title">"Historial de notificaciones push"</string>
   <string name="troubleshoot_notifications_entry_point_section">"Solucionar problemas"</string>

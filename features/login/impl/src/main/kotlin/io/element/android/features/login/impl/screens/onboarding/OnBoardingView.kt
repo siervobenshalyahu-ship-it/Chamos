@@ -9,6 +9,11 @@
 package io.element.android.features.login.impl.screens.onboarding
 
 import androidx.compose.foundation.Image
+import io.element.android.libraries.designsystem.theme.ChamosNeonVioleta
+import io.element.android.libraries.designsystem.theme.ChamosNeonAzul
+import io.element.android.libraries.designsystem.theme.ChamosFondo2
+import io.element.android.libraries.designsystem.theme.ChamosFondo1
+import io.element.android.libraries.designsystem.theme.ChamosFondo0
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -207,8 +212,8 @@ private fun AddOtherAccountScaffold(
 @Composable
 private fun OnBoardingContent(state: OnBoardingState) {
     // Chamos: bienvenida propia, con el neón azul y violeta de la marca
-    val azul = androidx.compose.ui.graphics.Color(0xFF29C5FF)
-    val violeta = androidx.compose.ui.graphics.Color(0xFF9B5CFF)
+    val azul = ChamosNeonAzul
+    val violeta = ChamosNeonVioleta
     val degradado = androidx.compose.ui.graphics.Brush.horizontalGradient(listOf(azul, violeta))
     Box(
         modifier = Modifier
@@ -216,9 +221,9 @@ private fun OnBoardingContent(state: OnBoardingState) {
             .background(
                 androidx.compose.ui.graphics.Brush.verticalGradient(
                     listOf(
-                        androidx.compose.ui.graphics.Color(0xFF070A1F),
-                        androidx.compose.ui.graphics.Color(0xFF0D1236),
-                        androidx.compose.ui.graphics.Color(0xFF1A0F3D),
+                        ChamosFondo0,
+                        ChamosFondo1,
+                        ChamosFondo2,
                     )
                 )
             ),
