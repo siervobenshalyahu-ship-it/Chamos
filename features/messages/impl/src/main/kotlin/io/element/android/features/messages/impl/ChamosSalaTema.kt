@@ -20,6 +20,11 @@ internal val ChamosVioletaSala: Color get() = ChamosNeonVioleta
 
 @Composable
 internal fun ChamosSalaTema(content: @Composable () -> Unit) {
+    // En el estilo Claro el combo se ve como el claro de siempre
+    if (io.element.android.libraries.designsystem.theme.ChamosModo.claro) {
+        content()
+        return
+    }
     val c = compoundColorsDark
     val neon = c.copy(
         bgCanvasDefault = ChamosFondo0,

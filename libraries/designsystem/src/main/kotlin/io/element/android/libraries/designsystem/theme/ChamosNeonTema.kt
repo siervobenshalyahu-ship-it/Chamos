@@ -17,6 +17,7 @@ import io.element.android.compound.tokens.generated.compoundColorsDark
 /** Estilo elegido: false = Adán (neón azul y violeta), true = Eva (fucsia, rosa y violeta). */
 object ChamosModo {
     var eva by mutableStateOf(false)
+    var claro by mutableStateOf(false)
 }
 
 val ChamosNeonAzul: Color get() = if (ChamosModo.eva) Color(0xFFFF7AD9) else Color(0xFF29C5FF)

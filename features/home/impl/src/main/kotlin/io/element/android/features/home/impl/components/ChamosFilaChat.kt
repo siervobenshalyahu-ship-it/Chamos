@@ -115,7 +115,7 @@ internal fun ChamosFilaChat(
             Spacer(modifier = Modifier.size(3.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 when {
-                    room.isTombstoned -> Texto("Esta sala ya no se usa", Color.Unspecified, Modifier.weight(1f))
+                    room.isTombstoned -> Texto("Este combo ya no se usa", Color.Unspecified, Modifier.weight(1f))
                     room.latestEvent is LatestEvent.Error -> {
                         Icon(
                             modifier = Modifier.size(15.dp),

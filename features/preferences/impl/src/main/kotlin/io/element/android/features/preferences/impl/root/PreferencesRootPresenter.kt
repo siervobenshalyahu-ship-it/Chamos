@@ -92,7 +92,7 @@ class PreferencesRootPresenter(
             featureFlagService.isFeatureEnabledFlow(FeatureFlags.AllowBlackTheme)
         }.collectAsState(initial = false)
         val theme = remember(isBlackThemeAllowed) {
-            appPreferencesStore.getThemeFlow().mapToTheme(isBlackThemeAllowed)
+            appPreferencesStore.getThemeFlow().mapToTheme(true)
         }.collectAsState(initial = Theme.System)
 
         val otherSessions by remember {
@@ -113,14 +113,15 @@ class PreferencesRootPresenter(
             derivedStateOf {
                 when (theme.value) {
                     Theme.Light -> ThemeOption.Light
+                    Theme.Black -> ThemeOption.Black
                     else -> ThemeOption.Dark
                 }
             }
         }
 
-        // Chamos: dos estilos, Adán (neón azul y violeta) y Eva (fucsia, rosa y violeta)
+        // Chamos: tres estilos: Adán (neón azul y violeta), Eva (fucsia, rosa y violeta) y Claro (el claro de siempre)
         val availableThemeOptions = remember {
-            listOf(ThemeOption.Dark, ThemeOption.Light).toImmutableList()
+            listOf(ThemeOption.Dark, ThemeOption.Black, ThemeOption.Light).toImmutableList()
         }
 
         val snackbarMessage by snackbarDispatcher.collectSnackbarMessageAsState()

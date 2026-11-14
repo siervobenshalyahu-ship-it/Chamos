@@ -65,19 +65,22 @@ fun ElementThemeApp(
         featureFlagService.isFeatureEnabledFlow(FeatureFlags.AllowBlackTheme)
     }.collectAsState(initial = false)
     val theme by remember(isBlackThemeAllowed) {
-        appPreferencesStore.getThemeFlow().mapToTheme(allowBlackTheme = isBlackThemeAllowed)
+        appPreferencesStore.getThemeFlow().mapToTheme(allowBlackTheme = true)
     }.collectAsState(initial = Theme.System)
-    // Chamos: Eva (fucsia) cuando la opción elegida es "Claro"; todo lo demás es Adán (neón azul y violeta)
-    ChamosModo.eva = theme == Theme.Light
+    // Chamos: tres estilos. Eva (fucsia) = opción Black guardada, Claro = el tema claro de siempre,
+    // y cualquier otra cosa es Adán (neón azul y violeta).
+    ChamosModo.eva = theme == Theme.Black
+    ChamosModo.claro = theme == Theme.Light
     LaunchedEffect(theme) {
-        // Chamos: la app siempre usa el tema neón oscuro
-        AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
+        AppCompatDelegate.setDefaultNightMode(
+            if (theme == Theme.Light) AppCompatDelegate.MODE_NIGHT_NO else AppCompatDelegate.MODE_NIGHT_YES
+        )
     }
     CompositionLocalProvider(
         LocalBuildMeta provides buildMeta,
     ) {
         ElementTheme(
-            theme = Theme.Dark,
+            theme = if (theme == Theme.Light) Theme.Light else Theme.Dark,
             content = content,
             compoundLight = compoundLight,
             compoundDark = chamosNeonColors(compoundDark),
