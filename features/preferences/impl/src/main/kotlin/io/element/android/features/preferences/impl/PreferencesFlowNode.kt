@@ -10,6 +10,7 @@ package io.element.android.features.preferences.impl
 
 import android.os.Parcelable
 import androidx.compose.runtime.Composable
+import io.element.android.libraries.designsystem.theme.ChamosNeonTema
 import androidx.compose.ui.Modifier
 import com.bumble.appyx.core.modality.BuildContext
 import com.bumble.appyx.core.node.Node
@@ -387,6 +388,8 @@ class PreferencesFlowNode(
 
     @Composable
     override fun View(modifier: Modifier) {
-        BackstackView()
+        ChamosNeonTema {
+            BackstackView()
+        }
     }
 }
