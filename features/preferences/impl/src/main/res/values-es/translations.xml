@@ -8,7 +8,7 @@
   <string name="screen_advanced_settings_element_call_base_url">"URL base personalizada de Element Call"</string>
   <string name="screen_advanced_settings_element_call_base_url_description">"Define una URL base personalizada para Element Call."</string>
   <string name="screen_advanced_settings_element_call_base_url_validation_error">"URL no válida, asegúrate de incluir el protocolo (http/https) y la dirección correcta."</string>
-  <string name="screen_advanced_settings_hide_invite_avatars_toggle_title">"Ocultar avatares en las invitaciones a salas"</string>
+  <string name="screen_advanced_settings_hide_invite_avatars_toggle_title">"Ocultar avatares en las invitaciones a combos"</string>
   <string name="screen_advanced_settings_hide_timeline_media_toggle_title">"Ocultar vistas previas de multimedia en la cronología"</string>
   <string name="screen_advanced_settings_labs">"Experimental"</string>
   <string name="screen_advanced_settings_live_location_section_description">"La distancia que debes recorrer para que se active una actualización."</string>
@@ -37,7 +37,7 @@
   <string name="screen_advanced_settings_share_presence_description">"Si se desactiva, no podrás enviar ni recibir confirmaciones de lectura ni notificaciones de escritura."</string>
   <string name="screen_advanced_settings_show_media_timeline_always_hide">"Ocultar siempre"</string>
   <string name="screen_advanced_settings_show_media_timeline_always_show">"Mostrar siempre"</string>
-  <string name="screen_advanced_settings_show_media_timeline_private_rooms">"En las salas privadas"</string>
+  <string name="screen_advanced_settings_show_media_timeline_private_rooms">"En los combos privados"</string>
   <string name="screen_advanced_settings_show_media_timeline_subtitle">"Siempre se puede mostrar un ítem multimedia oculto pulsando sobre él"</string>
   <string name="screen_advanced_settings_show_media_timeline_title">"Mostrar multimedia en la cronología"</string>
   <string name="screen_advanced_settings_view_source_description">"Habilita la opción para ver el contenido en bruto del mensaje en la cronología."</string>
@@ -75,7 +75,7 @@ Si continúas, es posible que algunos de tus ajustes cambien."</string>
   <string name="screen_notification_settings_failed_fixing_configuration">"La configuración no se ha corregido, por favor inténtalo de nuevo."</string>
   <string name="screen_notification_settings_group_chats">"Chats grupales"</string>
   <string name="screen_notification_settings_invite_for_me_label">"Invitaciones"</string>
-  <string name="screen_notification_settings_mentions_only_disclaimer">"Tu servidor base no admite esta opción en salas cifradas, puede que no recibas notificaciones de algunas salas."</string>
+  <string name="screen_notification_settings_mentions_only_disclaimer">"Tu servidor base no admite esta opción en combos cifradas, puede que no recibas notificaciones de algunas combos."</string>
   <string name="screen_notification_settings_mentions_section_title">"Menciones"</string>
   <string name="screen_notification_settings_message_sound_dialog_choose_other">"Elegir otro sonido…"</string>
   <string name="screen_notification_settings_message_sound_dialog_current_subtitle">"Usando actualmente %1$s"</string>

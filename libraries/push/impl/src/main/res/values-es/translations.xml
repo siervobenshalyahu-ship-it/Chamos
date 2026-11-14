@@ -25,7 +25,7 @@
   </plurals>
   <string name="notification_incoming_audio_call">"📞 Llamada entrante"</string>
   <string name="notification_incoming_call">"📹 Llamada entrante"</string>
-  <string name="notification_inline_reply_failed">"** No se ha podido enviar - por favor, abre la sala"</string>
+  <string name="notification_inline_reply_failed">"** No se ha podido enviar - por favor, abre el combo"</string>
   <string name="notification_invitation_action_join">"Unirse"</string>
   <string name="notification_invitation_action_reject">"Rechazar"</string>
   <plurals name="notification_invitations">
@@ -44,8 +44,8 @@
   <string name="notification_reaction_body">"Reaccionó con %1$s"</string>
   <string name="notification_room_action_mark_as_read">"Marcar como leído"</string>
   <string name="notification_room_action_quick_reply">"Respuesta rápida"</string>
-  <string name="notification_room_invite_body">"Te invitó a unirte a la sala"</string>
-  <string name="notification_room_invite_body_with_sender">"%1$s te invitó a unirte a la sala"</string>
+  <string name="notification_room_invite_body">"Te invitó a unirte al combo"</string>
+  <string name="notification_room_invite_body_with_sender">"%1$s te invitó a unirte al combo"</string>
   <string name="notification_sender_me">"Yo"</string>
   <string name="notification_sender_mention_reply">"%1$s mencionó o respondió"</string>
   <string name="notification_space_invite_body">"Te invitó a unirte al espacio"</string>
@@ -62,8 +62,8 @@
   <string name="notification_unread_notified_messages_in_room">"%1$s en %2$s"</string>
   <string name="notification_unread_notified_messages_in_room_and_invitation">"%1$s en %2$s y %3$s"</string>
   <plurals name="notification_unread_notified_messages_in_room_rooms">
-    <item quantity="one">"%d sala"</item>
-    <item quantity="other">"%d salas"</item>
+    <item quantity="one">"%d combo"</item>
+    <item quantity="other">"%d combos"</item>
   </plurals>
   <string name="push_distributor_background_sync_android">"Sincronización en segundo plano"</string>
   <string name="push_distributor_firebase_android">"Servicios de Google"</string>

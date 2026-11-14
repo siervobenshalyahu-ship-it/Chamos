@@ -134,14 +134,6 @@ private fun AttachmentSourcePickerMenu(
             )
         }
         ChamosVivoItem()
-        ListItem(
-            modifier = Modifier.clickable {
-                state.eventSink(MessageComposerEvent.PickAttachmentSource.Poll)
-                onCreatePollClick()
-            },
-            leadingContent = ListItemContent.Icon(IconSource.Vector(CompoundIcons.Polls())),
-            content = { Text(stringResource(R.string.screen_room_attachment_source_poll)) },
-        )
         if (enableTextFormatting) {
             ListItem(
                 modifier = Modifier.clickable { state.eventSink(MessageComposerEvent.ToggleTextFormatting(enabled = true)) },

@@ -64,7 +64,7 @@
   <string name="a11y_read_receipts_tap_to_show_all_android">"mostrar todas las confirmaciones de lectura"</string>
   <string name="a11y_remove_reaction">"Elimina la reacción con %1$s"</string>
   <string name="a11y_remove_reaction_with">"Retirar la reacción con %1$s"</string>
-  <string name="a11y_room_avatar">"Avatar de la sala"</string>
+  <string name="a11y_room_avatar">"Avatar del combo"</string>
   <string name="a11y_send_files">"Enviar archivos"</string>
   <string name="a11y_sender_location">"Ubicación del remitente"</string>
   <string name="a11y_sent_by_sender_at_date">"Enviado por %1$s a las %2$s"</string>
@@ -77,7 +77,7 @@
   <string name="a11y_status">"Estado"</string>
   <string name="a11y_thread_in_room">"Hilo en %1$s"</string>
   <string name="a11y_threads_in_room">"Hilos en %1$s"</string>
-  <string name="a11y_tombstoned_room">"Sala clausurada"</string>
+  <string name="a11y_tombstoned_room">"Combo clausurada"</string>
   <string name="a11y_user_avatar">"Avatar del usuario"</string>
   <string name="a11y_user_menu">"Menú de usuario"</string>
   <string name="a11y_video_preview">"Vista previa del vídeo"</string>
@@ -89,7 +89,7 @@
   <string name="a11y_your_avatar">"Tu avatar"</string>
   <string name="action_accept">"Aceptar"</string>
   <string name="action_add_caption">"Agregar leyenda"</string>
-  <string name="action_add_existing_rooms">"Añadir salas existentes"</string>
+  <string name="action_add_existing_rooms">"Añadir combos existentes"</string>
   <string name="action_add_to_timeline">"Añadir a la cronología"</string>
   <string name="action_back">"Atrás"</string>
   <string name="action_call">"Llamar"</string>
@@ -109,7 +109,7 @@
   <string name="action_copy_link_to_message">"Copiar enlace al mensaje"</string>
   <string name="action_copy_text">"Copiar texto"</string>
   <string name="action_create">"Crear"</string>
-  <string name="action_create_room">"Crear una sala"</string>
+  <string name="action_create_room">"Crear un combo"</string>
   <string name="action_create_space">"Crear espacio"</string>
   <string name="action_deactivate">"Desactivar"</string>
   <string name="action_deactivate_account">"Desactivar cuenta"</string>
@@ -148,13 +148,13 @@
   <string name="action_learn_more">"Más información"</string>
   <string name="action_leave">"Salir"</string>
   <string name="action_leave_conversation">"Salir de la conversación"</string>
-  <string name="action_leave_room">"Salir de la sala"</string>
+  <string name="action_leave_room">"Salir del combo"</string>
   <string name="action_leave_space">"Salir del espacio"</string>
   <string name="action_load_more">"Cargar más"</string>
   <string name="action_manage_account">"Gestionar cuenta"</string>
   <string name="action_manage_account_and_devices">"Gestionar cuenta y dispositivos"</string>
   <string name="action_manage_devices">"Administrar dispositivos"</string>
-  <string name="action_manage_rooms">"Gestionar salas"</string>
+  <string name="action_manage_rooms">"Gestionar combos"</string>
   <string name="action_mark_as_read">"Marcar como leído"</string>
   <string name="action_message">"Enviar mensaje"</string>
   <string name="action_minimize">"Minimizar"</string>
@@ -179,7 +179,7 @@
   <string name="action_report_bug">"Informar de un error"</string>
   <string name="action_report_content">"Denunciar contenido"</string>
   <string name="action_report_dm">"Denunciar conversación"</string>
-  <string name="action_report_room">"Denunciar sala"</string>
+  <string name="action_report_room">"Denunciar combo"</string>
   <string name="action_reset">"Restablecer"</string>
   <string name="action_reset_identity">"Restablecer identidad"</string>
   <string name="action_retry">"Reintentar"</string>
@@ -227,7 +227,7 @@
   <string name="common_advanced_settings">"Ajustes avanzados"</string>
   <string name="common_an_image">"una imagen"</string>
   <string name="common_analytics">"Estadísticas"</string>
-  <string name="common_android_shortcuts_remove_reason_left_room">"Saliste de la sala"</string>
+  <string name="common_android_shortcuts_remove_reason_left_room">"Saliste del combo"</string>
   <string name="common_android_shortcuts_remove_reason_session_logged_out">"Se te ha desconectado de la sesión"</string>
   <string name="common_appearance">"Apariencia"</string>
   <string name="common_audio">"Sonido"</string>
@@ -241,10 +241,10 @@
   <string name="common_chat_backup">"Copia de seguridad del chat"</string>
   <string name="common_copied_to_clipboard">"Copiado al portapapeles"</string>
   <string name="common_copyright">"Derechos de autor"</string>
-  <string name="common_creating_room">"Creando sala…"</string>
+  <string name="common_creating_room">"Creando combo…"</string>
   <string name="common_creating_space">"Creando espacio…"</string>
   <string name="common_current_user_canceled_knock">"Solicitud cancelada"</string>
-  <string name="common_current_user_left_room">"Saliste de la sala"</string>
+  <string name="common_current_user_left_room">"Saliste del combo"</string>
   <string name="common_current_user_left_space">"Saliste del espacio"</string>
   <string name="common_current_user_rejected_invite">"Invitación rechazada"</string>
   <string name="common_decryption_error">"Error de descifrado"</string>
@@ -294,7 +294,7 @@ Motivo: %1$s."</string>
   <string name="common_in_reply_to">"En respuesta a %1$s"</string>
   <string name="common_install_apk_android">"Instalar APK"</string>
   <string name="common_invite_unknown_profile">"No se encontró este ID de Matrix, por lo que es posible que no se reciba la invitación."</string>
-  <string name="common_leaving_room">"Saliendo de la sala"</string>
+  <string name="common_leaving_room">"Saliendo del combo"</string>
   <string name="common_leaving_space">"Saliendo del espacio"</string>
   <string name="common_line_copied_to_clipboard">"Línea copiada al portapapeles"</string>
   <string name="common_link_copied_to_clipboard">"Enlace copiado al portapapeles"</string>
@@ -321,7 +321,7 @@ Motivo: %1$s."</string>
   <string name="common_name">"Nombre"</string>
   <string name="common_name_and_id">"%1$s (%2$s)"</string>
   <string name="common_no_results">"No hay resultados"</string>
-  <string name="common_no_room_name">"Sala sin nombre"</string>
+  <string name="common_no_room_name">"Combo sin nombre"</string>
   <string name="common_no_space_name">"Espacio sin nombre"</string>
   <string name="common_not_encrypted">"No cifrado"</string>
   <string name="common_offline">"Sin conexión"</string>
@@ -348,10 +348,10 @@ Motivo: %1$s."</string>
   <string name="common_preparing">"Preparando…"</string>
   <string name="common_privacy_policy">"Política de privacidad"</string>
   <string name="common_private">"Privado"</string>
-  <string name="common_private_room">"Sala privada"</string>
+  <string name="common_private_room">"Combo privada"</string>
   <string name="common_private_space">"Espacio privado"</string>
   <string name="common_public">"Público"</string>
-  <string name="common_public_room">"Sala pública"</string>
+  <string name="common_public_room">"Combo pública"</string>
   <string name="common_public_space">"Espacio público"</string>
   <string name="common_reaction">"Reacción"</string>
   <string name="common_reactions">"Reacciones"</string>
@@ -368,12 +368,12 @@ Motivo: %1$s."</string>
   <string name="common_report_submitted">"Informe enviado"</string>
   <string name="common_rich_text_editor">"Editor de texto enriquecido"</string>
   <string name="common_role">"Rol"</string>
-  <string name="common_room">"Sala"</string>
-  <string name="common_room_name">"Nombre de la sala"</string>
+  <string name="common_room">"Combo"</string>
+  <string name="common_room_name">"Nombre del combo"</string>
   <string name="common_room_name_placeholder">"p. ej., el nombre de tu proyecto"</string>
   <plurals name="common_rooms">
-    <item quantity="one">"%1$d sala"</item>
-    <item quantity="other">"%1$d salas"</item>
+    <item quantity="one">"%1$d combo"</item>
+    <item quantity="other">"%1$d combos"</item>
   </plurals>
   <string name="common_saved_changes">"Cambios guardados"</string>
   <string name="common_saving">"Guardando"</string>
@@ -422,7 +422,7 @@ Motivo: %1$s."</string>
   <string name="common_thread">"Hilo"</string>
   <string name="common_threads">"Hilos"</string>
   <string name="common_topic">"Tema"</string>
-  <string name="common_topic_placeholder">"¿De qué trata esta sala?"</string>
+  <string name="common_topic_placeholder">"¿De qué trata este combo?"</string>
   <string name="common_unable_to_decrypt">"No se puede descifrar"</string>
   <string name="common_unable_to_decrypt_insecure_device">"Enviado desde un dispositivo no seguro"</string>
   <string name="common_unable_to_decrypt_no_access">"No tienes acceso a este mensaje"</string>
@@ -460,9 +460,9 @@ Motivo: %1$s."</string>
   <string name="content_scanner_scanning">"Escaneando…"</string>
   <string name="content_scanner_unsafe_message">"Se ha desactivado la vista previa y la descarga."</string>
   <string name="content_scanner_unsafe_title">"El archivo no es seguro"</string>
-  <string name="crypto_event_key_forwarded_known_profile_dialog_content">"%1$s (%2$s) compartió este mensaje ya que no estabas en la sala cuando se envió."</string>
-  <string name="crypto_event_key_forwarded_unknown_profile_dialog_content">"%1$s compartió este mensaje ya que no estabas en la sala cuando se envió."</string>
-  <string name="crypto_history_visible">"Esta sala se ha configurado para que los miembros nuevos puedan leer el historial. %1$s"</string>
+  <string name="crypto_event_key_forwarded_known_profile_dialog_content">"%1$s (%2$s) compartió este mensaje ya que no estabas en el combo cuando se envió."</string>
+  <string name="crypto_event_key_forwarded_unknown_profile_dialog_content">"%1$s compartió este mensaje ya que no estabas en el combo cuando se envió."</string>
+  <string name="crypto_history_visible">"Este combo se ha configurado para que los miembros nuevos puedan leer el historial. %1$s"</string>
   <string name="crypto_identity_change_pin_violation">"Se restableció la identidad digital de %1$s. %2$s"</string>
   <string name="crypto_identity_change_pin_violation_new">"Se restableció la identidad digital de %1$s %2$s. %3$s"</string>
   <string name="crypto_identity_change_pin_violation_new_user_id">"(%1$s)"</string>
@@ -478,8 +478,8 @@ Motivo: %1$s."</string>
   <string name="dialog_default_video_quality_selector_title">"Calidad de subida de vídeos"</string>
   <string name="dialog_file_too_large_to_upload_subtitle">"El tamaño máximo de archivo permitido es: %1$s"</string>
   <string name="dialog_file_too_large_to_upload_title">"El archivo es demasiado grande para ser subido"</string>
-  <string name="dialog_room_reported">"Sala denunciada"</string>
-  <string name="dialog_room_reported_and_left">"Denunciaste y saliste de la sala"</string>
+  <string name="dialog_room_reported">"Combo denunciada"</string>
+  <string name="dialog_room_reported_and_left">"Denunciaste y saliste del combo"</string>
   <string name="dialog_title_confirmation">"Confirmar"</string>
   <string name="dialog_title_error">"Error"</string>
   <string name="dialog_title_success">"Terminado"</string>
@@ -497,14 +497,14 @@ Motivo: %1$s."</string>
   <string name="error_failed_loading_messages">"Error al cargar mensajes"</string>
   <string name="error_failed_locating_user">"%1$s no ha podido acceder a tu ubicación. Por favor vuelve a intentarlo más tarde."</string>
   <string name="error_failed_uploading_voice_message">"No se pudo cargar tu mensaje de voz."</string>
-  <string name="error_invalid_invite">"La sala ya no existe o la invitación ya no es válida."</string>
+  <string name="error_invalid_invite">"El combo ya no existe o la invitación ya no es válida."</string>
   <string name="error_location_service_disabled_android">"Activa el GPS para acceder a las funciones basadas en la ubicación."</string>
   <string name="error_message_not_found">"Mensaje no encontrado"</string>
   <string name="error_missing_location_auth_android">"%1$s no tiene permiso para acceder a tu ubicación. Puedes habilitar el acceso en Ajustes."</string>
   <string name="error_missing_location_rationale_android">"%1$s no tiene permiso para acceder a tu ubicación. Habilita el acceso a continuación."</string>
   <string name="error_missing_microphone_voice_rationale_android">"%1$s no tiene permiso para acceder al micrófono. Habilita el acceso para grabar un mensaje de voz."</string>
   <string name="error_network_or_server_issue">"Esto puede deberse a problemas de red o del servidor."</string>
-  <string name="error_room_address_already_exists">"Esta dirección de sala ya existe. Intenta editar el campo de dirección de sala o cambia el nombre de la sala"</string>
+  <string name="error_room_address_already_exists">"Esta dirección de combo ya existe. Intenta editar el campo de dirección de combo o cambia el nombre del combo"</string>
   <string name="error_room_address_invalid_symbols">"No se permiten algunos caracteres. Solo se admiten letras, dígitos y los siguientes símbolos ! $ &amp; ‘ ( ) * + / ; = ? @ [ ] - . _"</string>
   <string name="error_some_messages_have_not_been_sent">"Algunos mensajes no se han enviado"</string>
   <string name="error_unknown">"Lo siento, se ha producido un error"</string>
@@ -555,7 +555,7 @@ Motivo: %1$s."</string>
   <string name="screen_room_grouped_state_events_expand">"Expandir"</string>
   <string name="screen_room_grouped_state_events_reduce">"Reducir"</string>
   <string name="screen_room_live_location_banner">"Compartiendo ubicación en tiempo real"</string>
-  <string name="screen_room_permalink_same_room_android">"¡Ya estás viendo esta sala!"</string>
+  <string name="screen_room_permalink_same_room_android">"¡Ya estás viendo este combo!"</string>
   <string name="screen_room_pinned_banner_indicator">"%1$s de %2$s"</string>
   <string name="screen_room_pinned_banner_indicator_description">"%1$s mensajes fijados"</string>
   <string name="screen_room_pinned_banner_loading_description">"Cargando mensaje…"</string>
@@ -570,7 +570,7 @@ Motivo: %1$s."</string>
   <string name="screen_sharing_location_option_sheet_title">"Cómo compartir"</string>
   <string name="screen_space_list_description">"Espacios que has creado o a los que te has unido."</string>
   <string name="screen_space_list_details">"%1$s • %2$s"</string>
-  <string name="screen_space_list_empty_state_title">"Crea espacios para organizar salas"</string>
+  <string name="screen_space_list_empty_state_title">"Crea espacios para organizar combos"</string>
   <string name="screen_space_list_parent_space">"Espacio %1$s"</string>
   <string name="screen_space_list_title">"Espacios"</string>
   <string name="screen_static_location_sheet_timestamp_description">"Compartida %1$s"</string>

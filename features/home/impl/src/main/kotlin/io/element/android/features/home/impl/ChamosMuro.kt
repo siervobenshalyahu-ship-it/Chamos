@@ -469,7 +469,14 @@ fun rememberChamosMuro(
         val id = salaId ?: return "El Muro aún no está listo"
         val sala = client.getJoinedRoom(id) ?: return "El Muro aún no está listo"
         if (uri == null) {
-            return if (sala.liveTimeline.sendMessage(cuerpo, null, emptyList()).isSuccess) null else "No se pudo publicar"
+            // Si el envío falla (red lenta, sincronización a medias), se reintenta antes de rendirse.
+            repeat(3) { intento ->
+                val r = runCatching { sala.liveTimeline.sendMessage(cuerpo, null, emptyList()) }.getOrNull()
+                if (r != null && r.isSuccess) return null
+                android.util.Log.w("ChamosMuro", "envio fallo (intento ${intento + 1}): ${r?.exceptionOrNull()}")
+                delay(1200L * (intento + 1))
+            }
+            return "No se pudo publicar. Revisa tu conexión e intenta de nuevo."
         }
         val sender = mediaSenderFactory.create(client, sala)
         if (mime != null && mime.startsWith("video")) {
@@ -526,7 +533,17 @@ fun rememberChamosMuro(
     }
     val comentar: suspend (MuroPost, String) -> Boolean = comenta@{ p, texto ->
         val sala = salaId?.let { client.getJoinedRoom(it) } ?: return@comenta false
-        runCatching { sala.liveTimeline.replyMessage(EventId(p.id), texto, null, emptyList()).isSuccess }.getOrDefault(false)
+        var ok = false
+        repeat(3) { intento ->
+            if (ok) return@repeat
+            val r = runCatching { sala.liveTimeline.replyMessage(EventId(p.id), texto, null, emptyList()) }.getOrNull()
+            ok = r != null && r.isSuccess
+            if (!ok) {
+                android.util.Log.w("ChamosMuro", "comentario fallo (intento ${intento + 1}): ${r?.exceptionOrNull()}")
+                delay(1200L * (intento + 1))
+            }
+        }
+        ok
     }
     val borrarComentario: suspend (MuroComentario) -> Boolean = bc@{ c ->
         val sala = salaId?.let { client.getJoinedRoom(it) } ?: return@bc false

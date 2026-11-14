@@ -7,7 +7,7 @@
   <string name="screen_deactivate_account_description_bold_part">"irreversible"</string>
   <string name="screen_deactivate_account_list_item_1">"%1$s tu cuenta (no podrás volver a iniciar sesión y tu ID no se podrá volver a utilizar)."</string>
   <string name="screen_deactivate_account_list_item_1_bold_part">"Inhabilitará permanentemente"</string>
-  <string name="screen_deactivate_account_list_item_2">"Te eliminará de todas las salas de chat."</string>
+  <string name="screen_deactivate_account_list_item_2">"Te eliminará de todas los combos de chat."</string>
   <string name="screen_deactivate_account_list_item_3">"Eliminará la información de tu cuenta de nuestro servidor de identidad."</string>
   <string name="screen_deactivate_account_list_item_4">"Tus mensajes seguirán siendo visibles para los usuarios registrados, pero no estarán disponibles para los usuarios nuevos o no registrados si decides eliminarlos."</string>
   <string name="screen_deactivate_account_title">"Eliminar cuenta"</string>
