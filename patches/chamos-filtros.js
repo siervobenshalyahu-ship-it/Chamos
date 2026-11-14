@@ -773,7 +773,8 @@
       [-1, 1].forEach(function (d) { for (var i = 0; i < 3; i++) { ctx.beginPath(); ctx.moveTo(d * a * 0.14, a * (0.03 + i * 0.025)); ctx.lineTo(d * a * 0.5, a * (0.0 + i * 0.07)); ctx.stroke(); } });
     });
   }
-  function lentesBarbaCara(ctx, c, t) {
+  function lentesBarbaCara(ctx, c, t, pal) {
+    pal = pal || { a: "#ffffff", b: "#d6dbe2", pelo: "rgba(170,178,190,.55)", bigote: "#f6f7fa", bigoteBorde: "rgba(150,158,170,.6)", cejas: "#f3f4f8" };
     var u = arriba(c), r = der(c), a = c.ancho, h = c.alto;
     function P(k, d) { return { x: c.centro.x + r.x * k * a + u.x * d * h, y: c.centro.y + r.y * k * a + u.y * d * h }; }
     var bm = M(c, c.barbilla);
@@ -785,7 +786,7 @@
     var sh = "rgba(0,0,0,.25)";
     ctx.shadowColor = sh; ctx.shadowBlur = a * 0.05; ctx.shadowOffsetY = a * 0.02;
     var g = ctx.createLinearGradient(bm.x - u.x * h * 0.5, bm.y - u.y * h * 0.5, bm.x - u.x * h * -0.4, bm.y - u.y * h * -0.4);
-    g.addColorStop(0, "#ffffff"); g.addColorStop(1, "#d6dbe2");
+    g.addColorStop(0, pal.a); g.addColorStop(1, pal.b);
     ctx.fillStyle = g;
     ctx.beginPath();
     ctx.moveTo(c.ore1.x + r.x * a * 0.02, c.ore1.y + r.y * a * 0.02);
@@ -801,7 +802,7 @@
     ctx.closePath(); ctx.fill();
     ctx.restore();
     // textura de mechones
-    ctx.save(); ctx.strokeStyle = "rgba(170,178,190,.55)"; ctx.lineWidth = Math.max(1, a * 0.006); ctx.lineCap = "round";
+    ctx.save(); ctx.strokeStyle = pal.pelo; ctx.lineWidth = Math.max(1, a * 0.006); ctx.lineCap = "round";
     for (var i = 0; i < 26; i++) {
       var k = (i / 25) * 2 - 1, x0 = bm.x + r.x * k * a * 0.42, y0 = bm.y + r.y * k * a * 0.42 - h * 0.12 * (1 - Math.abs(k)) * 0 - h * (0.18 - 0.1 * Math.abs(k));
       ctx.beginPath(); ctx.moveTo(x0, y0); ctx.quadraticCurveTo(x0 + k * a * 0.03, y0 + h * 0.1, x0 + k * a * 0.05, y0 + h * (0.2 + 0.05 * Math.sin(i)));
@@ -811,7 +812,7 @@
     // bigote
     var lb = M(c, c.labio);
     sobre(ctx, lb.x - u.x * h * 0.015, lb.y - u.y * h * 0.015 - h * 0.005, c.ang, function () {
-      ctx.fillStyle = "#f6f7fa"; ctx.strokeStyle = "rgba(150,158,170,.6)"; ctx.lineWidth = Math.max(1.5, a * 0.01);
+      ctx.fillStyle = pal.bigote; ctx.strokeStyle = pal.bigoteBorde; ctx.lineWidth = Math.max(1.5, a * 0.01);
       ctx.beginPath(); ctx.moveTo(0, -a * 0.03);
       ctx.bezierCurveTo(a * 0.1, -a * 0.09, a * 0.28, -a * 0.04, a * 0.3, a * 0.07);
       ctx.bezierCurveTo(a * 0.2, a * 0.03, a * 0.1, a * 0.06, 0, a * 0.04);
@@ -822,7 +823,7 @@
     // cejas canosas
     [[c.ce1, -1], [c.ce2, 1]].forEach(function (z) {
       var pts2 = z[0].map(function (p) { return M(c, p); });
-      ctx.save(); ctx.strokeStyle = "#f3f4f8"; ctx.lineWidth = Math.max(4, a * 0.04); ctx.lineCap = "round"; ctx.lineJoin = "round";
+      ctx.save(); ctx.strokeStyle = pal.cejas; ctx.lineWidth = Math.max(4, a * 0.04); ctx.lineCap = "round"; ctx.lineJoin = "round";
       ctx.shadowColor = "rgba(0,0,0,.3)"; ctx.shadowBlur = 3;
       ctx.beginPath(); pts2.forEach(function (p, i) { i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y); }); ctx.stroke(); ctx.restore();
     });
@@ -898,6 +899,174 @@
     });
   }
 
+  /* ------------------------------------------------------------------ lentes 3: pintura, cómic, gafas, ojo azul, carita, escarcha, garabato */
+  var pintCv = document.createElement("canvas");
+  /** Estilo pintado / cómic: suaviza, reduce los colores a pocos tonos y marca los bordes con línea oscura. */
+  function estiloPintura(ctx, w, h, niveles, borde, suave) {
+    var sw = Math.max(96, Math.round(w / 3)), sh = Math.max(72, Math.round(h / 3));
+    pintCv.width = sw; pintCv.height = sh;
+    var px = pintCv.getContext("2d", { willReadFrequently: true });
+    px.filter = "blur(" + suave + "px) saturate(1.5) contrast(1.1)";
+    px.drawImage(ctx.canvas, 0, 0, sw, sh); px.filter = "none";
+    var im = px.getImageData(0, 0, sw, sh), d = im.data, n = sw * sh, lum = new Float32Array(n), i, x, y;
+    for (i = 0; i < n; i++) lum[i] = d[i * 4] * 0.3 + d[i * 4 + 1] * 0.59 + d[i * 4 + 2] * 0.11;
+    var q = 255 / (niveles - 1);
+    for (y = 1; y < sh - 1; y++) for (x = 1; x < sw - 1; x++) {
+      var k = y * sw + x, e = Math.abs(lum[k + 1] - lum[k - 1]) + Math.abs(lum[k + sw] - lum[k - sw]), o = k * 4;
+      if (e > borde) { d[o] *= 0.12; d[o + 1] *= 0.12; d[o + 2] *= 0.12; }
+      else { d[o] = Math.round(d[o] / q) * q; d[o + 1] = Math.round(d[o + 1] / q) * q; d[o + 2] = Math.round(d[o + 2] / q) * q; }
+    }
+    px.putImageData(im, 0, 0);
+    ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.imageSmoothingEnabled = true; ctx.drawImage(pintCv, 0, 0, w, h); ctx.restore();
+  }
+  function brillitos(ctx, w, h, t, n) {
+    ctx.save(); ctx.fillStyle = "rgba(255,255,255,.95)"; ctx.shadowColor = "#fff"; ctx.shadowBlur = 8;
+    for (var i = 0; i < n; i++) {
+      var f = 0.5 + 0.5 * Math.sin(t / 380 + i * 2.1);
+      destello(ctx, rnd(i + 1) * w, rnd(i + 50) * h, (0.012 + 0.022 * rnd(i + 9)) * h * (0.4 + f), t / 900 + i);
+    }
+    ctx.restore();
+  }
+  /** Contorno cerrado de un ojo (con los puntos del detector) para recortar lo que se pinta encima. */
+  function recorteOjo(ctx, c, e) {
+    if (!e.arriba.length || !e.abajo.length) return false;
+    var p = e.arriba.concat(e.abajo.slice().reverse()).map(function (q) { return M(c, q); });
+    ctx.beginPath(); p.forEach(function (q, i) { i ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y); }); ctx.closePath(); ctx.clip();
+    return true;
+  }
+  /** Iris grande y brillante (azul por defecto) con pupila y reflejo. */
+  function irisColor(ctx, c, e, c0, c1, escala) {
+    var p = M(c, e.iris), r = c.ew * (escala || 0.46);
+    ctx.save();
+    recorteOjo(ctx, c, e);
+    var g = ctx.createRadialGradient(p.x, p.y, r * 0.2, p.x, p.y, r);
+    g.addColorStop(0, "#05070a"); g.addColorStop(0.3, "#05070a"); g.addColorStop(0.36, c0); g.addColorStop(0.8, c1); g.addColorStop(1, "#0a1a2a");
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, TAU); ctx.fill();
+    ctx.fillStyle = "rgba(255,255,255,.9)"; ctx.beginPath(); ctx.arc(p.x - r * 0.35, p.y - r * 0.38, r * 0.17, 0, TAU); ctx.fill();
+    ctx.restore();
+  }
+  function lentesOjoAzulCara(ctx, c, t) {
+    irisColor(ctx, c, c.e1, "#7fc6ff", "#2c78b8", 0.55); irisColor(ctx, c, c.e2, "#7fc6ff", "#2c78b8", 0.55);
+  }
+  function lentesGafasSol(ctx, c) {
+    var o = M(c, c.ojos), A = c.ew;
+    sobre(ctx, o.x, o.y, c.ang, function () {
+      var sep = c.entre * 0.5, w2 = A * 1.05, h2 = A * 0.62;
+      ctx.lineJoin = "round";
+      [-1, 1].forEach(function (s) {
+        var g = ctx.createLinearGradient(0, -h2, 0, h2); g.addColorStop(0, "#1c2a4a"); g.addColorStop(1, "#0a1020");
+        ctx.fillStyle = g; ctx.strokeStyle = "#36456b"; ctx.lineWidth = A * 0.16;
+        ctx.beginPath();
+        ctx.moveTo(s * sep - w2, -h2 * 0.8); ctx.quadraticCurveTo(s * sep, -h2 * 1.15, s * sep + w2, -h2 * 0.85);
+        ctx.lineTo(s * sep + w2 * 0.9, h2 * 0.45); ctx.quadraticCurveTo(s * sep, h2 * 1.2, s * sep - w2 * 0.95, h2 * 0.5); ctx.closePath();
+        ctx.fill(); ctx.stroke();
+        ctx.fillStyle = "rgba(255,255,255,.16)"; ctx.beginPath(); ctx.ellipse(s * sep - w2 * 0.35, -h2 * 0.35, w2 * 0.3, h2 * 0.14, -0.3, 0, TAU); ctx.fill();
+      });
+      ctx.strokeStyle = "#36456b"; ctx.lineWidth = A * 0.14; ctx.beginPath(); ctx.moveTo(-sep + w2, -h2 * 0.45); ctx.quadraticCurveTo(0, -h2 * 0.8, sep - w2, -h2 * 0.45); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(-sep - w2, -h2 * 0.5); ctx.lineTo(-c.ancho * 0.52, -h2 * 0.3); ctx.moveTo(sep + w2, -h2 * 0.5); ctx.lineTo(c.ancho * 0.52, -h2 * 0.3); ctx.stroke();
+    });
+  }
+  function lentesGafasNerd(ctx, c) {
+    var o = M(c, c.ojos), A = c.ew;
+    sobre(ctx, o.x, o.y, c.ang, function () {
+      var sep = c.entre * 0.5, r = A * 1.0;
+      [-1, 1].forEach(function (s) {
+        ctx.fillStyle = "rgba(255,255,255,.07)"; ctx.beginPath(); ctx.arc(s * sep, 0, r, 0, TAU); ctx.fill();
+        ctx.strokeStyle = "#0d0d10"; ctx.lineWidth = A * 0.22; ctx.beginPath(); ctx.arc(s * sep, 0, r, 0, TAU); ctx.stroke();
+        ctx.strokeStyle = "rgba(255,255,255,.55)"; ctx.lineWidth = A * 0.06; ctx.beginPath(); ctx.arc(s * sep, 0, r * 0.7, Math.PI * 1.15, Math.PI * 1.45); ctx.stroke();
+      });
+      ctx.strokeStyle = "#0d0d10"; ctx.lineWidth = A * 0.2; ctx.beginPath(); ctx.moveTo(-sep + r, -r * 0.1); ctx.quadraticCurveTo(0, -r * 0.45, sep - r, -r * 0.1); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(-sep - r, -r * 0.1); ctx.lineTo(-c.ancho * 0.52, 0); ctx.moveTo(sep + r, -r * 0.1); ctx.lineTo(c.ancho * 0.52, 0); ctx.stroke();
+    });
+  }
+  function lentesCaritaFeliz(ctx, c, t) {
+    ctx.save();
+    var g = ctx.createRadialGradient(c.centro.x, c.centro.y - c.alto * 0.1, c.ancho * 0.1, c.centro.x, c.centro.y, c.alto * 0.6);
+    g.addColorStop(0, "#ffffff"); g.addColorStop(1, "#dcdcdc");
+    ctx.fillStyle = g; trazoOval(ctx, ovalM(c)); ctx.fill();
+    ctx.restore();
+    [c.e1, c.e2].forEach(function (e) {
+      var p = M(c, e.centro);
+      sobre(ctx, p.x, p.y, c.ang, function () {
+        ctx.fillStyle = "#111"; ctx.beginPath(); ctx.ellipse(0, 0, c.ew * 0.42, c.ew * 0.58, 0, 0, TAU); ctx.fill();
+        ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(-c.ew * 0.12, -c.ew * 0.2, c.ew * 0.14, 0, TAU); ctx.fill();
+      });
+    });
+    var b = M(c, c.boca), a = c.ancho, prof = a * (0.16 + 0.025 * Math.sin(t / 320));
+    sobre(ctx, b.x, b.y - c.alto * 0.04, c.ang, function () {
+      ctx.strokeStyle = "#111"; ctx.lineWidth = Math.max(3, a * 0.035); ctx.lineCap = "round";
+      ctx.beginPath(); ctx.moveTo(-a * 0.3, 0); ctx.quadraticCurveTo(0, prof * 2, a * 0.3, 0); ctx.stroke();
+    });
+    var n = M(c, c.nariz);
+    ctx.fillStyle = "rgba(0,0,0,.18)"; ctx.beginPath(); ctx.ellipse(n.x, n.y, c.ancho * 0.03, c.ancho * 0.018, c.ang, 0, TAU); ctx.fill();
+  }
+  function lentesBarbaNegra(ctx, c, t) { lentesBarbaCara(ctx, c, t, { a: "#2e2e33", b: "#0c0c0f", pelo: "rgba(0,0,0,.55)", bigote: "#16161a", bigoteBorde: "rgba(0,0,0,.6)", cejas: "#141417" }); }
+  function espinaHielo(ctx, x, y, ang, largo, ancho) {
+    ctx.save(); ctx.translate(x, y); ctx.rotate(ang);
+    var g = ctx.createLinearGradient(0, 0, largo, 0); g.addColorStop(0, "rgba(235,248,255,.95)"); g.addColorStop(1, "rgba(120,190,235,.85)");
+    ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(0, -ancho / 2); ctx.lineTo(largo, 0); ctx.lineTo(0, ancho / 2); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = "rgba(255,255,255,.7)"; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(largo * 0.85, 0); ctx.stroke();
+    ctx.restore();
+  }
+  function lentesEscarchaGlobal(ctx, w, h, t) {
+    var m = Math.min(w, h), gr = ctx.createRadialGradient(w / 2, h / 2, m * 0.3, w / 2, h / 2, Math.max(w, h) * 0.72);
+    gr.addColorStop(0, "rgba(170,225,255,0)"); gr.addColorStop(1, "rgba(190,235,255,.8)");
+    ctx.save(); ctx.fillStyle = gr; ctx.fillRect(0, 0, w, h);
+    var i, k;
+    for (k = 0; k < 4; k++) {
+      var horiz = k < 2, len = horiz ? w : h, cant = horiz ? 15 : 11;
+      for (i = 0; i < cant; i++) {
+        var p = (i + 0.5) / cant * len, L = m * (0.05 + 0.1 * rnd(i + k * 31)), A = m * (0.025 + 0.03 * rnd(i + k * 7 + 3));
+        if (k === 0) espinaHielo(ctx, p, 0, Math.PI / 2, L, A);
+        else if (k === 1) espinaHielo(ctx, p, h, -Math.PI / 2, L, A);
+        else if (k === 2) espinaHielo(ctx, 0, p, 0, L, A);
+        else espinaHielo(ctx, w, p, Math.PI, L, A);
+      }
+    }
+    ctx.fillStyle = "rgba(255,255,255,.9)";
+    for (i = 0; i < 46; i++) {
+      var x = (rnd(i + 3) * w + Math.sin(t / 700 + i) * 12 + w) % w, y = (rnd(i + 80) * h + t * 0.045 * (0.5 + rnd(i + 5))) % h;
+      ctx.beginPath(); ctx.arc(x, y, m * (0.004 + 0.006 * rnd(i + 11)), 0, TAU); ctx.fill();
+    }
+    ctx.restore();
+  }
+  function lentesEscarchaCara(ctx, c, t) {
+    piel(ctx, c, "#bfe6ff", "screen", 0.28, 5);
+    irisColor(ctx, c, c.e1, "#aef2ff", "#1fa5e8", 0.5); irisColor(ctx, c, c.e2, "#aef2ff", "#1fa5e8", 0.5);
+    [c.e1, c.e2].forEach(function (e) { var p = M(c, e.centro); brillo(ctx, p.x, p.y, c.ew * 1.3, "rgba(120,220,255,.55)", 0.55); });
+  }
+  function ojoGarabato(ctx, c, e, lado, t) {
+    var p = M(c, e.centro), r = c.ew * 1.0, mira = Math.sin(t / 900) * 0.25;
+    sobre(ctx, p.x, p.y, c.ang, function () {
+      ctx.lineJoin = "round"; ctx.lineCap = "round";
+      function forma() {
+        ctx.beginPath(); ctx.moveTo(-r, r * 0.1); ctx.bezierCurveTo(-r * 0.6, -r * 0.75, r * 0.7, -r * 0.8, r, r * 0.05);
+        ctx.bezierCurveTo(r * 0.6, r * 0.85, -r * 0.6, r * 0.85, -r, r * 0.1); ctx.closePath();
+      }
+      forma(); ctx.fillStyle = "#e9e9e9"; ctx.fill();
+      ctx.save(); forma(); ctx.clip();
+      ctx.fillStyle = "#0b0b0b"; ctx.beginPath(); ctx.arc(r * (0.35 + mira * lado), r * 0.12, r * 0.28, 0, TAU); ctx.fill();
+      ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(r * (0.28 + mira * lado), r * 0.04, r * 0.07, 0, TAU); ctx.fill();
+      ctx.fillStyle = "rgba(255,255,255,.35)"; ctx.fillRect(-r, -r, r * 2, r * 0.95);
+      ctx.restore();
+      forma(); ctx.strokeStyle = "#fff"; ctx.lineWidth = r * 0.34; ctx.stroke();
+      forma(); ctx.strokeStyle = "#0b0b0b"; ctx.lineWidth = r * 0.17; ctx.stroke();
+      ctx.strokeStyle = "#0b0b0b"; ctx.lineWidth = r * 0.2;
+      ctx.beginPath(); ctx.moveTo(-r * 1.05, -r * 0.1); ctx.lineTo(r * 1.05, -r * 0.04); ctx.stroke();
+      ctx.lineWidth = r * 0.14; ctx.beginPath(); ctx.moveTo(-r * 0.7, r * 1.15); ctx.quadraticCurveTo(0, r * 1.35, r * 0.7, r * 1.15); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(-r * 0.9, -r * 1.2); ctx.quadraticCurveTo(0, -r * (1.55 + lado * 0.15), r * 0.9, -r * 1.05); ctx.stroke();
+    });
+  }
+  function lentesGarabatoCara(ctx, c, t) {
+    ojoGarabato(ctx, c, c.e1, -1, t); ojoGarabato(ctx, c, c.e2, 1, t);
+    var b = M(c, c.boca), a = c.ancho;
+    sobre(ctx, b.x, b.y + c.alto * 0.02, c.ang, function () {
+      ctx.lineCap = "round"; ctx.strokeStyle = "#fff"; ctx.lineWidth = a * 0.06;
+      ctx.beginPath(); ctx.moveTo(-a * 0.25, 0); ctx.quadraticCurveTo(0, a * 0.04, a * 0.25, -a * 0.02); ctx.stroke();
+      ctx.strokeStyle = "#0b0b0b"; ctx.lineWidth = a * 0.03; ctx.stroke();
+    });
+  }
+
   /* ------------------------------------------------------------------ efectos de cara */
   function ojosGrandes(c, f, r) { return [W(c.e1.centro, c.ew * r, f), W(c.e2.centro, c.ew * r, f)]; }
 
@@ -931,6 +1100,30 @@
       global: function (ctx, w, h, t) { lentesGymGlobal(ctx, w, h, t); }, dibujar: function (ctx, c, t) { lentesGymCara(ctx, c, t); } },
     { id: "l-taller", n: "Taller", e: "🪵", grupo: "Lentes", css: "saturate(1.1)",
       global: function (ctx, w, h, t) { lentesTaller(ctx, w, h, t); }, dibujar: function (ctx, c, t) { lentesTallerCara(ctx, c, t); } },
+    { id: "l-pintura", n: "Pintura", e: "🎨", grupo: "Lentes", css: "saturate(1.25)",
+      base: function (ctx, w, h) { estiloPintura(ctx, w, h, 6, 40, 2.2); },
+      global: function (ctx, w, h, t) { brillitos(ctx, w, h, t, 16); } },
+    { id: "l-comic", n: "Cómic", e: "🖍️", grupo: "Lentes", css: "contrast(1.15) saturate(1.4)",
+      base: function (ctx, w, h) { estiloPintura(ctx, w, h, 4, 26, 1.2); } },
+    { id: "l-gafas-sol", n: "Gafas pintadas", e: "🕶️", grupo: "Lentes", css: "saturate(1.2)",
+      base: function (ctx, w, h) { estiloPintura(ctx, w, h, 7, 44, 2.6); },
+      dibujar: function (ctx, c) { lentesGafasSol(ctx, c); } },
+    { id: "l-gafas-nerd", n: "Gafas nerd", e: "🤓", grupo: "Lentes",
+      warps: function (c) { return ojosGrandes(c, 0.3, 1.1); },
+      dibujar: function (ctx, c) { lentesGafasNerd(ctx, c); } },
+    { id: "l-ojo-azul", n: "Ojo azul", e: "👁️", grupo: "Lentes", css: "contrast(1.08)",
+      warps: function (c) { return ojosGrandes(c, 0.62, 1.2); },
+      dibujar: function (ctx, c, t) { lentesOjoAzulCara(ctx, c, t); } },
+    { id: "l-feliz", n: "Carita feliz", e: "😁", grupo: "Lentes",
+      warps: function (c) { return [W(c.boca, c.ancho * 0.5, 0.3)]; },
+      dibujar: function (ctx, c, t) { lentesCaritaFeliz(ctx, c, t); } },
+    { id: "l-barba-negra", n: "Barba negra", e: "🧔", grupo: "Lentes", css: "contrast(1.05)",
+      dibujar: function (ctx, c, t) { lentesBarbaNegra(ctx, c, t); } },
+    { id: "l-escarcha", n: "Escarcha", e: "🥶", grupo: "Lentes", css: "saturate(.85) brightness(1.05) hue-rotate(-8deg)",
+      global: function (ctx, w, h, t) { lentesEscarchaGlobal(ctx, w, h, t); },
+      dibujar: function (ctx, c, t) { lentesEscarchaCara(ctx, c, t); } },
+    { id: "l-garabato", n: "Ojos de garabato", e: "✏️", grupo: "Lentes", css: "grayscale(1) contrast(1.15)",
+      dibujar: function (ctx, c, t) { lentesGarabatoCara(ctx, c, t); } },
     { id: "kawaii", n: "Kawaii", e: "🌸", grupo: "Manga",
       warps: function (c) { return ojosGrandes(c, 0.5, 1.15).concat([W(c.barbilla, c.ancho * 0.5, -0.1)]); },
       css: "brightness(1.07) saturate(1.12) contrast(.97)",
@@ -1108,6 +1301,7 @@
       lineasVelocidad(ctx, w, h, w / 2, h / 2, ahora, h * 0.55, "rgba(0,0,0,.55)", 46);
       textoManga(ctx, "ドン!", w * 0.84, h * 0.12, h * 0.11, 0.12);
     }
+    if (ef && ef.base) ef.base(ctx, w, h, ahora);
     if (ef && ef.global) ef.global(ctx, w, h, ahora, caras);
     if (ef && ef.dibujar) caras.forEach(function (c) { ef.dibujar(ctx, c, ahora, w, h); });
     ctx.restore();
