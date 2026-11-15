@@ -1278,7 +1278,7 @@ async function webRegistro(request, env) {
   if (DESECHABLES.has(dom)) return jsonCors({ error: "Usa un correo real, no uno temporal" }, 400);
   if (!(await dominioRecibeCorreo(dom))) return jsonCors({ error: "Ese correo no existe, revisa cómo lo escribiste" }, 400);
   const usaGmail = !!(env.GAS_URL && env.GAS_SECRET);
-  if (!usaGmail && (!((env.MAILJET_KEY && env.MAILJET_SECRET) || env.BREVO_KEY) || !env.MAIL_FROM)) {
+  if (env.CODIGOS_CORREO !== "1" || (!usaGmail && (!((env.MAILJET_KEY && env.MAILJET_SECRET) || env.BREVO_KEY) || !env.MAIL_FROM))) {
     // Modo manual: sin servicio de correo, solo se guarda el registro y el enlace se envía a mano.
     await env.DB.prepare("CREATE TABLE IF NOT EXISTS web_registros (email TEXT PRIMARY KEY, nombre TEXT, pais TEXT, primera INTEGER, ultima INTEGER, descargas INTEGER DEFAULT 0, ip TEXT)").run();
     const t = Date.now();
