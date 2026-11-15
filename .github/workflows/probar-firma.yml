@@ -17,6 +17,8 @@ jobs:
           java -version 2>&1 | head -1
           echo "Largo del texto de la llave: ${#B64}"
           echo "Largo del alias: ${#ALIAS} | clave de llave: ${#KP} | clave del almacen: ${#SP}"
+          ALIAS=$(printf %s "$ALIAS" | tr -d "[:space:]"); KP=$(printf %s "$KP" | tr -d "[:space:]"); SP=$(printf %s "$SP" | tr -d "[:space:]")
+          echo "Tras quitar espacios: alias ${#ALIAS}, clave ${#KP}"
           [ "$KP" = "$SP" ] && echo "Las dos claves son iguales: SI" || echo "Las dos claves son iguales: NO"
           printf '%s' "$B64" | base64 -d > k.keystore || { echo "El texto de la llave NO se puede decodificar"; exit 0; }
           ls -l k.keystore

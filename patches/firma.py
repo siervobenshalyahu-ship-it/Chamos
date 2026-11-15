@@ -18,7 +18,7 @@ new = '''            keyAlias = "%s"
             keyPassword = "%s"
             storeFile = file("./signature/chamos.keystore")
             storePassword = "%s"''' % (
-    os.environ["CHAMOS_KEY_ALIAS"], os.environ["CHAMOS_KEY_PASSWORD"], os.environ["CHAMOS_STORE_PASSWORD"])
+    os.environ["CHAMOS_KEY_ALIAS"].strip(), os.environ["CHAMOS_KEY_PASSWORD"].strip(), os.environ["CHAMOS_STORE_PASSWORD"].strip())
 open(p, "w", encoding="utf-8").write(s.replace(old, new))
 print("Firmando con la llave propia de Chamos.")
 
