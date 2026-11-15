@@ -211,7 +211,7 @@ object ChamosNumero {
 }
 
 private const val TEXTO_INVITACION =
-    "Hola, uso Chamos, la app de mensajes de los venezolanos 🇻🇪. Chats, videos, estados y juegos, gratis. Descárgala aquí: https://siervobenshalyahu-ship-it.github.io/Chamos-apk-web/"
+    "Hola, uso Chamos, la app de mensajes de los venezolanos 🇻🇪. Chats, videos, estados y juegos, gratis. Descárgala aquí: https://chamos.pages.dev/"
 
 /** Invita por WhatsApp, Telegram, mensaje de texto o cualquier otra app (canal = "whatsapp", "telegram", "sms" o "otro"). */
 fun chamosInvitar(ctx: Context, canal: String) {
@@ -220,7 +220,7 @@ fun chamosInvitar(ctx: Context, canal: String) {
     try {
         when (canal) {
             "whatsapp" -> ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://wa.me/?text=" + URLEncoder.encode(texto, "UTF-8"))).addFlags(nuevo))
-            "telegram" -> ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/share/url?url=" + URLEncoder.encode("https://siervobenshalyahu-ship-it.github.io/Chamos-apk-web/", "UTF-8") + "&text=" + URLEncoder.encode("Hola, uso Chamos, la app de mensajes de los venezolanos 🇻🇪. Gratis, descárgala aquí:", "UTF-8"))).addFlags(nuevo))
+            "telegram" -> ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/share/url?url=" + URLEncoder.encode("https://chamos.pages.dev/", "UTF-8") + "&text=" + URLEncoder.encode("Hola, uso Chamos, la app de mensajes de los venezolanos 🇻🇪. Gratis, descárgala aquí:", "UTF-8"))).addFlags(nuevo))
             "sms" -> ctx.startActivity(Intent(Intent.ACTION_SENDTO, Uri.parse("smsto:")).putExtra("sms_body", texto).addFlags(nuevo))
             else -> {
                 val enviar = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, texto)

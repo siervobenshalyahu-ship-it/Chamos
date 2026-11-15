@@ -394,7 +394,7 @@ button{padding:0 18px;border-radius:26px;border:0;background:#22D3EE;color:#0F15
 <a href="https://translate.google.com"><i><img data-e="🌍" onerror="this.parentNode.textContent=this.dataset.e" src="https://www.google.com/s2/favicons?domain=translate.google.com&sz=128"></i>Traductor</a>
 <a href="https://news.google.com/?hl=es-419&amp;gl=VE&amp;ceid=VE:es-419"><i><img data-e="📰" onerror="this.parentNode.textContent=this.dataset.e" src="https://www.google.com/s2/favicons?domain=news.google.com&sz=128"></i>Noticias</a>
 <a href="https://www.google.com/search?q=clima"><i>⛅</i>Clima</a>
-<a href="https://siervobenshalyahu-ship-it.github.io/Chamos-apk-web/"><i>🇻🇪</i>Chamos</a>
+<a href="https://chamos.pages.dev/"><i>🇻🇪</i>Chamos</a>
 </div>
 <small>Navegador de Chamos · no guardamos tu historial</small>
 <script>

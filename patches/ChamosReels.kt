@@ -1019,7 +1019,7 @@ private fun videoCompartido(contexto: android.content.Context, reel: ReelItem, r
         val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
             type = "video/mp4"
             putExtra(android.content.Intent.EXTRA_STREAM, uri)
-            putExtra(android.content.Intent.EXTRA_TEXT, "Video de " + reel.autor + " en Chamos. Descarga Chamos: https://siervobenshalyahu-ship-it.github.io/Chamos-apk-web/")
+            putExtra(android.content.Intent.EXTRA_TEXT, "Video de " + reel.autor + " en Chamos. Descarga Chamos: https://chamos.pages.dev/")
             addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
         val chooser = android.content.Intent.createChooser(intent, "Compartir video").addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -1031,7 +1031,7 @@ private fun videoCompartido(contexto: android.content.Context, reel: ReelItem, r
 private fun textoCompartido(contexto: android.content.Context, reel: ReelItem) {
     val texto = "Mira este video de " + reel.autor + " en Chamos" +
         (if (reel.descripcion.isNotBlank()) ": «" + reel.descripcion + "»" else "") +
-        ". Descarga Chamos: https://siervobenshalyahu-ship-it.github.io/Chamos-apk-web/"
+        ". Descarga Chamos: https://chamos.pages.dev/"
     val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
         type = "text/plain"
         putExtra(android.content.Intent.EXTRA_TEXT, texto)
