@@ -1278,7 +1278,15 @@ async function webRegistro(request, env) {
   if (DESECHABLES.has(dom)) return jsonCors({ error: "Usa un correo real, no uno temporal" }, 400);
   if (!(await dominioRecibeCorreo(dom))) return jsonCors({ error: "Ese correo no existe, revisa cómo lo escribiste" }, 400);
   const usaGmail = !!(env.GAS_URL && env.GAS_SECRET);
-  if (!usaGmail && (!((env.MAILJET_KEY && env.MAILJET_SECRET) || env.BREVO_KEY) || !env.MAIL_FROM)) return jsonCors({ error: "Falta configurar el correo (GAS_URL y GAS_SECRET)" }, 503);
+  if (!usaGmail && (!((env.MAILJET_KEY && env.MAILJET_SECRET) || env.BREVO_KEY) || !env.MAIL_FROM)) {
+    // Modo manual: sin servicio de correo, solo se guarda el registro y el enlace se envía a mano.
+    await env.DB.prepare("CREATE TABLE IF NOT EXISTS web_registros (email TEXT PRIMARY KEY, nombre TEXT, pais TEXT, primera INTEGER, ultima INTEGER, descargas INTEGER DEFAULT 0, ip TEXT)").run();
+    const t = Date.now();
+    await env.DB.prepare(
+      "INSERT INTO web_registros (email, nombre, pais, primera, ultima, ip) VALUES (?1,?2,?3,?4,?4,?5) ON CONFLICT(email) DO UPDATE SET nombre=?2, pais=?3, ultima=?4, ip=?5",
+    ).bind(email, nombre, corto(request.cf && request.cf.country, 4), t, corto(request.headers.get("cf-connecting-ip"), 64)).run();
+    return jsonCors({ ok: true, manual: true });
+  }
   const exp = Date.now() + 15 * 60 * 1000;
   const carga = exp + "." + btoa(unescape(encodeURIComponent(email)));
   const firma = await webFirma(env, carga);
@@ -1365,6 +1373,20 @@ async function webApk(request, env) {
   if (l) h.set("content-length", l);
   return new Response(r.body, { headers: h });
 }
+async function webListaHtml(request, env) {
+  const k = new URL(request.url).searchParams.get("k") || "";
+  if (!env.ADMIN_KEY || k !== env.ADMIN_KEY) return new Response("Clave incorrecta", { status: 401 });
+  await env.DB.prepare("CREATE TABLE IF NOT EXISTS web_registros (email TEXT PRIMARY KEY, nombre TEXT, pais TEXT, primera INTEGER, ultima INTEGER, descargas INTEGER DEFAULT 0, ip TEXT)").run();
+  const r = await env.DB.prepare("SELECT email, nombre, pais, primera FROM web_registros ORDER BY primera DESC LIMIT 1000").all();
+  const esc = (x) => String(x == null ? "" : x).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+  const filas = r.results.map((f) => "<tr><td>" + esc(f.nombre) + "</td><td>" + esc(f.email) + "</td><td>" + esc(f.pais) + "</td><td>" + new Date(f.primera).toLocaleString("es-VE", { timeZone: "America/Caracas" }) + "</td></tr>").join("");
+  const todos = r.results.map((f) => f.email).join(", ");
+  const html = '<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Registrados</title>' +
+    '<style>body{font-family:Arial;background:#0a0e2b;color:#fff;margin:12px}table{border-collapse:collapse;width:100%}td,th{border-bottom:1px solid #334;padding:8px;font-size:14px;text-align:left}textarea{width:100%;height:90px;background:#121843;color:#fff;border:1px solid #29c5ff;border-radius:8px;padding:8px}h2{color:#29c5ff}</style>' +
+    "<h2>Registrados (" + r.results.length + ")</h2><p>Todos los correos, para copiar y pegar en \"CCO\":</p><textarea readonly onclick=\"this.select()\">" + esc(todos) + "</textarea>" +
+    "<table><tr><th>Nombre</th><th>Correo</th><th>País</th><th>Fecha</th></tr>" + filas + "</table>";
+  return new Response(html, { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" } });
+}
 async function webLista(request, env) {
   if (!env.ADMIN_KEY || request.headers.get("x-clave") !== env.ADMIN_KEY) return jsonCors({ error: "Clave incorrecta" }, 401);
   await prepararTablas(env);
@@ -1385,6 +1407,9 @@ export default {
     }
     if (url.pathname === "/web/apk" && request.method === "GET") {
       try { return await webApk(request, env); } catch (e) { console.error(e); return jsonCors({ error: String(e.message || e) }, 500); }
+    }
+    if (url.pathname === "/web/lista" && request.method === "GET") {
+      try { return await webListaHtml(request, env); } catch (e) { console.error(e); return new Response("Error: " + String(e.message || e), { status: 500 }); }
     }
     if (url.pathname === "/web/registros" && request.method === "GET") {
       try { return await webLista(request, env); } catch (e) { console.error(e); return jsonCors({ error: String(e.message || e) }, 500); }
