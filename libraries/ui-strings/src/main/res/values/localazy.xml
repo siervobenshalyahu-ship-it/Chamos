@@ -372,7 +372,7 @@ Motivo: %1$s."</string>
   <string name="common_reaction">"Reacción"</string>
   <string name="common_reactions">"Reacciones"</string>
   <string name="common_reason">"Motivo"</string>
-  <string name="common_recovery_key">"Clave de recuperación"</string>
+  <string name="common_recovery_key">"Contraseña de recuperación"</string>
   <string name="common_refreshing">"Recargando…"</string>
   <string name="common_removing">"Eliminando…"</string>
   <plurals name="common_replies">
