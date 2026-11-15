@@ -509,7 +509,7 @@ Motivo: %1$s."</string>
   <string name="error_some_messages_have_not_been_sent">"Algunos mensajes no se han enviado"</string>
   <string name="error_unknown">"Lo siento, se ha producido un error"</string>
   <string name="invite_friends_rich_title">"Únete a %1$s, solo para venezolanos"</string>
-  <string name="invite_friends_text">"Ven a Chamos, la app de mensajes solo para venezolanos. Escríbeme aquí: %2$s\nDescárgala: https://siervobenshalyahu-ship-it.github.io/Chamos-apk-web/"</string>
+  <string name="invite_friends_text">"Ven a Chamos, la app de mensajes solo para venezolanos. Escríbeme aquí: %2$s\nDescárgala: https://chamos.pages.dev/"</string>
   <string name="live_location_sharing_foreground_service_channel_title_android">"Compartir la ubicación en directo"</string>
   <string name="live_location_sharing_foreground_service_message_android">"Se está compartiendo actualmente la ubicación"</string>
   <string name="live_location_sharing_foreground_service_title_android">"%1$s Ubicación en tiempo real"</string>

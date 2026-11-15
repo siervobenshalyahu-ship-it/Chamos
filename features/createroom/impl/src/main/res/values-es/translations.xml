@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
-  <string name="screen_create_room_action_create_room">"Nuevo combo"</string>
+  <string name="screen_create_room_action_create_room">"Armar el combo"</string>
   <string name="screen_create_room_add_people_title">"Invitar personas"</string>
-  <string name="screen_create_room_error_creating_room">"Se ha producido un error al crear el combo"</string>
+  <string name="screen_create_room_error_creating_room">"Se ha producido un error al armar el combo"</string>
   <string name="screen_create_room_error_creating_space">"No se pudo crear el espacio debido a un error desconocido. Inténtalo de nuevo más tarde."</string>
   <string name="screen_create_room_name_placeholder">"Añadir nombre…"</string>
-  <string name="screen_create_room_new_room_title">"Nuevo combo"</string>
+  <string name="screen_create_room_new_room_title">"Armar el combo"</string>
   <string name="screen_create_room_new_space_title">"Nuevo espacio"</string>
   <string name="screen_create_room_private_option_description">"Solo las personas invitadas pueden acceder."</string>
   <string name="screen_create_room_private_option_title">"Privado"</string>
