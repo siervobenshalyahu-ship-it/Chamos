@@ -18,7 +18,7 @@
   <string name="screen_room_change_permissions_moderators">"Moderador"</string>
   <string name="screen_room_change_permissions_remove_people">"Eliminar personas"</string>
   <string name="screen_room_change_permissions_room_avatar">"Cambiar el avatar de la sala"</string>
-  <string name="screen_room_change_permissions_room_details">"Editar detalles"</string>
+  <string name="screen_room_change_permissions_room_details">"Editar el combo"</string>
   <string name="screen_room_change_permissions_room_name">"Cambiar el nombre de la sala"</string>
   <string name="screen_room_change_permissions_room_topic">"Cambiar el tema de la sala"</string>
   <string name="screen_room_change_permissions_send_messages">"Enviar mensajes"</string>
@@ -48,7 +48,7 @@
   <string name="screen_room_details_badge_encrypted">"Cifrada"</string>
   <string name="screen_room_details_badge_not_encrypted">"No cifrada"</string>
   <string name="screen_room_details_badge_public">"Sala pública"</string>
-  <string name="screen_room_details_edit_room_title">"Editar detalles"</string>
+  <string name="screen_room_details_edit_room_title">"Editar el combo"</string>
   <string name="screen_room_details_edition_error">"Se ha producido un error desconocido y no se ha podido cambiar la información."</string>
   <string name="screen_room_details_edition_error_title">"No se puede actualizar la sala"</string>
   <string name="screen_room_details_encryption_enabled_subtitle">"Los mensajes están protegidos con \"candados\". Sólo tú y los destinatarios tenéis las llaves únicas para abrirlos."</string>

@@ -175,7 +175,7 @@ private fun CreateRoomActionButtonsList(
         if (state.userListState.recentDirectRooms.isNotEmpty()) {
             item {
                 ListSectionHeader(
-                    title = "Mis contactos",
+                    title = "Libreta Chamos",
                     hasDivider = false,
                 )
             }
