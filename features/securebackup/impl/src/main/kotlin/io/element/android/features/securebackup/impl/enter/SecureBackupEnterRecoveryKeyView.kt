@@ -12,6 +12,9 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import androidx.compose.foundation.layout.Column
+import io.element.android.features.securebackup.impl.tools.ChamosPatron
+import io.element.android.libraries.designsystem.theme.components.Text
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.PreviewParameter
@@ -61,6 +64,7 @@ fun SecureBackupEnterRecoveryKeyView(
 private fun Content(
     state: SecureBackupEnterRecoveryKeyState,
 ) {
+    Column {
     RecoveryKeyView(
         modifier = Modifier
             .bringIntoViewOnImeVisible()
@@ -77,6 +81,11 @@ private fun Content(
             state.eventSink(SecureBackupEnterRecoveryKeyEvent.ChangeRecoveryKeyFieldContentsVisibility(it))
         }
     )
+    Text(text = "¿Usaste un patrón? Dibújalo aquí:")
+    ChamosPatron(onPatron = { p ->
+        if (p != null) state.eventSink.invoke(SecureBackupEnterRecoveryKeyEvent.OnRecoveryKeyChange(p))
+    })
+    }
 }
 
 @Composable

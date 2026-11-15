@@ -10,6 +10,7 @@ package io.element.android.features.securebackup.impl.setup
 
 sealed interface SecureBackupSetupEvent {
     data object CreateRecoveryKey : SecureBackupSetupEvent
+    data class CreateWithPassphrase(val passphrase: String) : SecureBackupSetupEvent
     data object RecoveryKeyHasBeenSaved : SecureBackupSetupEvent
     data object CopyRecoveryKey : SecureBackupSetupEvent
     data object Done : SecureBackupSetupEvent

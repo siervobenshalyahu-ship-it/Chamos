@@ -12,6 +12,15 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import io.element.android.features.securebackup.impl.tools.ChamosPatron
+import io.element.android.libraries.designsystem.theme.components.Text
+import io.element.android.libraries.designsystem.theme.components.TextField
+import androidx.compose.foundation.layout.Column
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -135,6 +144,41 @@ private fun Content(
         onSubmit = null,
         toggleRecoveryKeyVisibility = {},
     )
+    if (formattedRecoveryKey == null && !state.recoveryKeyViewState.inProgress && !state.isChangeRecoveryKeyUserStory) {
+        EligeTuPropia(state)
+    }
+}
+
+/** Chamos: la persona puede elegir su propia contraseña o un patrón en vez de la clave generada. */
+@Composable
+private fun EligeTuPropia(state: SecureBackupSetupState) {
+    var clave by remember { mutableStateOf("") }
+    var patron by remember { mutableStateOf<String?>(null) }
+    Column(modifier = Modifier.padding(top = 24.dp)) {
+        Text(text = "O crea la tuya: una contraseña (mínimo 8 caracteres) o un patrón. Si la olvidas no podrás recuperar tus mensajes.")
+        TextField(
+            modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+            value = clave,
+            onValueChange = { clave = it },
+            placeholder = "Mi contraseña de recuperación",
+            singleLine = true,
+            visualTransformation = PasswordVisualTransformation(),
+        )
+        Button(
+            text = "Usar mi contraseña",
+            enabled = clave.length >= 8,
+            modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+            onClick = { state.eventSink(SecureBackupSetupEvent.CreateWithPassphrase(clave)) },
+        )
+        Text(modifier = Modifier.padding(top = 20.dp), text = "O dibuja un patrón (menos seguro que una contraseña larga):")
+        ChamosPatron(onPatron = { patron = it })
+        Button(
+            text = "Usar mi patrón",
+            enabled = patron != null,
+            modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+            onClick = { patron?.let { state.eventSink(SecureBackupSetupEvent.CreateWithPassphrase(it)) } },
+        )
+    }
 }
 
 @Composable

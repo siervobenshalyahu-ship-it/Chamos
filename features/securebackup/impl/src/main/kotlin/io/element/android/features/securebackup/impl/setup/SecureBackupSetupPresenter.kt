@@ -57,16 +57,21 @@ class SecureBackupSetupPresenter(
             derivedStateOf { stateAndDispatch.state.value.toSetupState() }
         }
         var showSaveConfirmationDialog by remember { mutableStateOf(false) }
+        var eleccion by remember { mutableStateOf<String?>(null) }
 
         fun handleEvent(event: SecureBackupSetupEvent) {
             when (event) {
                 SecureBackupSetupEvent.CreateRecoveryKey -> {
-                    coroutineScope.createOrChangeRecoveryKey(stateAndDispatch)
+                    coroutineScope.createOrChangeRecoveryKey(stateAndDispatch, null)
+                }
+                is SecureBackupSetupEvent.CreateWithPassphrase -> {
+                    eleccion = event.passphrase
+                    coroutineScope.createOrChangeRecoveryKey(stateAndDispatch, event.passphrase)
                 }
                 SecureBackupSetupEvent.RecoveryKeyHasBeenSaved ->
                     stateAndDispatch.dispatchAction(SecureBackupSetupStateMachine.Event.UserSavedKey)
                 SecureBackupSetupEvent.CopyRecoveryKey -> {
-                    val recoveryKey = setupState.recoveryKey() ?: return
+                    val recoveryKey = (eleccion ?: setupState.recoveryKey()) ?: return
                     clipboardHelper.copyPlainText(recoveryKey, isSensitive = true) {
                         toastHelper.show(R.string.screen_recovery_key_copied_to_clipboard)
                     }
@@ -84,7 +89,7 @@ class SecureBackupSetupPresenter(
 
         val recoveryKeyViewState = RecoveryKeyViewState(
             recoveryKeyUserStory = if (isChangeRecoveryKeyUserStory) RecoveryKeyUserStory.Change else RecoveryKeyUserStory.Setup,
-            formattedRecoveryKey = setupState.recoveryKey(),
+            formattedRecoveryKey = setupState.recoveryKey()?.let { eleccion ?: it },
             displayTextFieldContents = true,
             inProgress = setupState is SetupState.Creating,
         )
@@ -110,7 +115,8 @@ class SecureBackupSetupPresenter(
     }
 
     private fun CoroutineScope.createOrChangeRecoveryKey(
-        stateAndDispatch: StateAndDispatch<SecureBackupSetupStateMachine.State, SecureBackupSetupStateMachine.Event>
+        stateAndDispatch: StateAndDispatch<SecureBackupSetupStateMachine.State, SecureBackupSetupStateMachine.Event>,
+        passphrase: String?,
     ) = launch {
         stateAndDispatch.dispatchAction(SecureBackupSetupStateMachine.Event.UserCreatesKey)
         if (isChangeRecoveryKeyUserStory) {
@@ -128,7 +134,7 @@ class SecureBackupSetupPresenter(
         } else {
             observeEncryptionService(stateAndDispatch)
             Timber.tag(loggerTagSetup.value).d("Calling encryptionService.enableRecovery()")
-            encryptionService.enableRecovery(waitForBackupsToUpload = false).onFailure {
+            encryptionService.enableRecovery(waitForBackupsToUpload = false, passphrase = passphrase).onFailure {
                 Timber.tag(loggerTagSetup.value).e(it, "Failed to enable recovery")
                 if (it is Exception) {
                     stateAndDispatch.dispatchAction(SecureBackupSetupStateMachine.Event.SdkError(it))

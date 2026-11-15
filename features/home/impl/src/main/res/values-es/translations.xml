@@ -5,12 +5,12 @@
   <string name="banner_battery_optimization_title_android">"¿No llegan las notificaciones?"</string>
   <string name="banner_new_sound_message">"Se ha actualizado tu sonido de notificación: más claro, rápido y menos disruptivo."</string>
   <string name="banner_new_sound_title">"Hemos actualizado tus sonidos"</string>
-  <string name="banner_set_up_recovery_content">"Tus chats se respaldan automáticamente con cifrado de extremo a extremo. Para restaurar esta copia de seguridad y conservar tu identidad digital si pierdes el acceso a todos tus dispositivos, necesitarás tu contraseña de recuperación."</string>
-  <string name="banner_set_up_recovery_submit">"Obtener contraseña de recuperación"</string>
+  <string name="banner_set_up_recovery_content">"Tus chats se respaldan automáticamente con cifrado de extremo a extremo. Para restaurar esta copia de seguridad y conservar tu identidad digital si pierdes el acceso a todos tus dispositivos, necesitarás tu contraseña o patrón de recuperación."</string>
+  <string name="banner_set_up_recovery_submit">"Obtener contraseña o patrón de recuperación"</string>
   <string name="banner_set_up_recovery_title">"Copia de seguridad de tus chats"</string>
-  <string name="confirm_recovery_key_banner_message">"Confirma tu contraseña de recuperación para mantener el acceso a tu almacén de claves y al historial de mensajes."</string>
-  <string name="confirm_recovery_key_banner_primary_button_title">"Introduce tu contraseña de recuperación"</string>
-  <string name="confirm_recovery_key_banner_secondary_button_title">"¿Olvidaste tu contraseña de recuperación?"</string>
+  <string name="confirm_recovery_key_banner_message">"Confirma tu contraseña o patrón de recuperación para mantener el acceso a tu almacén de claves y al historial de mensajes."</string>
+  <string name="confirm_recovery_key_banner_primary_button_title">"Introduce tu contraseña o patrón de recuperación"</string>
+  <string name="confirm_recovery_key_banner_secondary_button_title">"¿Olvidaste tu contraseña o patrón de recuperación?"</string>
   <string name="confirm_recovery_key_banner_title">"Tu almacén de claves no está sincronizado"</string>
   <string name="full_screen_intent_banner_message">"Para asegurarte de que nunca te pierdas una llamada importante, modifica tus ajustes para permitir notificaciones a pantalla completa cuando el teléfono esté bloqueado."</string>
   <string name="full_screen_intent_banner_title">"Mejora tu experiencia de llamada"</string>
