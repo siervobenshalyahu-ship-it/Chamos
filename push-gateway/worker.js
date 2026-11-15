@@ -209,6 +209,12 @@ async function prepararTablas(env) {
   try {
     await env.DB.prepare("ALTER TABLE eventos ADD COLUMN disp TEXT").run();
   } catch (_) {}
+  try {
+    await env.DB.prepare("CREATE TABLE IF NOT EXISTS web_registros (email TEXT PRIMARY KEY, nombre TEXT, pais TEXT, primera INTEGER, ultima INTEGER, descargas INTEGER DEFAULT 0, ip TEXT)").run();
+  } catch (_) {}
+  try {
+    await env.DB.prepare("ALTER TABLE web_registros ADD COLUMN disp TEXT").run();
+  } catch (_) {}
   tablasListas = true;
 }
 
@@ -423,7 +429,7 @@ async function resumen(request, env) {
   if (request.headers.get("x-clave") !== env.ADMIN_KEY) return jsonCors({ error: "Clave incorrecta" }, 401);
   await prepararTablas(env);
   const hace30 = Date.now() - 30 * 24 * 3600 * 1000;
-  const [tot, unicos, dias, paises, usuarios, nUsuarios, versiones, recientes, topSeg, nSeg, opiniones, modelos] = await env.DB.batch([
+  const [tot, unicos, dias, paises, usuarios, nUsuarios, versiones, recientes, topSeg, nSeg, opiniones, modelos, regweb] = await env.DB.batch([
     env.DB.prepare("SELECT tipo, COUNT(*) AS n FROM eventos GROUP BY tipo"),
     env.DB.prepare("SELECT tipo, COUNT(DISTINCT anon) AS n FROM eventos GROUP BY tipo"),
     env.DB.prepare(
@@ -441,6 +447,7 @@ async function resumen(request, env) {
       "SELECT COALESCE(NULLIF(json_extract(extra,'$.m'),''),'(sin modelo)') AS modelo, COUNT(DISTINCT anon) AS telefonos, MAX(ts) AS ultima " +
         "FROM eventos WHERE tipo='instalacion' GROUP BY modelo ORDER BY telefonos DESC, ultima DESC LIMIT 300",
     ),
+    env.DB.prepare("SELECT email, nombre, pais, ip, disp, primera, ultima, descargas FROM web_registros ORDER BY primera DESC LIMIT 500"),
   ]);
   return jsonCors({
     totales: tot.results,
@@ -455,6 +462,7 @@ async function resumen(request, env) {
     total_seguidores: nSeg.results[0].n,
     opiniones: opiniones.results,
     modelos: modelos.results,
+    registros_web: regweb.results,
   });
 }
 
@@ -568,6 +576,7 @@ async function go(){
    '<div class="c"><b>'+n(d.totales,'descarga_media')+'</b><span>Videos y fotos guardados con marca de agua</span></div>'+
    '<div class="c"><b>'+n(d.totales,'denuncia')+'</b><span>Denuncias enviadas</span></div>'+
    '<div class="c"><b>'+d.total_seguidores+'</b><span>Seguimientos activos ('+n(d.totales,'seguir')+' en total, '+n(d.totales,'dejar_seguir')+' dejados)</span></div></div>'+
+   '<h2>Registros para descargar ('+(d.registros_web||[]).length+')</h2><div class="sc"><table><tr><th>Cuándo</th><th>Nombre</th><th>Correo</th><th>País</th><th>IP</th><th>Dispositivo</th></tr>'+(d.registros_web||[]).map(g=>'<tr><td>'+fmt(g.primera)+'</td><td>'+esc(g.nombre)+'</td><td>'+esc(g.email)+'</td><td>'+esc(g.pais)+'</td><td>'+esc(g.ip)+'</td><td>'+esc(g.disp)+'</td></tr>').join('')+'</table></div><p>Correos para copiar (copia oculta):</p><textarea readonly rows="4" style="width:100%" onclick="this.select()">'+(d.registros_web||[]).map(g=>g.email).join(', ')+'</textarea>'+
    '<h2>Opiniones de la web ('+(d.opiniones||[]).length+')</h2><div class="sc"><table><tr><th>Fecha</th><th>Nombre</th><th>Opinión</th></tr>'+(d.opiniones||[]).map(o=>'<tr><td>'+new Date(o.ts).toLocaleString()+'</td><td>'+esc(o.nombre||'—')+' '+esc(o.pais||'')+'</td><td>'+esc(o.texto)+'</td></tr>').join('')+'</table></div>'+
    '<h2>Más seguidos</h2><div class="sc"><table><tr><th>Usuario</th><th>Seguidores</th></tr>'+(d.top_seguidos||[]).map(t=>'<tr><td>'+esc(t.usuario)+'</td><td>'+t.n+'</td></tr>').join('')+'</table></div>'+
    '<h2>Últimos 30 días</h2><div class="sc"><table><tr><th>Día</th><th>Visitas</th><th>Descargas</th><th>Instal.</th></tr>'+
@@ -1280,11 +1289,11 @@ async function webRegistro(request, env) {
   const usaGmail = !!(env.GAS_URL && env.GAS_SECRET);
   if (env.CODIGOS_CORREO !== "1" || (!usaGmail && (!((env.MAILJET_KEY && env.MAILJET_SECRET) || env.BREVO_KEY) || !env.MAIL_FROM))) {
     // Modo manual: sin servicio de correo, solo se guarda el registro y el enlace se envía a mano.
-    await env.DB.prepare("CREATE TABLE IF NOT EXISTS web_registros (email TEXT PRIMARY KEY, nombre TEXT, pais TEXT, primera INTEGER, ultima INTEGER, descargas INTEGER DEFAULT 0, ip TEXT)").run();
+    await prepararTablas(env);
     const t = Date.now();
     await env.DB.prepare(
-      "INSERT INTO web_registros (email, nombre, pais, primera, ultima, ip) VALUES (?1,?2,?3,?4,?4,?5) ON CONFLICT(email) DO UPDATE SET nombre=?2, pais=?3, ultima=?4, ip=?5",
-    ).bind(email, nombre, corto(request.cf && request.cf.country, 4), t, corto(request.headers.get("cf-connecting-ip"), 64)).run();
+      "INSERT INTO web_registros (email, nombre, pais, primera, ultima, ip, disp) VALUES (?1,?2,?3,?4,?4,?5,?6) ON CONFLICT(email) DO UPDATE SET nombre=?2, pais=?3, ultima=?4, ip=?5, disp=?6",
+    ).bind(email, nombre, corto(request.cf && request.cf.country, 4), t, corto(request.headers.get("cf-connecting-ip"), 64), dispositivo(request.headers.get("user-agent"), null)).run();
     return jsonCors({ ok: true, manual: true });
   }
   const exp = Date.now() + 15 * 60 * 1000;
