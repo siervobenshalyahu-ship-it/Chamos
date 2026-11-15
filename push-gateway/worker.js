@@ -1277,7 +1277,8 @@ async function webRegistro(request, env) {
   if (ERRATAS[dom]) return jsonCors({ error: "¿Quisiste escribir " + email.split("@")[0] + "@" + ERRATAS[dom] + "?" }, 400);
   if (DESECHABLES.has(dom)) return jsonCors({ error: "Usa un correo real, no uno temporal" }, 400);
   if (!(await dominioRecibeCorreo(dom))) return jsonCors({ error: "Ese correo no existe, revisa cómo lo escribiste" }, 400);
-  if (!((env.MAILJET_KEY && env.MAILJET_SECRET) || env.BREVO_KEY) || !env.MAIL_FROM) return jsonCors({ error: "Falta configurar el correo (MAILJET_KEY, MAILJET_SECRET y MAIL_FROM)" }, 503);
+  const usaGmail = !!(env.GAS_URL && env.GAS_SECRET);
+  if (!usaGmail && (!((env.MAILJET_KEY && env.MAILJET_SECRET) || env.BREVO_KEY) || !env.MAIL_FROM)) return jsonCors({ error: "Falta configurar el correo (GAS_URL y GAS_SECRET)" }, 503);
   const exp = Date.now() + 15 * 60 * 1000;
   const carga = exp + "." + btoa(unescape(encodeURIComponent(email)));
   const firma = await webFirma(env, carga);
@@ -1298,7 +1299,16 @@ async function webRegistro(request, env) {
     '<p style="color:#b8c0ff">Escríbelo en la página. Sirve por 10 minutos.</p>' +
     '<p style="color:#8890c8;font-size:12px">Si no pediste esto, ignora este correo.</p></div>';
   const asunto = "Tu código de Chamos: " + codigo;
-  const r = env.MAILJET_KEY && env.MAILJET_SECRET
+  if (usaGmail) {
+    // Gmail propio a través de Google Apps Script (ver correo-gmail.gs)
+    let g = null;
+    try {
+      const rg = await fetch(env.GAS_URL, { method: "POST", headers: { "content-type": "text/plain" }, body: JSON.stringify({ secret: env.GAS_SECRET, to: email, subject: asunto, html }), redirect: "follow" });
+      g = await rg.json();
+    } catch (e) { console.error("gas", e); }
+    if (!g || !g.ok) { console.error("gas respuesta", JSON.stringify(g)); return jsonCors({ error: "No pudimos enviar el correo. Revisa que esté bien escrito." }, 502); }
+  }
+  const r = usaGmail ? { ok: true } : env.MAILJET_KEY && env.MAILJET_SECRET
     ? await fetch("https://api.mailjet.com/v3.1/send", {
         method: "POST",
         headers: { authorization: "Basic " + btoa(env.MAILJET_KEY + ":" + env.MAILJET_SECRET), "content-type": "application/json" },
