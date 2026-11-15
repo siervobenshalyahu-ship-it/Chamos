@@ -331,7 +331,9 @@ fun RoomDetailsView(
                 dmOtherMemberDetailsState = state.dmOtherMemberDetailsState,
                 canReportRoom = state.canReportRoom,
                 onReportRoomClick = onReportRoomClick,
-                onLeaveRoomClick = { state.eventSink(RoomDetailsEvent.LeaveRoom(needsConfirmation = true)) }
+                onLeaveRoomClick = { state.eventSink(RoomDetailsEvent.LeaveRoom(needsConfirmation = true)) },
+                esCreador = state.esCreador,
+                onBorrarComboClick = { state.eventSink(RoomDetailsEvent.BorrarCombo) },
             )
             if (state.showDebugInfo) {
                 DebugInfoSection(
@@ -833,7 +835,20 @@ private fun OtherActionsSection(
     onReportRoomClick: () -> Unit,
     onLeaveRoomClick: () -> Unit,
     dmOtherMemberDetailsState: UserProfileState?,
+    esCreador: Boolean = false,
+    onBorrarComboClick: () -> Unit = {},
 ) {
+    var confirmarBorrar by remember { mutableStateOf(false) }
+    if (confirmarBorrar) {
+        io.element.android.libraries.designsystem.components.dialogs.ConfirmationDialog(
+            title = "Borrar el combo",
+            content = "Se sacará a todos los miembros y el combo dejará de existir para ellos. Esto no se puede deshacer.",
+            submitText = "Borrar",
+            destructiveSubmit = true,
+            onSubmitClick = { confirmarBorrar = false; onBorrarComboClick() },
+            onDismiss = { confirmarBorrar = false },
+        )
+    }
     PreferenceCategory {
         if (dmOtherMemberDetailsState != null) {
             BlockUserSection(dmOtherMemberDetailsState)
@@ -857,6 +872,14 @@ private fun OtherActionsSection(
             style = ListItemStyle.Destructive,
             onClick = onLeaveRoomClick,
         )
+        if (esCreador) {
+            ListItem(
+                content = { Text("Borrar el combo") },
+                leadingContent = ListItemContent.Icon(IconSource.Vector(CompoundIcons.Delete())),
+                style = ListItemStyle.Destructive,
+                onClick = { confirmarBorrar = true },
+            )
+        }
     }
 }
 

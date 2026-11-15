@@ -44,6 +44,7 @@ import io.element.android.libraries.matrix.api.encryption.identity.IdentityState
 import io.element.android.libraries.matrix.api.notificationsettings.NotificationSettingsService
 import io.element.android.libraries.matrix.api.room.JoinedRoom
 import io.element.android.libraries.matrix.api.room.RoomMember
+import io.element.android.libraries.matrix.api.room.roomMembers
 import io.element.android.libraries.matrix.api.room.join.JoinRule
 import io.element.android.libraries.matrix.api.room.powerlevels.canEditRolesAndPermissions
 import io.element.android.libraries.matrix.api.room.powerlevels.permissionsAsState
@@ -157,6 +158,16 @@ class RoomDetailsPresenter(
                 is RoomDetailsEvent.LeaveRoom -> {
                     leaveRoomState.eventSink(LeaveRoomEvent.LeaveRoom(room.roomId, needsConfirmation = event.needsConfirmation))
                 }
+                RoomDetailsEvent.BorrarCombo -> {
+                    // Chamos: quien creó el combo puede borrarlo: se saca a todos y luego se sale.
+                    scope.launch {
+                        val miembros = membersState.roomMembers().orEmpty()
+                        miembros.filter { it.userId != client.sessionId }.forEach { m ->
+                            room.kickUser(m.userId, "Combo borrado")
+                        }
+                        leaveRoomState.eventSink(LeaveRoomEvent.LeaveRoom(room.roomId, needsConfirmation = false))
+                    }
+                }
                 RoomDetailsEvent.MuteNotification -> {
                     scope.launch(dispatchers.io) {
                         notificationSettingsService.muteRoom(room.roomId)
@@ -224,6 +235,7 @@ class RoomDetailsPresenter(
             roomVersion = roomInfo.roomVersion,
             roomHistoryVisibility = roomInfo.historyVisibility,
             hasNewContent = hasNewContent,
+            esCreador = !isDm && roomInfo.creators.contains(client.sessionId),
             eventSink = ::handleEvent,
         )
     }
