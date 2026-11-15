@@ -1,0 +1,48 @@
+name: Pausar o reanudar descargas
+# "pausar": pasa todas las releases públicas a borrador (nadie puede bajar los APK; tú sí, entrando a GitHub con tu cuenta).
+# "reanudar": vuelve a publicar justo las que se pausaron.
+on:
+  workflow_dispatch:
+    inputs:
+      accion:
+        description: "pausar o reanudar"
+        type: choice
+        options: [pausar, reanudar]
+        default: pausar
+
+permissions:
+  contents: write
+
+jobs:
+  cambiar:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Pausar
+        if: inputs.accion == 'pausar'
+        run: |
+          mkdir -p pausa
+          gh api "repos/$REPO/releases" --paginate -q '.[]|select(.draft==false)|[.id,.tag_name]|@tsv' > pausa/releases-pausadas.tsv
+          n=0
+          while IFS=$'\t' read -r id tag; do
+            gh api -X PATCH "repos/$REPO/releases/$id" -F draft=true -q '.tag_name' >/dev/null && n=$((n+1)) || echo "No se pudo pausar $tag"
+          done < pausa/releases-pausadas.tsv
+          echo "Pausadas: $n"
+          git config user.name "chamos-bot"; git config user.email "bot@chamos.invalid"
+          git add pausa/releases-pausadas.tsv
+          git commit -m "Descargas pausadas ($n releases)" || true
+          git push origin HEAD:main
+      - name: Reanudar
+        if: inputs.accion == 'reanudar'
+        run: |
+          test -s pausa/releases-pausadas.tsv || { echo "No hay lista de releases pausadas"; exit 1; }
+          n=0
+          while IFS=$'\t' read -r id tag; do
+            gh api -X PATCH "repos/$REPO/releases/$id" -F draft=false -q '.tag_name' >/dev/null && n=$((n+1)) || echo "No se pudo reanudar $tag"
+          done < pausa/releases-pausadas.tsv
+          echo "Reanudadas: $n"
