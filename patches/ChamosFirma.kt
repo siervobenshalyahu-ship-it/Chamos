@@ -15,6 +15,7 @@ object ChamosFirma {
     private val OFICIALES = setOf(
         "7c13b8f28ea511a38ece5bdefdf91072e8a584cde92b96a7162907a48fee6931",
         "67b0771894605d9a978599287ba6755f039f1882891afdbc1557c71cc81d551f",
+        "75ebe79ffdd2f0561b5dd752cc4b9d6dc5b7aff270f13e662dd84b4e2fa147f4",
     )
 
     @Suppress("DEPRECATION")
