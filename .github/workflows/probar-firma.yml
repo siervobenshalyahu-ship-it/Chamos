@@ -1,0 +1,29 @@
+name: Probar firma (secretos de la llave)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  probar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Revisar los secretos de firma (no imprime ninguna clave)
+        env:
+          B64: ${{ secrets.CHAMOS_KEYSTORE_B64 }}
+          ALIAS: ${{ secrets.CHAMOS_KEY_ALIAS }}
+          KP: ${{ secrets.CHAMOS_KEY_PASSWORD }}
+          SP: ${{ secrets.CHAMOS_STORE_PASSWORD }}
+        run: |
+          java -version 2>&1 | head -1
+          echo "Largo del texto de la llave: ${#B64}"
+          echo "Largo del alias: ${#ALIAS} | clave de llave: ${#KP} | clave del almacen: ${#SP}"
+          [ "$KP" = "$SP" ] && echo "Las dos claves son iguales: SI" || echo "Las dos claves son iguales: NO"
+          printf '%s' "$B64" | base64 -d > k.keystore || { echo "El texto de la llave NO se puede decodificar"; exit 0; }
+          ls -l k.keystore
+          keytool -list -v -keystore k.keystore -storepass "$SP" 2>&1 | grep -E "Alias name|SHA1:|SHA256:|Tipo de almac|Keystore type|incorrect|tampered|Exception" || true
+          cp k.keystore k2.keystore
+          if keytool -keypasswd -alias "$ALIAS" -keypass "$KP" -new "$KP" -keystore k2.keystore -storepass "$SP" >/dev/null 2>&1; then
+            echo "RESULTADO: alias y clave de la llave CORRECTOS"
+          else
+            echo "RESULTADO: alias o clave de la llave INCORRECTOS"
+          fi
