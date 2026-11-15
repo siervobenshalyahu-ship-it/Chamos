@@ -21,6 +21,9 @@ import kotlinx.collections.immutable.toImmutableSet
 /** Maximum number of messages that can be selected at once. */
 const val MAX_SELECTION_COUNT = 10
 
+/** Maximum number of messages that can be selected at once to delete them. */
+const val MAX_DELETE_SELECTION_COUNT = 50
+
 @Immutable
 sealed interface SelectionState {
     /** Selection mode is not active. */
@@ -39,8 +42,9 @@ sealed interface SelectionState {
 /**
  * An action which can be performed on several timeline events at once, and which selection mode can be entered for.
  */
-enum class SelectionAction(@field:StringRes val titleRes: Int, @field:DrawableRes val iconRes: Int) {
-    Forward(CommonStrings.action_forward, R.drawable.ic_compound_forward),
+enum class SelectionAction(@field:StringRes val titleRes: Int, @field:DrawableRes val iconRes: Int, val maxCount: Int) {
+    Forward(CommonStrings.action_forward, R.drawable.ic_compound_forward, MAX_SELECTION_COUNT),
+    Delete(CommonStrings.action_remove, R.drawable.ic_compound_delete, MAX_DELETE_SELECTION_COUNT),
 }
 
 /**
@@ -49,6 +53,7 @@ enum class SelectionAction(@field:StringRes val titleRes: Int, @field:DrawableRe
  */
 fun SelectionAction.canApplyTo(event: TimelineItem.Event): Boolean = when (this) {
     SelectionAction.Forward -> event.isRemote && event.content.canBeForwarded()
+    SelectionAction.Delete -> event.isRemote
 }
 
 /**

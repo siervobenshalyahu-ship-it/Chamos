@@ -293,7 +293,7 @@ class TimelinePresenter(
                     selectionState.value = when {
                         // Deselecting the last event does not exit selection mode: it is only left explicitly, as on iOS.
                         event.eventId in selected -> current.deselect(setOf(event.eventId))
-                        selected.size >= MAX_SELECTION_COUNT -> {
+                        selected.size >= current.action.maxCount -> {
                             snackbarDispatcher.post(SnackbarMessage(CommonStrings.screen_room_maximum_messages_selected))
                             current
                         }
@@ -525,8 +525,19 @@ class TimelinePresenter(
             Timber.tag(tag).d("Timeline: $timelineMode | focus state: ${focusRequestState.value}")
         }
 
+        val ocultosContext = androidx.compose.ui.platform.LocalContext.current
+        ChamosOcultos.init(ocultosContext)
+        val ocultos = ChamosOcultos.ids.value
+        val itemsVisibles = remember(timelineItems, ocultos) {
+            if (ocultos.isEmpty()) {
+                timelineItems
+            } else {
+                timelineItems.filterNot { it is TimelineItem.Event && it.eventId?.value in ocultos }.toImmutableList()
+            }
+        }
+
         return TimelineState(
-            timelineItems = timelineItems,
+            timelineItems = itemsVisibles,
             timelineMode = timelineMode,
             timelineRoomInfo = timelineRoomInfo,
             newEventState = newEventState.value,

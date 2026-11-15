@@ -73,6 +73,12 @@ data class MessagesState(
         val hasUnreadThreads: Boolean,
     )
 
+    /** The user selected several messages to delete: has to choose between deleting for themselves or for everyone. */
+    data class ConfirmingSelectionDeletion(
+        val eventIds: ImmutableList<EventId>,
+        val deletableForEveryone: Int,
+    ) : AsyncAction.Confirming
+
     /** The user asked to remove [eventId] and has to confirm, optionally giving a reason. */
     data class ConfirmingRedaction(
         val eventId: EventId,

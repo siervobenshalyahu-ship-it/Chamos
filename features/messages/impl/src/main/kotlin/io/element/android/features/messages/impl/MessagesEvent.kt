@@ -24,6 +24,8 @@ sealed interface MessagesEvent {
     data object ShowLiveLocationShare : MessagesEvent
     data object MarkAsFullyReadAndExit : MessagesEvent
     data object ConfirmSelectionAction : MessagesEvent
+    data object DeleteSelectionForMe : MessagesEvent
+    data object DeleteSelectionForEveryone : MessagesEvent
 }
 
 enum class InviteDialogAction {

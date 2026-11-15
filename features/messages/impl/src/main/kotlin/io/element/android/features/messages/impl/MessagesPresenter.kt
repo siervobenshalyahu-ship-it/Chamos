@@ -41,6 +41,7 @@ import io.element.android.features.messages.impl.timeline.MarkAsFullyRead
 import io.element.android.features.messages.impl.timeline.SelectionAction
 import io.element.android.features.messages.impl.timeline.SelectionState
 import io.element.android.features.messages.impl.timeline.TimelineController
+import io.element.android.features.messages.impl.timeline.ChamosOcultos
 import io.element.android.features.messages.impl.timeline.TimelineEvent
 import io.element.android.features.messages.impl.timeline.TimelineState
 import io.element.android.features.messages.impl.timeline.components.customreaction.CustomReactionState
@@ -247,6 +248,11 @@ class MessagesPresenter(
         }
 
         val redactEventAction = remember { mutableStateOf<AsyncAction<Unit>>(AsyncAction.Uninitialized) }
+        val chamosContext = androidx.compose.ui.platform.LocalContext.current
+        ChamosOcultos.init(chamosContext)
+
+        fun puedeBorrarParaTodos(e: TimelineItem.Event): Boolean =
+            e.isRemote && (e.isMine && userEventPermissions.canRedactOwn || !e.isMine && userEventPermissions.canRedactOther)
 
         fun handleEvent(event: MessagesEvent) {
             when (event) {
@@ -268,6 +274,14 @@ class MessagesPresenter(
                             SelectionAction.Forward -> {
                                 navigator.forwardEvents(timelineState.selectedEventIdsInTimelineOrder(), timelineController)
                             }
+                            SelectionAction.Delete -> {
+                                val ids = timelineState.selectedEventIdsInTimelineOrder()
+                                if (ids.isNotEmpty()) {
+                                    val porId = timelineState.timelineItems.filterIsInstance<TimelineItem.Event>().associateBy { it.eventId }
+                                    val paraTodos = ids.count { id -> porId[id]?.let { puedeBorrarParaTodos(it) } == true }
+                                    redactEventAction.value = MessagesState.ConfirmingSelectionDeletion(ids, paraTodos)
+                                }
+                            }
                         }
                     }
                 }
@@ -277,6 +291,36 @@ class MessagesPresenter(
                     if (confirming != null) {
                         localCoroutineScope.launch {
                             redact(confirming.eventId.toEventOrTransactionId(), event.reason?.takeIf { it.isNotBlank() })
+                        }
+                    }
+                }
+                MessagesEvent.DeleteSelectionForMe -> {
+                    val confirming = redactEventAction.value as? MessagesState.ConfirmingSelectionDeletion
+                    redactEventAction.value = AsyncAction.Uninitialized
+                    if (confirming != null) {
+                        ChamosOcultos.ocultar(chamosContext, confirming.eventIds.map { it.value })
+                        timelineState.eventSink(TimelineEvent.ExitSelectionMode)
+                    }
+                }
+                MessagesEvent.DeleteSelectionForEveryone -> {
+                    val confirming = redactEventAction.value as? MessagesState.ConfirmingSelectionDeletion
+                    redactEventAction.value = AsyncAction.Uninitialized
+                    if (confirming != null) {
+                        val porId = timelineState.timelineItems.filterIsInstance<TimelineItem.Event>().associateBy { it.eventId }
+                        val ids = confirming.eventIds
+                        timelineState.eventSink(TimelineEvent.ExitSelectionMode)
+                        localCoroutineScope.launch {
+                            val soloParaMi = mutableListOf<String>()
+                            ids.forEach { id ->
+                                val e = porId[id]
+                                if (e != null && puedeBorrarParaTodos(e)) {
+                                    redact(id.toEventOrTransactionId(), null)
+                                } else {
+                                    soloParaMi.add(id.value)
+                                }
+                            }
+                            // Los mensajes de otras personas, si no tienes permiso para borrarlos del servidor, se ocultan solo en tu teléfono.
+                            if (soloParaMi.isNotEmpty()) ChamosOcultos.ocultar(chamosContext, soloParaMi)
                         }
                     }
                 }
@@ -434,6 +478,10 @@ class MessagesPresenter(
                 } else {
                     navigator.forwardEvents(listOf(eventId), timelineController)
                 }
+            }
+            TimelineItemAction.Select -> {
+                val eventId = targetEvent.eventId ?: return@launch
+                timelineState.eventSink(TimelineEvent.EnterSelectionMode(SelectionAction.Delete, eventId))
             }
             TimelineItemAction.ReportContent -> handleReportAction(targetEvent)
             TimelineItemAction.EndPoll -> handleEndPollAction(targetEvent, timelineState)

@@ -200,6 +200,9 @@ class DefaultActionListPresenter(
             if (timelineItem.isRemote && timelineItem.content.canBeForwarded()) {
                 add(TimelineItemAction.Forward)
             }
+            if (timelineItem.isRemote) {
+                add(TimelineItemAction.Select)
+            }
             if (timelineItem.isEditable && usersEventPermissions.canSendMessage) {
                 if (timelineItem.content is TimelineItemEventContentWithAttachment ||
                     timelineItem.content is TimelineItemGalleryContent ||

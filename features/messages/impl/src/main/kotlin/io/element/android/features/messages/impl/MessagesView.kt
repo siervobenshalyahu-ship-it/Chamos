@@ -495,6 +495,16 @@ fun MessagesViewOriginal(
         },
     )
 
+    (state.redactEventAction as? MessagesState.ConfirmingSelectionDeletion)?.let { confirming ->
+        ChamosBorrarSeleccionDialog(
+            total = confirming.eventIds.size,
+            paraTodos = confirming.deletableForEveryone,
+            onParaMi = { state.eventSink(MessagesEvent.DeleteSelectionForMe) },
+            onParaTodos = { state.eventSink(MessagesEvent.DeleteSelectionForEveryone) },
+            onCancel = { state.eventSink(MessagesEvent.CancelRedact) },
+        )
+    }
+
     if (state.redactEventAction is MessagesState.ConfirmingRedaction) {
         TextFieldDialog(
             title = stringResource(R.string.screen_room_confirm_removal_title),
@@ -507,6 +517,51 @@ fun MessagesViewOriginal(
             onDismissRequest = { state.eventSink(MessagesEvent.CancelRedact) },
         )
     }
+}
+
+/** Chamos: pregunta si se borran los mensajes seleccionados solo para ti o para todos. */
+@Composable
+private fun ChamosBorrarSeleccionDialog(
+    total: Int,
+    paraTodos: Int,
+    onParaMi: () -> Unit,
+    onParaTodos: () -> Unit,
+    onCancel: () -> Unit,
+) {
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onCancel,
+        containerColor = ElementTheme.colors.bgCanvasDefault,
+        title = {
+            Text(text = if (total == 1) "Eliminar 1 mensaje" else "Eliminar $total mensajes")
+        },
+        text = {
+            Text(
+                text = if (paraTodos == total) {
+                    "Elige cómo quieres eliminarlos."
+                } else if (paraTodos == 0) {
+                    "No tienes permiso para eliminarlos para todos, solo puedes eliminarlos para ti."
+                } else {
+                    "Solo $paraTodos de los $total se pueden eliminar para todos. Los demás se ocultarán solo en tu teléfono."
+                },
+                color = ElementTheme.colors.textSecondary,
+            )
+        },
+        confirmButton = {
+            androidx.compose.foundation.layout.Column(horizontalAlignment = androidx.compose.ui.Alignment.End) {
+                androidx.compose.material3.TextButton(onClick = onParaMi) {
+                    Text(text = "Eliminar para mí", color = ElementTheme.colors.textPrimary)
+                }
+                if (paraTodos > 0) {
+                    androidx.compose.material3.TextButton(onClick = onParaTodos) {
+                        Text(text = "Eliminar para todos", color = ElementTheme.colors.textCriticalPrimary)
+                    }
+                }
+                androidx.compose.material3.TextButton(onClick = onCancel) {
+                    Text(text = "Cancelar", color = ElementTheme.colors.textSecondary)
+                }
+            }
+        },
+    )
 }
 
 @Composable
