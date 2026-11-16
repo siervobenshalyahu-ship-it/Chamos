@@ -209,6 +209,10 @@ async function prepararTablas(env) {
   try {
     await env.DB.prepare("ALTER TABLE eventos ADD COLUMN disp TEXT").run();
   } catch (_) {}
+  // Sitio: dominio de la página desde donde llegó la visita (chamos.pages.dev o el viejo github.io).
+  try {
+    await env.DB.prepare("ALTER TABLE eventos ADD COLUMN sitio TEXT").run();
+  } catch (_) {}
   try {
     await env.DB.prepare("CREATE TABLE IF NOT EXISTS web_registros (email TEXT PRIMARY KEY, nombre TEXT, pais TEXT, primera INTEGER, ultima INTEGER, descargas INTEGER DEFAULT 0, ip TEXT)").run();
   } catch (_) {}
@@ -271,6 +275,11 @@ async function guardarEvento(request, env) {
   const anon = corto(d.id, 64);
   const ip = corto(request.headers.get("cf-connecting-ip"), 64);
   const disp = dispositivo(request.headers.get("user-agent"), d);
+  let sitio = "";
+  try {
+    sitio = new URL(request.headers.get("origin") || request.headers.get("referer") || "").hostname;
+  } catch (_) {}
+  sitio = corto(sitio, 80);
   if (tipo === "registro") {
     const uid = corto(d.u, 100);
     if (!uid.startsWith("@")) return jsonCors({ error: "Falta usuario" }, 400);
@@ -282,8 +291,8 @@ async function guardarEvento(request, env) {
       .run();
   } else {
     const extra = JSON.stringify({ v: corto(d.v, 20), m: corto(d.m, 60), p: corto(d.p, 100) });
-    await env.DB.prepare("INSERT INTO eventos (ts, tipo, anon, pais, extra, ip, disp) VALUES (?1,?2,?3,?4,?5,?6,?7)")
-      .bind(ahora, tipo, anon, pais, extra, ip, disp)
+    await env.DB.prepare("INSERT INTO eventos (ts, tipo, anon, pais, extra, ip, disp, sitio) VALUES (?1,?2,?3,?4,?5,?6,?7,?8)")
+      .bind(ahora, tipo, anon, pais, extra, ip, disp, sitio)
       .run();
   }
   return jsonCors({ ok: true });
@@ -439,7 +448,7 @@ async function resumen(request, env) {
     env.DB.prepare("SELECT user_id, nombre, version, modelo, pais, primera, ultima, ip FROM usuarios ORDER BY primera DESC LIMIT 200"),
     env.DB.prepare("SELECT COUNT(*) AS n FROM usuarios"),
     env.DB.prepare("SELECT version, COUNT(*) AS n FROM usuarios GROUP BY version ORDER BY n DESC"),
-    env.DB.prepare("SELECT ts, tipo, pais, ip, disp FROM eventos WHERE tipo IN ('visita','descarga','instalacion') ORDER BY ts DESC LIMIT 200"),
+    env.DB.prepare("SELECT ts, tipo, pais, ip, disp, sitio FROM eventos WHERE tipo IN ('visita','descarga','instalacion') ORDER BY ts DESC LIMIT 200"),
     env.DB.prepare("SELECT seguido AS usuario, COUNT(*) AS n FROM seguidores GROUP BY seguido ORDER BY n DESC LIMIT 15"),
     env.DB.prepare("SELECT COUNT(*) AS n FROM seguidores"),
     env.DB.prepare("SELECT ts, nombre, texto, pais FROM opiniones ORDER BY ts DESC LIMIT 50"),
@@ -586,8 +595,8 @@ async function go(){
    '<h2>Usuarios</h2><div class="sc"><table><tr><th>Usuario</th><th>Nombre</th><th>Versión</th><th>Teléfono</th><th>IP</th><th>Desde</th><th>Última vez</th></tr>'+
    d.usuarios.map(u=>'<tr><td>'+esc(u.user_id)+'</td><td>'+esc(u.nombre)+'</td><td>'+esc(u.version)+'</td><td>'+esc(u.modelo)+'</td><td>'+esc(u.ip)+'</td><td>'+fmt(u.primera)+'</td><td>'+fmt(u.ultima)+'</td></tr>').join('')+'</table></div>'+
    '<h2>Modelos de teléfono con Chamos instalada ('+(d.modelos||[]).length+' modelos)</h2><div class="sc"><table><tr><th>Modelo</th><th>Teléfonos</th><th>Última vez</th></tr>'+(d.modelos||[]).map(m=>'<tr><td>'+esc(m.modelo)+'</td><td>'+m.telefonos+'</td><td>'+fmt(m.ultima)+'</td></tr>').join('')+'</table></div>'+
-   '<h2>Últimas visitas, descargas e instalaciones</h2><div class="sc"><table><tr><th>Cuándo</th><th>Qué</th><th>País</th><th>IP</th><th>Dispositivo</th></tr>'+
-   (d.recientes||[]).map(r=>'<tr><td>'+fmt(r.ts)+'</td><td>'+esc(r.tipo)+'</td><td>'+esc(r.pais)+'</td><td>'+esc(r.ip)+'</td><td>'+esc(r.disp)+'</td></tr>').join('')+'</table></div>';
+   '<h2>Últimas visitas, descargas e instalaciones</h2><div class="sc"><table><tr><th>Cuándo</th><th>Qué</th><th>País</th><th>IP</th><th>Dispositivo</th><th>Sitio</th></tr>'+
+   (d.recientes||[]).map(r=>'<tr><td>'+fmt(r.ts)+'</td><td>'+esc(r.tipo)+'</td><td>'+esc(r.pais)+'</td><td>'+esc(r.ip)+'</td><td>'+esc(r.disp)+'</td><td>'+esc(r.sitio||'(antes)')+'</td></tr>').join('')+'</table></div>';
   bots();
 }
 function esc(s){return String(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
