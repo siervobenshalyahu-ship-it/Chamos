@@ -4,8 +4,8 @@ App de mensajes hecha para venezolanos: chats, Estados, Videos, Chamo Muro, jueg
 Es una versión modificada (fork) de [Element X Android](https://github.com/element-hq/element-x-android),
 publicada bajo **AGPL-3.0** (ver [LICENSE](LICENSE) y [NOTICE](NOTICE)).
 
-- Descargar la app: https://siervobenshalyahu-ship-it.github.io/Chamos-apk-web/
-- Política de privacidad: https://siervobenshalyahu-ship-it.github.io/Chamos-apk-web/privacidad.html
+- Descargar la app: https://chamos.pages.dev/
+- Política de privacidad: https://chamos.pages.dev/privacidad.html
 
 ## Código fuente
 Este repositorio contiene todo lo que Chamos añade o cambia sobre Element X:

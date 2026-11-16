@@ -177,7 +177,7 @@ jobs:
               "screen_onboarding_welcome_subtitle": "Bienvenido a %1$s. Tu gente, tu barrio, tu idioma.",
               "screen_onboarding_welcome_message": "Bienvenido a %1$s, la app hecha solo para venezolanos. Sin pedirte tu número de teléfono.",
               "action_invite_friends": "Invitar a un pana",
-              "invite_friends_text": "Ven a Chamos, la app de mensajes solo para venezolanos. Escríbeme aquí: %2$s\\nDescárgala: https://siervobenshalyahu-ship-it.github.io/Chamos-apk-web/",
+              "invite_friends_text": "Ven a Chamos, la app de mensajes solo para venezolanos. Escríbeme aquí: %2$s\\nDescárgala: https://chamos.pages.dev/",
               "invite_friends_rich_title": "Únete a %1$s, solo para venezolanos",
           }
           files = [f for f in glob.glob(os.path.join(root, "**/res/values/localazy.xml"), recursive=True)]

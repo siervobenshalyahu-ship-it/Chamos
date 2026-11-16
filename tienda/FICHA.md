@@ -6,9 +6,9 @@
 **Precio:** Gratis
 **Idioma:** Español (Venezuela)
 **Clasificación sugerida:** +12 (chat entre usuarios, contenido generado por usuarios)
-**Web:** https://siervobenshalyahu-ship-it.github.io/Chamos-apk-web/
+**Web:** https://chamos.pages.dev/
 **Código fuente:** https://github.com/siervobenshalyahu-ship-it/Chamos
-**Política de privacidad:** https://siervobenshalyahu-ship-it.github.io/Chamos-apk-web/privacidad.html
+**Política de privacidad:** https://chamos.pages.dev/privacidad.html
 **Licencia:** AGPL-3.0
 
 ## Descripción corta (80 caracteres)
