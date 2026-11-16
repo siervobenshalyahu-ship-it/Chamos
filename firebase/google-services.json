@@ -7,6 +7,28 @@
   "client": [
     {
       "client_info": {
+        "mobilesdk_app_id": "1:91262240336:android:28569e7406c078af65f355",
+        "android_client_info": {
+          "package_name": "com.chamos.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCeC2criAj6s0GuZMmy_P3X4ItZLi8Scic"
+        },
+        {
+          "current_key": "AIzaSyBtFRWzhxNryexDmRov7ZdFvvRlkWgT2Bw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
         "mobilesdk_app_id": "1:91262240336:android:f6eb70e625992bcc65f355",
         "android_client_info": {
           "package_name": "com.chamos.app.debug"
@@ -16,6 +38,9 @@
       "api_key": [
         {
           "current_key": "AIzaSyCeC2criAj6s0GuZMmy_P3X4ItZLi8Scic"
+        },
+        {
+          "current_key": "AIzaSyBtFRWzhxNryexDmRov7ZdFvvRlkWgT2Bw"
         }
       ],
       "services": {
