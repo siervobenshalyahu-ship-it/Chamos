@@ -468,7 +468,7 @@ async function resumen(request, env) {
 
 // ───────────────────────── Chamos IA: chat público (Workers AI, sin ejecutar nada) ─────────────────────────
 // Necesita: enlace (binding) de Workers AI con el nombre AI, y la base D1 (DB) para los límites.
-const ORIGENES_IA = ["https://siervobenshalyahu-ship-it.github.io"];
+const ORIGENES_IA = ["https://siervobenshalyahu-ship-it.github.io", "https://chamos.pages.dev"];
 const MODELOS_IA = ["@cf/meta/llama-3.1-8b-instruct", "@cf/meta/llama-3.2-3b-instruct", "@cf/meta/llama-3-8b-instruct"];
 const LIMITE_PERSONA_DIA = 30;
 const LIMITE_GLOBAL_DIA = 200;
