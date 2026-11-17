@@ -77,6 +77,10 @@ class PreferencesRootPresenter(
             // Force a refresh of the profile
             matrixClient.getUserProfile()
         }
+        LaunchedEffect(Unit) {
+            // Chamos: "Mi teléfono" necesita la sesión para activar y consultar.
+            io.element.android.features.preferences.impl.chamos.ChamosMiTelefono.attach(matrixClient, sessionStore)
+        }
         val preferencesAccountState = preferencesAccountPresenter.present()
         val isMultiAccountEnabled by remember {
             featureFlagService.isFeatureEnabledFlow(FeatureFlags.MultiAccount)

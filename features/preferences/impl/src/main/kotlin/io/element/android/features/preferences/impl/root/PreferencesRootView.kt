@@ -363,6 +363,7 @@ private fun ColumnScope.GeneralSection(
         color = ElementTheme.colors.bgSubtleSecondary,
     )
     // Chamos: sin "Estadísticas" ni "Experimental" en Ajustes
+    io.element.android.features.preferences.impl.chamos.ChamosMiTelefonoItem()
     ListItem(
         content = { Text(stringResource(id = CommonStrings.common_about)) },
         leadingContent = ListItemContent.Icon(IconSource.Vector(CompoundIcons.Info())),
