@@ -82,7 +82,8 @@ private fun ChamosMiTelefonoDialog(onCerrar: () -> Unit) {
             Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
                 Text(
                     "Si lo activas, este teléfono guarda en Chamos su última ubicación y batería cada ~15 minutos. " +
-                        "Solo tú la ves, entrando con tu cuenta desde otro dispositivo. Viene apagado y puedes quitarlo cuando quieras.",
+                        "Solo tú la ves, entrando con tu cuenta desde otro dispositivo. Viene apagado y puedes quitarlo cuando quieras. " +
+                        "Necesita: GPS (ubicación) encendido, internet, el permiso de ubicación \"Permitir todo el tiempo\" y Chamos sin restricción de batería.",
                 )
                 Text(
                     modifier = Modifier.padding(top = 12.dp),
