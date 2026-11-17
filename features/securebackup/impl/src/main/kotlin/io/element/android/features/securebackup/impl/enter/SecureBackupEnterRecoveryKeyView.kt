@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.foundation.layout.Column
-import io.element.android.features.securebackup.impl.tools.ChamosPatron
 import io.element.android.libraries.designsystem.theme.components.Text
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -81,10 +80,6 @@ private fun Content(
             state.eventSink(SecureBackupEnterRecoveryKeyEvent.ChangeRecoveryKeyFieldContentsVisibility(it))
         }
     )
-    Text(text = "¿Usaste un patrón? Dibújalo aquí:")
-    ChamosPatron(onPatron = { p ->
-        if (p != null) state.eventSink.invoke(SecureBackupEnterRecoveryKeyEvent.OnRecoveryKeyChange(p))
-    })
     }
 }
 

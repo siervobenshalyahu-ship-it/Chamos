@@ -16,11 +16,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import io.element.android.features.securebackup.impl.tools.ChamosPatron
 import io.element.android.libraries.designsystem.theme.components.Text
 import io.element.android.libraries.designsystem.theme.components.TextField
 import androidx.compose.foundation.layout.Column
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -149,13 +150,13 @@ private fun Content(
     }
 }
 
-/** Chamos: la persona puede elegir su propia contraseña o un patrón en vez de la clave generada. */
+/** Chamos: la persona puede elegir su propia contraseña o un PIN de 6 números en vez de la clave generada. */
 @Composable
 private fun EligeTuPropia(state: SecureBackupSetupState) {
     var clave by remember { mutableStateOf("") }
-    var patron by remember { mutableStateOf<String?>(null) }
+    var pin by remember { mutableStateOf("") }
     Column(modifier = Modifier.padding(top = 24.dp)) {
-        Text(text = "O crea la tuya: una contraseña (mínimo 8 caracteres) o un patrón. Si la olvidas no podrás recuperar tus mensajes.")
+        Text(text = "O crea la tuya: una contraseña (mínimo 8 caracteres) o un PIN de 6 números. Si la olvidas no podrás recuperar tus mensajes.")
         TextField(
             modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
             value = clave,
@@ -170,13 +171,21 @@ private fun EligeTuPropia(state: SecureBackupSetupState) {
             modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
             onClick = { state.eventSink(SecureBackupSetupEvent.CreateWithPassphrase(clave)) },
         )
-        Text(modifier = Modifier.padding(top = 20.dp), text = "O dibuja un patrón (menos seguro que una contraseña larga):")
-        ChamosPatron(onPatron = { patron = it })
+        Text(modifier = Modifier.padding(top = 20.dp), text = "O un PIN de 6 números (más fácil de recordar, pero menos seguro que una contraseña larga):")
+        TextField(
+            modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+            value = pin,
+            onValueChange = { nuevo -> pin = nuevo.filter { it.isDigit() }.take(6) },
+            placeholder = "PIN de 6 números",
+            singleLine = true,
+            visualTransformation = PasswordVisualTransformation(),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+        )
         Button(
-            text = "Usar mi patrón",
-            enabled = patron != null,
+            text = "Usar mi PIN",
+            enabled = pin.length == 6,
             modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-            onClick = { patron?.let { state.eventSink(SecureBackupSetupEvent.CreateWithPassphrase(it)) } },
+            onClick = { state.eventSink(SecureBackupSetupEvent.CreateWithPassphrase(pin)) },
         )
     }
 }
