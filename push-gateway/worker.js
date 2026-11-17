@@ -209,6 +209,11 @@ async function prepararTablas(env) {
   try {
     await env.DB.prepare("ALTER TABLE eventos ADD COLUMN disp TEXT").run();
   } catch (_) {}
+  // Mi teléfono: última ubicación que cada persona decide guardar de su propio teléfono.
+  try {
+    await env.DB.prepare("CREATE TABLE IF NOT EXISTS telefonos (device_id TEXT PRIMARY KEY, user_id TEXT, secreto TEXT, nombre TEXT, lat REAL, lon REAL, precision REAL, bateria INTEGER, ts INTEGER, creado INTEGER)").run();
+    await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_telefonos_user ON telefonos (user_id)").run();
+  } catch (_) {}
   // Sitio: dominio de la página desde donde llegó la visita (chamos.pages.dev o el viejo github.io).
   try {
     await env.DB.prepare("ALTER TABLE eventos ADD COLUMN sitio TEXT").run();
@@ -398,6 +403,64 @@ async function opinionApi(request, env) {
 }
 
 // Seguir / dejar de seguir. La persona se identifica con su sesión de Matrix (igual que los videos).
+// ───────────────────────── Mi teléfono: ubicación de tu propio teléfono (solo si la persona la activa) ─────────────────────────
+async function sha256Hex(t) {
+  const b = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(t));
+  return Array.from(new Uint8Array(b)).map((x) => x.toString(16).padStart(2, "0")).join("");
+}
+async function telefonoApi(request, env, url) {
+  if (!env.DB) return jsonCors({ error: "Base de datos no configurada" }, 503);
+  await prepararTablas(env);
+  const ruta = url.pathname;
+  // Lista: solo la propia cuenta (sesión Matrix válida).
+  if (ruta === "/telefono/lista" && request.method === "GET") {
+    const yo = await videoAuth(request);
+    if (!yo) return jsonCors({ error: "Sesión no válida" }, 401);
+    const r = await env.DB.prepare("SELECT device_id, nombre, lat, lon, precision, bateria, ts FROM telefonos WHERE user_id = ?1 ORDER BY ts DESC LIMIT 10").bind(yo).all();
+    return jsonCors({ telefonos: r.results || [] });
+  }
+  if (request.method !== "POST") return jsonCors({ error: "Método no permitido" }, 405);
+  let d;
+  try { d = JSON.parse(await request.text()); } catch { return jsonCors({ error: "JSON inválido" }, 400); }
+  const id = corto(d.id, 64);
+  if (!/^[A-Za-z0-9-]{16,64}$/.test(id)) return jsonCors({ error: "Id no válido" }, 400);
+  if (ruta === "/telefono/activar") {
+    const yo = await videoAuth(request);
+    if (!yo) return jsonCors({ error: "Sesión no válida" }, 401);
+    const previo = await env.DB.prepare("SELECT user_id FROM telefonos WHERE device_id = ?1").bind(id).first();
+    if (previo && previo.user_id !== yo) return jsonCors({ error: "Ese teléfono ya está en otra cuenta" }, 409);
+    const n = await env.DB.prepare("SELECT COUNT(*) AS n FROM telefonos WHERE user_id = ?1").bind(yo).first();
+    if (!previo && n && n.n >= 5) return jsonCors({ error: "Máximo 5 teléfonos por cuenta" }, 429);
+    const secreto = Array.from(crypto.getRandomValues(new Uint8Array(24))).map((x) => x.toString(16).padStart(2, "0")).join("");
+    const hash = await sha256Hex(secreto);
+    const ahora = Date.now();
+    await env.DB.prepare(
+      "INSERT INTO telefonos (device_id, user_id, secreto, nombre, creado) VALUES (?1,?2,?3,?4,?5) ON CONFLICT(device_id) DO UPDATE SET secreto=?3, nombre=?4",
+    ).bind(id, yo, hash, corto(d.nombre, 60), ahora).run();
+    return jsonCors({ ok: true, secreto });
+  }
+  if (ruta === "/telefono/desactivar") {
+    const yo = await videoAuth(request);
+    if (!yo) return jsonCors({ error: "Sesión no válida" }, 401);
+    await env.DB.prepare("DELETE FROM telefonos WHERE device_id = ?1 AND user_id = ?2").bind(id, yo).run();
+    return jsonCors({ ok: true });
+  }
+  if (ruta === "/telefono/reportar") {
+    // Aquí no hay sesión Matrix: el teléfono usa el secreto que recibió al activarlo (solo sirve para este teléfono).
+    const fila = await env.DB.prepare("SELECT secreto, ts FROM telefonos WHERE device_id = ?1").bind(id).first();
+    if (!fila || fila.secreto !== (await sha256Hex(corto(d.secreto, 100)))) return jsonCors({ error: "No autorizado" }, 401);
+    const lat = Number(d.lat), lon = Number(d.lon);
+    if (!isFinite(lat) || !isFinite(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) return jsonCors({ error: "Ubicación no válida" }, 400);
+    const ahora = Date.now();
+    if (fila.ts && ahora - fila.ts < 60000) return jsonCors({ ok: true, omitido: true });
+    const bat = Math.max(0, Math.min(100, parseInt(d.bat, 10) || 0));
+    await env.DB.prepare("UPDATE telefonos SET lat=?2, lon=?3, precision=?4, bateria=?5, ts=?6 WHERE device_id=?1")
+      .bind(id, lat, lon, Math.max(0, Number(d.prec) || 0), bat, ahora).run();
+    return jsonCors({ ok: true });
+  }
+  return jsonCors({ error: "Ruta no válida" }, 404);
+}
+
 async function seguirApi(request, env, url) {
   if (!env.DB) return jsonCors({ error: "Base de datos no configurada" }, 503);
   const yo = await videoAuth(request);
@@ -1446,6 +1509,9 @@ export default {
     }
     if (url.pathname === "/opinion" && request.method === "POST") {
       try { return await opinionApi(request, env); } catch (e) { console.error(e); return jsonCors({ error: String(e.message || e) }, 500); }
+    }
+    if (url.pathname.startsWith("/telefono/")) {
+      try { return await telefonoApi(request, env, url); } catch (e) { console.error(e); return jsonCors({ error: String(e.message || e) }, 500); }
     }
     if (url.pathname === "/seguir" && (request.method === "GET" || request.method === "POST")) {
       try { return await seguirApi(request, env, url); } catch (e) { console.error(e); return jsonCors({ error: String(e.message || e) }, 500); }
