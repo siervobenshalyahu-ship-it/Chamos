@@ -214,6 +214,8 @@ async function prepararTablas(env) {
     await env.DB.prepare("CREATE TABLE IF NOT EXISTS telefonos (device_id TEXT PRIMARY KEY, user_id TEXT, secreto TEXT, nombre TEXT, lat REAL, lon REAL, precision REAL, bateria INTEGER, ts INTEGER, creado INTEGER)").run();
     await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_telefonos_user ON telefonos (user_id)").run();
   } catch (_) {}
+  try { await env.DB.prepare("ALTER TABLE telefonos ADD COLUMN alarma_hasta INTEGER DEFAULT 0").run(); } catch (_) {}
+  try { await env.DB.prepare("ALTER TABLE telefonos ADD COLUMN alarma_msg TEXT").run(); } catch (_) {}
   // Sitio: dominio de la página desde donde llegó la visita (chamos.pages.dev o el viejo github.io).
   try {
     await env.DB.prepare("ALTER TABLE eventos ADD COLUMN sitio TEXT").run();
@@ -416,7 +418,7 @@ async function telefonoApi(request, env, url) {
   if (ruta === "/telefono/lista" && request.method === "GET") {
     const yo = await videoAuth(request);
     if (!yo) return jsonCors({ error: "Sesión no válida" }, 401);
-    const r = await env.DB.prepare("SELECT device_id, nombre, lat, lon, precision, bateria, ts FROM telefonos WHERE user_id = ?1 ORDER BY ts DESC LIMIT 10").bind(yo).all();
+    const r = await env.DB.prepare("SELECT device_id, nombre, lat, lon, precision, bateria, ts, alarma_hasta FROM telefonos WHERE user_id = ?1 ORDER BY ts DESC LIMIT 10").bind(yo).all();
     return jsonCors({ telefonos: r.results || [] });
   }
   if (request.method !== "POST") return jsonCors({ error: "Método no permitido" }, 405);
@@ -445,18 +447,37 @@ async function telefonoApi(request, env, url) {
     await env.DB.prepare("DELETE FROM telefonos WHERE device_id = ?1 AND user_id = ?2").bind(id, yo).run();
     return jsonCors({ ok: true });
   }
+  if (ruta === "/telefono/alarma") {
+    // El dueño pide que el teléfono suene (con un mensaje para quien lo tenga). El teléfono la recibe cuando se conecte.
+    const yo = await videoAuth(request);
+    if (!yo) return jsonCors({ error: "Sesión no válida" }, 401);
+    const encender = d.on === true;
+    const msg = corto(d.msg, 140);
+    const hasta = encender ? Date.now() + 20 * 60 * 1000 : 0;
+    const r = await env.DB.prepare("UPDATE telefonos SET alarma_hasta=?3, alarma_msg=?4 WHERE device_id=?1 AND user_id=?2").bind(id, yo, hasta, msg).run();
+    if (!r.meta || !r.meta.changes) return jsonCors({ error: "Teléfono no encontrado" }, 404);
+    return jsonCors({ ok: true, hasta });
+  }
   if (ruta === "/telefono/reportar") {
     // Aquí no hay sesión Matrix: el teléfono usa el secreto que recibió al activarlo (solo sirve para este teléfono).
-    const fila = await env.DB.prepare("SELECT secreto, ts FROM telefonos WHERE device_id = ?1").bind(id).first();
+    const fila = await env.DB.prepare("SELECT secreto, ts, alarma_hasta, alarma_msg FROM telefonos WHERE device_id = ?1").bind(id).first();
     if (!fila || fila.secreto !== (await sha256Hex(corto(d.secreto, 100)))) return jsonCors({ error: "No autorizado" }, 401);
+    // Si hay una alarma pendiente se entrega una sola vez y se limpia.
+    let alarma = null;
+    if (fila.alarma_hasta && fila.alarma_hasta > Date.now()) {
+      alarma = fila.alarma_msg || "Este teléfono está perdido. Por favor devuélvelo a su dueño.";
+      await env.DB.prepare("UPDATE telefonos SET alarma_hasta=0 WHERE device_id=?1").bind(id).run();
+    }
+    // Sin GPS: no hay ubicación nueva, pero igual se entrega la alarma.
+    if (d.sin_gps === true) return jsonCors({ ok: true, alarma });
     const lat = Number(d.lat), lon = Number(d.lon);
     if (!isFinite(lat) || !isFinite(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) return jsonCors({ error: "Ubicación no válida" }, 400);
     const ahora = Date.now();
-    if (fila.ts && ahora - fila.ts < 60000) return jsonCors({ ok: true, omitido: true });
+    if (fila.ts && ahora - fila.ts < 60000) return jsonCors({ ok: true, omitido: true, alarma });
     const bat = Math.max(0, Math.min(100, parseInt(d.bat, 10) || 0));
     await env.DB.prepare("UPDATE telefonos SET lat=?2, lon=?3, precision=?4, bateria=?5, ts=?6 WHERE device_id=?1")
       .bind(id, lat, lon, Math.max(0, Number(d.prec) || 0), bat, ahora).run();
-    return jsonCors({ ok: true });
+    return jsonCors({ ok: true, alarma });
   }
   return jsonCors({ error: "Ruta no válida" }, 404);
 }
