@@ -166,19 +166,74 @@ object ChamosMiTelefono {
             .maxByOrNull { it.time }
     }
 
-    /** Manda la ubicación actual (o la última conocida) al servidor. Devuelve true si se envió. */
-    suspend fun reportarAhora(ctx: Context): Boolean = withContext(Dispatchers.IO) {
+    /** Manda la ubicación actual (o la última conocida) al servidor. Devuelve el mensaje de alarma si el dueño la pidió. */
+    suspend fun reportar(ctx: Context): String? = withContext(Dispatchers.IO) {
         val p = prefs(ctx)
-        val secreto = p.getString("secreto", null) ?: return@withContext false
-        if (!p.getBoolean("activado", false)) return@withContext false
-        val loc = ubicacion(ctx) ?: return@withContext false
-        val bm = ctx.getSystemService(Context.BATTERY_SERVICE) as BatteryManager
-        val cuerpo = JSONObject()
-            .put("id", idLocal(ctx)).put("secreto", secreto)
-            .put("lat", loc.latitude).put("lon", loc.longitude)
-            .put("prec", loc.accuracy.toDouble())
-            .put("bat", bm.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY))
-        llamar("POST", "/reportar", cuerpo, null).first == 200
+        val secreto = p.getString("secreto", null) ?: return@withContext null
+        if (!p.getBoolean("activado", false)) return@withContext null
+        val loc = ubicacion(ctx)
+        val cuerpo = JSONObject().put("id", idLocal(ctx)).put("secreto", secreto)
+        if (loc == null) {
+            // Sin GPS o sin permiso: no hay ubicación nueva, pero igual se pregunta si hay alarma pendiente.
+            cuerpo.put("sin_gps", true)
+        } else {
+            val bm = ctx.getSystemService(Context.BATTERY_SERVICE) as BatteryManager
+            cuerpo.put("lat", loc.latitude).put("lon", loc.longitude).put("prec", loc.accuracy.toDouble())
+                .put("bat", bm.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY))
+        }
+        val (code, j) = llamar("POST", "/reportar", cuerpo, null)
+        if (code != 200 || j == null || j.isNull("alarma") || !j.has("alarma")) null else j.optString("alarma").ifBlank { null }
+    }
+
+    /** Usado al activar: manda la primera ubicación (ignora cualquier alarma). */
+    suspend fun reportarAhora(ctx: Context) {
+        reportar(ctx)
+    }
+
+    /** Hace sonar la alarma del teléfono ~60 segundos y muestra el mensaje del dueño. */
+    suspend fun sonarAlarma(ctx: Context, mensaje: String) {
+        val nm = ctx.getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            nm.createNotificationChannel(
+                android.app.NotificationChannel("chamos_alarma", "Teléfono perdido", android.app.NotificationManager.IMPORTANCE_HIGH),
+            )
+        }
+        val notif = androidx.core.app.NotificationCompat.Builder(ctx, "chamos_alarma")
+            .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
+            .setContentTitle("Este teléfono está perdido")
+            .setContentText(mensaje)
+            .setStyle(androidx.core.app.NotificationCompat.BigTextStyle().bigText(mensaje))
+            .setPriority(androidx.core.app.NotificationCompat.PRIORITY_MAX)
+            .setCategory(androidx.core.app.NotificationCompat.CATEGORY_ALARM)
+            .setOngoing(false)
+            .build()
+        runCatching { nm.notify(7771, notif) }
+        val am = ctx.getSystemService(Context.AUDIO_SERVICE) as android.media.AudioManager
+        val volumenAntes = am.getStreamVolume(android.media.AudioManager.STREAM_ALARM)
+        var mp: android.media.MediaPlayer? = null
+        try {
+            am.setStreamVolume(android.media.AudioManager.STREAM_ALARM, am.getStreamMaxVolume(android.media.AudioManager.STREAM_ALARM), 0)
+            val uri = android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_ALARM)
+                ?: android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_RINGTONE)
+            mp = android.media.MediaPlayer().apply {
+                setAudioAttributes(
+                    android.media.AudioAttributes.Builder()
+                        .setUsage(android.media.AudioAttributes.USAGE_ALARM)
+                        .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .build(),
+                )
+                setDataSource(ctx, uri)
+                isLooping = true
+                prepare()
+                start()
+            }
+            kotlinx.coroutines.delay(60_000)
+        } catch (_: Exception) {
+        } finally {
+            runCatching { mp?.stop() }
+            runCatching { mp?.release() }
+            runCatching { am.setStreamVolume(android.media.AudioManager.STREAM_ALARM, volumenAntes, 0) }
+        }
     }
 
     fun abrirMapa(ctx: Context, t: Telefono) {
@@ -189,7 +244,8 @@ object ChamosMiTelefono {
 
 class ReportarWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx, params) {
     override suspend fun doWork(): Result {
-        ChamosMiTelefono.reportarAhora(applicationContext)
+        val alarma = ChamosMiTelefono.reportar(applicationContext)
+        if (alarma != null) ChamosMiTelefono.sonarAlarma(applicationContext, alarma)
         return Result.success()
     }
 }
