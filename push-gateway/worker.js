@@ -226,6 +226,10 @@ async function prepararTablas(env) {
   try {
     await env.DB.prepare("ALTER TABLE web_registros ADD COLUMN disp TEXT").run();
   } catch (_) {}
+  // Datos básicos del registro web: los que la persona escribe ella misma.
+  for (const col of ["apellido TEXT", "telefono TEXT", "ciudad TEXT", "origen TEXT", "acepto INTEGER", "mayor18 INTEGER", "pais_ip TEXT"]) {
+    try { await env.DB.prepare("ALTER TABLE web_registros ADD COLUMN " + col).run(); } catch (_) {}
+  }
   tablasListas = true;
 }
 
@@ -540,7 +544,7 @@ async function resumen(request, env) {
       "SELECT COALESCE(NULLIF(json_extract(extra,'$.m'),''),'(sin modelo)') AS modelo, COUNT(DISTINCT anon) AS telefonos, MAX(ts) AS ultima " +
         "FROM eventos WHERE tipo='instalacion' GROUP BY modelo ORDER BY telefonos DESC, ultima DESC LIMIT 300",
     ),
-    env.DB.prepare("SELECT email, nombre, pais, ip, disp, primera, ultima, descargas FROM web_registros ORDER BY primera DESC LIMIT 500"),
+    env.DB.prepare("SELECT email, nombre, apellido, telefono, ciudad, origen, pais, pais_ip, ip, disp, primera, ultima, descargas FROM web_registros ORDER BY primera DESC LIMIT 500"),
   ]);
   return jsonCors({
     totales: tot.results,
@@ -669,7 +673,7 @@ async function go(){
    '<div class="c"><b>'+n(d.totales,'descarga_media')+'</b><span>Videos y fotos guardados con marca de agua</span></div>'+
    '<div class="c"><b>'+n(d.totales,'denuncia')+'</b><span>Denuncias enviadas</span></div>'+
    '<div class="c"><b>'+d.total_seguidores+'</b><span>Seguimientos activos ('+n(d.totales,'seguir')+' en total, '+n(d.totales,'dejar_seguir')+' dejados)</span></div></div>'+
-   '<h2>Registros para descargar ('+(d.registros_web||[]).length+')</h2><div class="sc"><table><tr><th>Cuándo</th><th>Nombre</th><th>Correo</th><th>País</th><th>IP</th><th>Dispositivo</th></tr>'+(d.registros_web||[]).map(g=>'<tr><td>'+fmt(g.primera)+'</td><td>'+esc(g.nombre)+'</td><td>'+esc(g.email)+'</td><td>'+esc(g.pais)+'</td><td>'+esc(g.ip)+'</td><td>'+esc(g.disp)+'</td></tr>').join('')+'</table></div><p>Correos para copiar (copia oculta):</p><textarea readonly rows="4" style="width:100%" onclick="this.select()">'+(d.registros_web||[]).map(g=>g.email).join(', ')+'</textarea>'+
+   '<h2>Registros para descargar ('+(d.registros_web||[]).length+')</h2><div class="sc"><table><tr><th>Cuándo</th><th>Nombre</th><th>Correo</th><th>Teléfono</th><th>País / ciudad</th><th>Cómo llegó</th><th>IP</th><th>Dispositivo</th></tr>'+(d.registros_web||[]).map(g=>'<tr><td>'+fmt(g.primera)+'</td><td>'+esc((g.nombre||'')+' '+(g.apellido||''))+'</td><td>'+esc(g.email)+'</td><td>'+esc(g.telefono||'')+'</td><td>'+esc((g.pais||'')+(g.ciudad?' / '+g.ciudad:''))+'</td><td>'+esc(g.origen||'')+'</td><td>'+esc(g.ip)+'</td><td>'+esc(g.disp)+'</td></tr>').join('')+'</table></div><p>Correos para copiar (copia oculta):</p><textarea readonly rows="4" style="width:100%" onclick="this.select()">'+(d.registros_web||[]).map(g=>g.email).join(', ')+'</textarea>'+
    '<h2>Opiniones de la web ('+(d.opiniones||[]).length+')</h2><div class="sc"><table><tr><th>Fecha</th><th>Nombre</th><th>Opinión</th></tr>'+(d.opiniones||[]).map(o=>'<tr><td>'+new Date(o.ts).toLocaleString()+'</td><td>'+esc(o.nombre||'—')+' '+esc(o.pais||'')+'</td><td>'+esc(o.texto)+'</td></tr>').join('')+'</table></div>'+
    '<h2>Más seguidos</h2><div class="sc"><table><tr><th>Usuario</th><th>Seguidores</th></tr>'+(d.top_seguidos||[]).map(t=>'<tr><td>'+esc(t.usuario)+'</td><td>'+t.n+'</td></tr>').join('')+'</table></div>'+
    '<h2>Últimos 30 días</h2><div class="sc"><table><tr><th>Día</th><th>Visitas</th><th>Descargas</th><th>Instal.</th></tr>'+
@@ -1386,6 +1390,23 @@ async function webRegistro(request, env) {
     nombre = ya.nombre || "Miembro";
   }
   if (nombre.length < 2) return jsonCors({ error: "Escribe tu nombre" }, 400);
+  // Datos básicos (solo al registrarse; al entrar no se cambian).
+  const extra = { apellido: "", telefono: "", ciudad: "", origen: "", pais: "", acepto: 0, mayor18: 0 };
+  if (d.entrar !== true) {
+    extra.apellido = corto(d.apellido, 80).trim();
+    if (extra.apellido.length < 2) return jsonCors({ error: "Escribe tu apellido" }, 400);
+    const tel = corto(d.telefono, 30).replace(/[^\d+]/g, "");
+    if (tel && !/^\+?\d{7,15}$/.test(tel)) return jsonCors({ error: "El teléfono no parece válido (solo números, con código de país)" }, 400);
+    extra.telefono = tel;
+    extra.pais = corto(d.pais, 40).trim();
+    if (!extra.pais) return jsonCors({ error: "Elige tu país" }, 400);
+    extra.ciudad = corto(d.ciudad, 60).trim();
+    extra.origen = corto(d.origen, 40).trim();
+    if (d.mayor18 !== true) return jsonCors({ error: "Debes confirmar que tienes 18 años o más" }, 400);
+    if (d.acepto !== true) return jsonCors({ error: "Debes aceptar los términos y la política de privacidad" }, 400);
+    extra.acepto = Date.now();
+    extra.mayor18 = 1;
+  }
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) return jsonCors({ error: "Escribe un correo válido" }, 400);
   const dom = email.split("@")[1];
   if (ERRATAS[dom]) return jsonCors({ error: "¿Quisiste escribir " + email.split("@")[0] + "@" + ERRATAS[dom] + "?" }, 400);
@@ -1397,8 +1418,10 @@ async function webRegistro(request, env) {
     await prepararTablas(env);
     const t = Date.now();
     await env.DB.prepare(
-      "INSERT INTO web_registros (email, nombre, pais, primera, ultima, ip, disp) VALUES (?1,?2,?3,?4,?4,?5,?6) ON CONFLICT(email) DO UPDATE SET nombre=?2, pais=?3, ultima=?4, ip=?5, disp=?6",
-    ).bind(email, nombre, corto(request.cf && request.cf.country, 4), t, corto(request.headers.get("cf-connecting-ip"), 64), dispositivo(request.headers.get("user-agent"), null)).run();
+      "INSERT INTO web_registros (email, nombre, pais, primera, ultima, ip, disp, apellido, telefono, ciudad, origen, acepto, mayor18, pais_ip) VALUES (?1,?2,?3,?4,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13) " +
+      "ON CONFLICT(email) DO UPDATE SET nombre=?2, pais=COALESCE(NULLIF(?3,''),pais), ultima=?4, ip=?5, disp=?6, apellido=COALESCE(NULLIF(?7,''),apellido), telefono=COALESCE(NULLIF(?8,''),telefono), ciudad=COALESCE(NULLIF(?9,''),ciudad), origen=COALESCE(NULLIF(?10,''),origen), acepto=COALESCE(NULLIF(?11,0),acepto), mayor18=COALESCE(NULLIF(?12,0),mayor18), pais_ip=?13",
+    ).bind(email, nombre, extra.pais, t, corto(request.headers.get("cf-connecting-ip"), 64), dispositivo(request.headers.get("user-agent"), null),
+      extra.apellido, extra.telefono, extra.ciudad, extra.origen, extra.acepto, extra.mayor18, corto(request.cf && request.cf.country, 4)).run();
     return jsonCors({ ok: true, manual: true });
   }
   const exp = Date.now() + 15 * 60 * 1000;
@@ -1443,8 +1466,10 @@ async function webRegistro(request, env) {
       });
   if (!r.ok) { console.error("correo", r.status, await r.text()); return jsonCors({ error: "No pudimos enviar el correo. Revisa que esté bien escrito." }, 502); }
   await env.DB.prepare(
-    "INSERT INTO web_registros (email, nombre, pais, primera, ultima, ip) VALUES (?1,?2,?3,?4,?4,?5) ON CONFLICT(email) DO UPDATE SET nombre=?2, pais=?3, ultima=?4, ip=?5",
-  ).bind(email, nombre, corto(request.cf && request.cf.country, 4), ahora, corto(request.headers.get("cf-connecting-ip"), 64)).run();
+    "INSERT INTO web_registros (email, nombre, pais, primera, ultima, ip, apellido, telefono, ciudad, origen, acepto, mayor18, pais_ip) VALUES (?1,?2,?3,?4,?4,?5,?6,?7,?8,?9,?10,?11,?12) " +
+    "ON CONFLICT(email) DO UPDATE SET nombre=?2, pais=COALESCE(NULLIF(?3,''),pais), ultima=?4, ip=?5, apellido=COALESCE(NULLIF(?6,''),apellido), telefono=COALESCE(NULLIF(?7,''),telefono), ciudad=COALESCE(NULLIF(?8,''),ciudad), origen=COALESCE(NULLIF(?9,''),origen), acepto=COALESCE(NULLIF(?10,0),acepto), mayor18=COALESCE(NULLIF(?11,0),mayor18), pais_ip=?12",
+  ).bind(email, nombre, extra.pais, ahora, corto(request.headers.get("cf-connecting-ip"), 64),
+    extra.apellido, extra.telefono, extra.ciudad, extra.origen, extra.acepto, extra.mayor18, corto(request.cf && request.cf.country, 4)).run();
   return jsonCors({ ok: true });
 }
 async function webVerificar(request, env) {
