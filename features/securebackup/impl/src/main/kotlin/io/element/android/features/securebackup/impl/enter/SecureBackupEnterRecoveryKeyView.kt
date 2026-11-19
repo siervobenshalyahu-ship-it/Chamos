@@ -12,13 +12,6 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.platform.LocalUriHandler
-import io.element.android.libraries.designsystem.components.dialogs.ConfirmationDialog
-import io.element.android.libraries.designsystem.theme.components.TextButton
 import androidx.compose.foundation.layout.Column
 import io.element.android.libraries.designsystem.theme.components.Text
 import androidx.compose.ui.Modifier
@@ -70,23 +63,7 @@ fun SecureBackupEnterRecoveryKeyView(
 private fun Content(
     state: SecureBackupEnterRecoveryKeyState,
 ) {
-    var olvide by remember { mutableStateOf(false) }
-    val uriHandler = LocalUriHandler.current
-    if (olvide) {
-        ConfirmationDialog(
-            title = "Olvidé mi contraseña o PIN",
-            content = "La contraseña o PIN de recuperación no se puede enviar por correo: nadie la guarda, ni siquiera Chamos, y eso es lo que mantiene tus chats privados.\n\n" +
-                "Qué puedes hacer:\n" +
-                "• Si tienes Chamos abierto en otro teléfono, verifica desde allí con \"Verificar con otro dispositivo\" y luego crea una nueva en Ajustes → Respaldo de chats → Cambiar contraseña o PIN.\n" +
-                "• Si lo que olvidaste es la contraseña de tu CUENTA, puedes recuperarla con un código enviado a tu correo desde la página de la cuenta (toca \"Recuperar mi cuenta\" y elige \"¿Olvidaste tu contraseña?\").",
-            submitText = "Recuperar mi cuenta",
-            cancelText = "Cerrar",
-            onSubmitClick = { olvide = false; uriHandler.openUri("https://account.matrix.org/") },
-            onDismiss = { olvide = false },
-        )
-    }
     Column {
-    TextButton(text = "Olvidé mi contraseña o PIN", onClick = { olvide = true })
     RecoveryKeyView(
         modifier = Modifier
             .bringIntoViewOnImeVisible()
