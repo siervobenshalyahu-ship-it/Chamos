@@ -1376,8 +1376,15 @@ async function webRegistro(request, env) {
   if (!env.DB) return jsonCors({ error: "Base de datos no configurada" }, 503);
   let d;
   try { d = JSON.parse(await request.text()); } catch { return jsonCors({ error: "JSON inválido" }, 400); }
-  const nombre = corto(d.nombre, 80).trim();
+  let nombre = corto(d.nombre, 80).trim();
   const email = corto(d.email, 120).trim().toLowerCase();
+  if (d.entrar === true) {
+    // Entrar (ya registrado): se usa el nombre guardado. Si el correo no está registrado, que se registre.
+    await prepararTablas(env);
+    const ya = await env.DB.prepare("SELECT nombre FROM web_registros WHERE email = ?1").bind(email).first();
+    if (!ya) return jsonCors({ error: "Ese correo no está registrado. Usa la pestaña \"Registrarme\"." }, 404);
+    nombre = ya.nombre || "Miembro";
+  }
   if (nombre.length < 2) return jsonCors({ error: "Escribe tu nombre" }, 400);
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) return jsonCors({ error: "Escribe un correo válido" }, 400);
   const dom = email.split("@")[1];
@@ -1461,7 +1468,33 @@ async function webVerificar(request, env) {
   const firma = await webFirma(env, carga);
   if (!firma) return jsonCors({ error: "Falta el secreto WEB_SECRET" }, 503);
   const app = APPS_WEB[d.app] ? d.app : "chamos";
-  return jsonCors({ ok: true, url: new URL(request.url).origin + "/web/apk?t=" + encodeURIComponent(carga + "." + firma) + (app !== "chamos" ? "&app=" + app : "") });
+  // Sesión de 30 días: permite descargar y ver las secciones de miembros sin pedir otro código.
+  const expS = Date.now() + 30 * 24 * 3600 * 1000;
+  const cargaS = "S" + expS + "." + btoa(unescape(encodeURIComponent(email)));
+  const firmaS = await webFirma(env, cargaS);
+  const reg = await env.DB.prepare("SELECT nombre FROM web_registros WHERE email = ?1").bind(email).first();
+  return jsonCors({
+    ok: true,
+    nombre: reg ? reg.nombre : "",
+    sesion: cargaS + "." + firmaS,
+    exp: expS,
+    url: new URL(request.url).origin + "/web/apk?t=" + encodeURIComponent(carga + "." + firma) + (app !== "chamos" ? "&app=" + app : ""),
+  });
+}
+async function webEnlace(request, env) {
+  let d;
+  try { d = JSON.parse(await request.text()); } catch { return jsonCors({ error: "JSON inválido" }, 400); }
+  const t = corto(d.sesion, 400);
+  const i = t.lastIndexOf(".");
+  const carga = t.slice(0, i), firma = t.slice(i + 1);
+  const esperada = await webFirma(env, carga);
+  const exp = Number(carga.slice(1).split(".")[0]);
+  if (!esperada || carga.charAt(0) !== "S" || firma !== esperada || !(exp > Date.now())) return jsonCors({ error: "Tu sesión venció. Entra de nuevo." }, 401);
+  const app = APPS_WEB[d.app] ? d.app : "chamos";
+  const exp2 = Date.now() + 15 * 60 * 1000;
+  const carga2 = exp2 + "." + carga.split(".")[1];
+  const firma2 = await webFirma(env, carga2);
+  return jsonCors({ ok: true, url: new URL(request.url).origin + "/web/apk?t=" + encodeURIComponent(carga2 + "." + firma2) + (app !== "chamos" ? "&app=" + app : "") });
 }
 async function webApk(request, env) {
   const t = new URL(request.url).searchParams.get("t") || "";
@@ -1514,6 +1547,9 @@ export default {
     }
     if (url.pathname === "/web/verificar" && request.method === "POST") {
       try { return await webVerificar(request, env); } catch (e) { console.error(e); return jsonCors({ error: String(e.message || e) }, 500); }
+    }
+    if (url.pathname === "/web/enlace" && request.method === "POST") {
+      try { return await webEnlace(request, env); } catch (e) { console.error(e); return jsonCors({ error: String(e.message || e) }, 500); }
     }
     if (url.pathname === "/web/apk" && request.method === "GET") {
       try { return await webApk(request, env); } catch (e) { console.error(e); return jsonCors({ error: String(e.message || e) }, 500); }
