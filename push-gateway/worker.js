@@ -1344,6 +1344,11 @@ function soloRelease(request, env, url) {
 // Registro de la página web: nombre + correo para poder descargar la app. El enlace de descarga pasa por aquí
 // (firmado y con vencimiento) y el Worker entrega el APK de GitHub. Secreto: WEB_SECRET (o ADMIN_KEY si no existe).
 const APK_URL = "https://github.com/siervobenshalyahu-ship-it/Chamos/releases/latest/download/Chamos.apk";
+// Apps que se descargan desde la página (mismo registro con código). "golpe" es el juego Golpe, secuestro o traición.
+const APPS_WEB = {
+  chamos: { url: APK_URL, archivo: "Chamos.apk" },
+  golpe: { url: "https://github.com/siervobenshalyahu-ship-it/Chamos/releases/download/golpe-ultimo/golpe.apk", archivo: "Golpe-secuestro-o-traicion.apk" },
+};
 const _hexW = (b) => [...new Uint8Array(b)].map((x) => x.toString(16).padStart(2, "0")).join("");
 async function webFirma(env, texto) {
   const k = env.WEB_SECRET || env.ADMIN_KEY;
@@ -1455,7 +1460,8 @@ async function webVerificar(request, env) {
   const carga = exp + "." + btoa(unescape(encodeURIComponent(email)));
   const firma = await webFirma(env, carga);
   if (!firma) return jsonCors({ error: "Falta el secreto WEB_SECRET" }, 503);
-  return jsonCors({ ok: true, url: new URL(request.url).origin + "/web/apk?t=" + encodeURIComponent(carga + "." + firma) });
+  const app = APPS_WEB[d.app] ? d.app : "chamos";
+  return jsonCors({ ok: true, url: new URL(request.url).origin + "/web/apk?t=" + encodeURIComponent(carga + "." + firma) + (app !== "chamos" ? "&app=" + app : "") });
 }
 async function webApk(request, env) {
   const t = new URL(request.url).searchParams.get("t") || "";
@@ -1468,9 +1474,11 @@ async function webApk(request, env) {
     const email = decodeURIComponent(escape(atob(carga.split(".")[1])));
     await env.DB.prepare("UPDATE web_registros SET descargas = descargas + 1, ultima = ?2 WHERE email = ?1").bind(email, Date.now()).run();
   } catch (_) {}
-  const r = await fetch(APK_URL, { redirect: "follow" });
-  if (!r.ok) return new Response("No se pudo obtener la app, intenta de nuevo.", { status: 502, headers: CORS });
-  const h = new Headers({ "content-type": "application/vnd.android.package-archive", "content-disposition": 'attachment; filename="Chamos.apk"', ...CORS });
+  const pedida = new URL(request.url).searchParams.get("app") || "chamos";
+  const dest = APPS_WEB[pedida] || APPS_WEB.chamos;
+  const r = await fetch(dest.url, { redirect: "follow" });
+  if (!r.ok) return new Response("Todavía no está disponible para descargar. Intenta más tarde.", { status: 502, headers: CORS });
+  const h = new Headers({ "content-type": "application/vnd.android.package-archive", "content-disposition": 'attachment; filename="' + dest.archivo + '"', ...CORS });
   const l = r.headers.get("content-length");
   if (l) h.set("content-length", l);
   return new Response(r.body, { headers: h });
