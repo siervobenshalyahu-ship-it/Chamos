@@ -119,6 +119,24 @@ class SecureBackupSetupPresenter(
         passphrase: String?,
     ) = launch {
         stateAndDispatch.dispatchAction(SecureBackupSetupStateMachine.Event.UserCreatesKey)
+        if (isChangeRecoveryKeyUserStory && passphrase != null) {
+            // Chamos: cambiar a una contraseña o PIN propios = desactivar la recuperación actual y crearla de nuevo con la nueva.
+            observeEncryptionService(stateAndDispatch)
+            Timber.tag(loggerTagSetup.value).d("Changing recovery passphrase")
+            val desactivada = encryptionService.disableRecovery()
+            if (desactivada.isFailure) {
+                val e = desactivada.exceptionOrNull()
+                if (e is Exception) stateAndDispatch.dispatchAction(SecureBackupSetupStateMachine.Event.SdkError(e))
+                return@launch
+            }
+            encryptionService.enableRecovery(waitForBackupsToUpload = false, passphrase = passphrase).onFailure {
+                Timber.tag(loggerTagSetup.value).e(it, "Failed to change recovery passphrase")
+                if (it is Exception) {
+                    stateAndDispatch.dispatchAction(SecureBackupSetupStateMachine.Event.SdkError(it))
+                }
+            }
+            return@launch
+        }
         if (isChangeRecoveryKeyUserStory) {
             Timber.tag(loggerTagSetup.value).d("Calling encryptionService.resetRecoveryKey()")
             encryptionService.resetRecoveryKey().fold(

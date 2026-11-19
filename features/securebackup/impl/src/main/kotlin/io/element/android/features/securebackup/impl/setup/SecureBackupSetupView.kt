@@ -145,7 +145,7 @@ private fun Content(
         onSubmit = null,
         toggleRecoveryKeyVisibility = {},
     )
-    if (formattedRecoveryKey == null && !state.recoveryKeyViewState.inProgress && !state.isChangeRecoveryKeyUserStory) {
+    if (formattedRecoveryKey == null && !state.recoveryKeyViewState.inProgress) {
         EligeTuPropia(state)
     }
 }
@@ -156,7 +156,7 @@ private fun EligeTuPropia(state: SecureBackupSetupState) {
     var clave by remember { mutableStateOf("") }
     var pin by remember { mutableStateOf("") }
     Column(modifier = Modifier.padding(top = 24.dp)) {
-        Text(text = "O crea la tuya: una contraseña (mínimo 8 caracteres) o un PIN de 6 números. Si la olvidas no podrás recuperar tus mensajes.")
+        Text(text = if (state.isChangeRecoveryKeyUserStory) "Elige tu nueva contraseña (mínimo 8 caracteres) o un PIN de 6 números. La anterior dejará de servir. Si la olvidas no podrás recuperar tus mensajes." else "O crea la tuya: una contraseña (mínimo 8 caracteres) o un PIN de 6 números. Si la olvidas no podrás recuperar tus mensajes.")
         TextField(
             modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
             value = clave,
