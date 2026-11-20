@@ -397,7 +397,7 @@ h1 { font-family: var(--font-serif); font-size: 26px; line-height: 1.1; margin: 
   function iniciarRonda() {
     ronda++;
     fase = "escoger"; terminado = false; parar();
-    if ("speechSynthesis" in window) try { speechSynthesis.cancel(); } catch (e) {}
+    pararClip(); if ("speechSynthesis" in window) try { speechSynthesis.cancel(); } catch (e) {}
     bombo = barajar(Array.apply(null, { length: 75 }).map(function (_, i) { return i + 1; }));
     bolas = []; actual = 0; cartones = [];
     for (var i = 0; i < 4; i++) { $("mesa" + i).classList.remove("up"); fichas[i] -= ANTE; }
@@ -531,6 +531,19 @@ h1 { font-family: var(--font-serif); font-size: 26px; line-height: 1.1; margin: 
     g.gain.setValueAtTime(.18, a.currentTime); g.gain.exponentialRampToValueAtTime(.001, a.currentTime + .25);
     o.connect(g); g.connect(a.destination); o.start(); o.stop(a.currentTime + .26);
   }
+  /* Voz de la señora: si existe la grabación voz-senora/<nombre>.mp3 la usa; si no, la voz del teléfono */
+  var clipA = null;
+  function pararClip() { if (clipA) { try { clipA.pause(); } catch (e) {} clipA = null; } }
+  function senora(nombre, alt) {
+    if ($("voz").value !== "1") return;
+    pararClip();
+    try {
+      var a = new Audio("voz-senora/" + nombre + ".mp3"); clipA = a;
+      var caer = function () { if (clipA === a) { clipA = null; alt(); } };
+      a.onerror = caer;
+      var p = a.play(); if (p && p.catch) p.catch(caer);
+    } catch (e) { alt(); }
+  }
   function hablar(t, fuerte, enojo, tono) {
     if ($("voz").value !== "1" || !("speechSynthesis" in window)) return;
     try {
@@ -564,23 +577,24 @@ h1 { font-family: var(--font-serif); font-size: 26px; line-height: 1.1; margin: 
       t.setAttribute("y", 59 - (lin.length - 1) * 7 + 3 + (i - 1) * 14);
     }
   }
-  function frase(texto, enojo) {
+  function frase(texto, enojo, clip) {
     var c = $("centro"); if (!c) return;
     c.classList.add("enojada"); $("cejas").style.display = ""; $("globoHabla").style.display = "";
     globo(texto);
     hablaBoca(); setTimeout(hablaBoca, 1100);
-    hablar(texto, true, true);
+    if (clip) senora(clip, function () { hablar(texto, true, true); }); else hablar(texto, true, true);
     ruidoGrito();
   }
   function anotar(h) { var rg = $("regano"); rg.hidden = false; rg.innerHTML += (rg.innerHTML ? "<br>" : "") + h; }
   function enojar(nombre) {
     nombre = (nombre || miNombre || "").trim() || "mijo";
-    var pool = [REGANOS[0], REGANOS[2]];
-    if (cantadas >= 3) pool.push(REGANOS[3], REGANOS[4]);
-    if (victorias >= 3) pool.push(REGANOS[1]);
-    var t = pool[Math.floor(Math.random() * pool.length)].replace(/\{n\}/g, nombre);
+    var pool = [0, 2];
+    if (cantadas >= 3) pool.push(3, 4);
+    if (victorias >= 3) pool.push(1);
+    var ri = pool[Math.floor(Math.random() * pool.length)];
+    var t = REGANOS[ri].replace(/\{n\}/g, nombre);
     $("regano").innerHTML = ""; anotar("La señora del globo: «" + t + "»");
-    frase(t);
+    frase(t, true, "regano" + (ri + 1));
   }
   var MESAS_XY = [[76, 82], [284, 82], [76, 318], [284, 318]];
   /* cuando canta tu mesa: la señora pide un número, alguien de una mesa lo dice y ella te lo da */
@@ -629,7 +643,8 @@ h1 { font-family: var(--font-serif); font-size: 26px; line-height: 1.1; margin: 
     var dicho = DICHOS[n] ? ", " + DICHOS[n] : "";
     $("dicho").textContent = letra(n) + " " + n + dicho;
     ficha(); hablaBoca();
-    hablar(letra(n) + ", " + n + (DICHOS[n] ? ", " + DICHOS[n] : ""));
+    var textoN = letra(n) + ", " + n + (DICHOS[n] ? ", " + DICHOS[n] : "");
+    senora("n" + (n < 10 ? "0" : "") + n, function () { hablar(textoN); });
     // ¿alguien canta?
     var tipo = $("canto").value, ganadores = [];
     cartones.forEach(function (cd) {
@@ -653,8 +668,8 @@ h1 { font-family: var(--font-serif); font-size: 26px; line-height: 1.1; margin: 
     $("bTxt").textContent = quien + " cantó con el " + letra(bolas[bolas.length - 1]) + " " + bolas[bolas.length - 1] + "." + extra;
     $("dicho").textContent = "¡BINGO! Toda la mesa se paró gritando.";
     ruidoGrito(); confeti();
-    hablar("¡Bingooo!", true);
-    setTimeout(function () { hablar("¡Bingo, bingo, bingo!", true); ruidoGrito(); }, 1400);
+    senora("bingo1", function () { hablar("¡Bingooo!", true); });
+    setTimeout(function () { senora("bingo2", function () { hablar("¡Bingo, bingo, bingo!", true); }); ruidoGrito(); }, 1400);
     var gano = !!mesas[mesaElegida]; cantadas++; if (gano) victorias++;
     tEnojo = setTimeout(function () { if (gano && victorias >= 3) verificar(gs); else enojar(miNombre); }, $("voz").value === "1" ? 4200 : 2800);
     var gm = Object.keys(mesas).map(Number), premio = ANTE * 4 - Math.round(ANTE * 4 * 0.1), ult = ronda >= totalRondas();
@@ -704,7 +719,7 @@ h1 { font-family: var(--font-serif); font-size: 26px; line-height: 1.1; margin: 
     $("escoger").hidden = true; $("sentarse").hidden = true; mesaPend = -1; desenojar(); $("rondas").disabled = false; $("tuMesa").textContent = "toca una mesa para sentarte";
     for (var q = 0; q < 4; q++) $("mesa" + q).classList.remove("elegida");
     pintaPote();
-    if ("speechSynthesis" in window) try { speechSynthesis.cancel(); } catch (e) {}
+    pararClip(); if ("speechSynthesis" in window) try { speechSynthesis.cancel(); } catch (e) {}
     bombo = barajar(Array.apply(null, { length: 75 }).map(function (_, i) { return i + 1; }));
     bolas = []; actual = 0;
     crearCartones();
