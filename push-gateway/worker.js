@@ -1352,6 +1352,7 @@ const APK_URL = "https://github.com/siervobenshalyahu-ship-it/Chamos/releases/la
 const APPS_WEB = {
   chamos: { url: APK_URL, archivo: "Chamos.apk" },
   golpe: { url: "https://github.com/siervobenshalyahu-ship-it/Chamos/releases/download/golpe-ultimo/golpe.apk", archivo: "Golpe-secuestro-o-traicion.apk" },
+  juegos: { url: "https://github.com/siervobenshalyahu-ship-it/Chamos/releases/download/juegos-mesas-ultimo/juegos-de-mesas-venezolanos.apk", archivo: "Juegos-de-mesas-venezolanos.apk" },
 };
 const _hexW = (b) => [...new Uint8Array(b)].map((x) => x.toString(16).padStart(2, "0")).join("");
 async function webFirma(env, texto) {
