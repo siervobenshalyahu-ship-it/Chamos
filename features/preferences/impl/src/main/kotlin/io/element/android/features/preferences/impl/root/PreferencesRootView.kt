@@ -13,7 +13,10 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.res.painterResource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -382,6 +385,22 @@ private fun ColumnScope.Footer(
     version: String,
     onClick: (() -> Unit)?,
 ) {
+    // Chamos: marca del creador
+    Image(
+        painter = painterResource(id = R.drawable.marca_benshalyahu),
+        contentDescription = "Benshalyahu, el hebreo de Venezuela",
+        modifier = Modifier
+            .align(Alignment.CenterHorizontally)
+            .padding(top = 16.dp)
+            .size(112.dp),
+    )
+    Text(
+        modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = 6.dp),
+        textAlign = TextAlign.Center,
+        text = "Chamos, creado por Benshalyahu, el hebreo de Venezuela",
+        style = ElementTheme.typography.fontBodySmRegular,
+        color = ElementTheme.colors.textSecondary,
+    )
     Text(
         modifier = Modifier
             .align(Alignment.CenterHorizontally)
