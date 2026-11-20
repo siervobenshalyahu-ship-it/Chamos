@@ -61,9 +61,10 @@ fun SecureBackupSetupView(
     }
 
     if (state.setupState is SetupState.Error) {
+        val detalle = (state.setupState as SetupState.Error).exception.message.orEmpty()
         ErrorDialog(
-            title = stringResource(id = CommonStrings.common_something_went_wrong),
-            content = stringResource(id = CommonStrings.common_something_went_wrong_message),
+            title = if (detalle == "CLAVE_ACTUAL_INCORRECTA") "Contraseña o PIN actual incorrecto" else stringResource(id = CommonStrings.common_something_went_wrong),
+            content = if (detalle == "CLAVE_ACTUAL_INCORRECTA") "La contraseña o PIN actual no coincide. Revísala e inténtalo de nuevo." else stringResource(id = CommonStrings.common_something_went_wrong_message) + if (state.isChangeRecoveryKeyUserStory && detalle.isNotBlank()) "\n\n" + detalle.take(160) else "",
             onSubmit = {
                 state.eventSink.invoke(SecureBackupSetupEvent.DismissDialog)
             },
@@ -137,16 +138,77 @@ private fun Content(
             null
         }
     }
-    RecoveryKeyView(
-        modifier = Modifier.padding(top = 52.dp),
-        state = state.recoveryKeyViewState,
-        onClick = clickLambda,
-        onChange = null,
-        onSubmit = null,
-        toggleRecoveryKeyVisibility = {},
-    )
-    if (formattedRecoveryKey == null && !state.recoveryKeyViewState.inProgress) {
-        EligeTuPropia(state)
+    Column(modifier = Modifier.fillMaxWidth()) {
+        if (state.isChangeRecoveryKeyUserStory && formattedRecoveryKey == null) {
+            if (state.recoveryKeyViewState.inProgress) {
+                Text(modifier = Modifier.padding(top = 52.dp), text = "Cambiando tu contraseña o PIN… espera un momento.")
+            } else {
+                CambiarClave(state)
+            }
+        } else {
+            RecoveryKeyView(
+                modifier = Modifier.padding(top = 52.dp),
+                state = state.recoveryKeyViewState,
+                onClick = clickLambda,
+                onChange = null,
+                onSubmit = null,
+                toggleRecoveryKeyVisibility = {},
+            )
+            if (formattedRecoveryKey == null && !state.recoveryKeyViewState.inProgress) {
+                EligeTuPropia(state)
+            }
+        }
+    }
+}
+
+/** Chamos: cambiar la contraseña o PIN pidiendo primero la actual. */
+@Composable
+private fun CambiarClave(state: SecureBackupSetupState) {
+    var actual by remember { mutableStateOf("") }
+    var nueva by remember { mutableStateOf("") }
+    var repetir by remember { mutableStateOf("") }
+    val pinNuevo = nueva.length == 6 && nueva.all { it.isDigit() }
+    val valida = pinNuevo || nueva.length >= 8
+    val igual = nueva == repetir
+    Column(modifier = Modifier.fillMaxWidth().padding(top = 32.dp)) {
+        Text(text = "1. Escribe tu contraseña o PIN actual")
+        TextField(
+            modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+            value = actual,
+            onValueChange = { actual = it },
+            placeholder = "Contraseña o PIN actual",
+            singleLine = true,
+            visualTransformation = PasswordVisualTransformation(),
+        )
+        Text(modifier = Modifier.padding(top = 24.dp), text = "2. Escribe la nueva: una contraseña de 8 caracteres o más, o un PIN de 6 números")
+        TextField(
+            modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+            value = nueva,
+            onValueChange = { nueva = it },
+            placeholder = "Contraseña o PIN nuevo",
+            singleLine = true,
+            visualTransformation = PasswordVisualTransformation(),
+        )
+        TextField(
+            modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+            value = repetir,
+            onValueChange = { repetir = it },
+            placeholder = "Repite la nueva",
+            singleLine = true,
+            visualTransformation = PasswordVisualTransformation(),
+        )
+        if (nueva.isNotEmpty() && !valida) {
+            Text(modifier = Modifier.padding(top = 8.dp), text = "La nueva debe tener 8 caracteres o más, o ser un PIN de 6 números.")
+        } else if (repetir.isNotEmpty() && !igual) {
+            Text(modifier = Modifier.padding(top = 8.dp), text = "Las dos nuevas no coinciden.")
+        }
+        Text(modifier = Modifier.padding(top = 16.dp), text = "La anterior dejará de servir. Si olvidas la nueva no podrás recuperar tus mensajes.")
+        Button(
+            text = "Cambiar",
+            enabled = actual.isNotEmpty() && valida && igual && repetir.isNotEmpty(),
+            modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
+            onClick = { state.eventSink(SecureBackupSetupEvent.ChangeWithPassphrase(actual, nueva)) },
+        )
     }
 }
 

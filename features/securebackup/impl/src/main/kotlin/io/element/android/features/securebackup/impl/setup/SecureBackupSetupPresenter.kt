@@ -68,6 +68,10 @@ class SecureBackupSetupPresenter(
                     eleccion = event.passphrase
                     coroutineScope.createOrChangeRecoveryKey(stateAndDispatch, event.passphrase)
                 }
+                is SecureBackupSetupEvent.ChangeWithPassphrase -> {
+                    eleccion = event.nueva
+                    coroutineScope.cambiarClave(stateAndDispatch, event.actual, event.nueva)
+                }
                 SecureBackupSetupEvent.RecoveryKeyHasBeenSaved ->
                     stateAndDispatch.dispatchAction(SecureBackupSetupStateMachine.Event.UserSavedKey)
                 SecureBackupSetupEvent.CopyRecoveryKey -> {
@@ -111,6 +115,31 @@ class SecureBackupSetupPresenter(
             is SecureBackupSetupStateMachine.State.KeyCreated -> SetupState.Created(formattedRecoveryKey = key)
             is SecureBackupSetupStateMachine.State.KeyCreatedAndSaved -> SetupState.CreatedAndSaved(formattedRecoveryKey = key)
             is SecureBackupSetupStateMachine.State.Error -> SetupState.Error(exception)
+        }
+    }
+
+    /** Chamos: pide la contraseña o PIN actual, la comprueba, y solo entonces pone la nueva. */
+    private fun CoroutineScope.cambiarClave(
+        stateAndDispatch: StateAndDispatch<SecureBackupSetupStateMachine.State, SecureBackupSetupStateMachine.Event>,
+        actual: String,
+        nueva: String,
+    ) = launch {
+        stateAndDispatch.dispatchAction(SecureBackupSetupStateMachine.Event.UserCreatesKey)
+        val comprobada = encryptionService.recover(actual)
+        if (comprobada.isFailure) {
+            Timber.tag(loggerTagSetup.value).e(comprobada.exceptionOrNull(), "Current recovery passphrase is wrong")
+            stateAndDispatch.dispatchAction(SecureBackupSetupStateMachine.Event.SdkError(Exception("CLAVE_ACTUAL_INCORRECTA")))
+            return@launch
+        }
+        observeEncryptionService(stateAndDispatch)
+        val desactivada = encryptionService.disableRecovery()
+        if (desactivada.isFailure) {
+            stateAndDispatch.dispatchAction(SecureBackupSetupStateMachine.Event.SdkError(Exception(desactivada.exceptionOrNull()?.message ?: "No se pudo desactivar la anterior")))
+            return@launch
+        }
+        encryptionService.enableRecovery(waitForBackupsToUpload = false, passphrase = nueva).onFailure {
+            Timber.tag(loggerTagSetup.value).e(it, "Failed to set new recovery passphrase")
+            stateAndDispatch.dispatchAction(SecureBackupSetupStateMachine.Event.SdkError(Exception(it.message ?: "No se pudo crear la nueva")))
         }
     }
 
