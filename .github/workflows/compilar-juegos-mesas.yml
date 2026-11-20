@@ -1,0 +1,49 @@
+name: Juegos de mesas venezolanos (compilar APK)
+
+on:
+  workflow_dispatch:
+    inputs:
+      publicar:
+        description: "Publicar el APK en Releases (etiqueta juegos-mesas-ultimo)"
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 8.9
+      - name: Compilar
+        working-directory: juegos-mesas
+        run: gradle assembleRelease --no-daemon
+      - name: Renombrar
+        run: |
+          mkdir -p salida
+          cp juegos-mesas/app/build/outputs/apk/release/app-release.apk "salida/juegos-de-mesas-venezolanos.apk"
+          ls -la salida
+      - uses: actions/upload-artifact@v4
+        with:
+          name: juegos-de-mesas-venezolanos
+          path: salida/juegos-de-mesas-venezolanos.apk
+      - name: Publicar
+        if: inputs.publicar
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if gh release view juegos-mesas-ultimo >/dev/null 2>&1; then
+            gh release upload juegos-mesas-ultimo salida/juegos-de-mesas-venezolanos.apk --clobber
+          else
+            gh release create juegos-mesas-ultimo salida/juegos-de-mesas-venezolanos.apk \
+              --title "Juegos de mesas venezolanos" --prerelease --latest=false \
+              --notes "Dominó, bingo, caída, ajilei, robapilón, treinta y uno, chapitas y fútbol callejero. Sin internet."
+          fi

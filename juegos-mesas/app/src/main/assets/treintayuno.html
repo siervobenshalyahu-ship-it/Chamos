@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Treinta y uno (31), el juego de cartas con baraja española, de Chamos.">
+<title>31 Chamos</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Manrope:wght@400;600;800&display=swap">
+<style>
+:root { --bg:#080c18; --panel:#0e1424; --line:rgba(255,255,255,.10); --ink:#eef1f7; --muted:#9aa4b8; --amber:#f4b54a; --felt:#0f2b22; --felt2:#0a1f19; --good:#5fd39a; --bad:#ef7a6e;
+  --font-serif:"Fraunces",Georgia,serif; --font-sans:"Manrope",system-ui,sans-serif; color-scheme:dark; }
+* { box-sizing:border-box; } [hidden]{display:none!important;} html,body{margin:0;}
+body { background:var(--bg); color:var(--ink); font-family:var(--font-sans); font-size:15px; line-height:1.5; padding-block:14px 28px; padding-left:max(14px,env(safe-area-inset-left,0px)); padding-right:max(14px,env(safe-area-inset-right,0px)); }
+button { font:inherit; color:inherit; } :focus-visible{outline:2px solid var(--amber);outline-offset:2px;}
+.app { max-width:520px; margin:0 auto; display:flex; flex-direction:column; gap:12px; }
+header { display:flex; justify-content:space-between; align-items:flex-end; gap:12px; flex-wrap:wrap; }
+h1 { font-family:var(--font-serif); font-size:26px; line-height:1.1; margin:0; font-weight:700; }
+.sub { color:var(--muted); font-size:12px; margin:2px 0 0; }
+.rulesbtn { background:none; border:1px solid var(--line); border-radius:8px; padding:6px 12px; color:var(--muted); cursor:pointer; font-weight:600; font-size:13px; }
+.rulesbtn:hover { color:var(--ink); border-color:var(--amber); }
+.panel { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:12px 14px; }
+.panel h2 { font-family:var(--font-serif); font-size:18px; margin:0 0 6px; }
+.panel ul { margin:0; padding-left:18px; display:grid; gap:5px; color:#cdd4e3; font-size:14px; }
+.mesa { background:radial-gradient(ellipse at 50% 40%, var(--felt), var(--felt2)); border:1px solid rgba(255,255,255,.12); border-radius:16px; padding:12px; display:flex; flex-direction:column; gap:12px; }
+.rivales { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; }
+.rival { min-width:0; background:rgba(0,0,0,.28); border-radius:10px; padding:6px; text-align:center; font-size:12px; border:2px solid transparent; }
+.rival.turno { border-color:var(--amber); } .rival.fuera { opacity:.45; }
+.rival b { display:block; font-size:12px; } .vidas { letter-spacing:2px; font-size:12px; }
+.manito { display:flex; justify-content:center; gap:3px; margin-top:4px; }
+.carta { width:62px; flex:none; border:0; background:none; padding:0; border-radius:8px; cursor:default; }
+.carta svg { display:block; width:100%; height:auto; filter:drop-shadow(0 3px 5px rgba(0,0,0,.45)); }
+.carta.sel { transform:translateY(-12px); } .carta.btn { cursor:pointer; }
+.carta.btn:hover svg { filter:drop-shadow(0 3px 8px rgba(244,181,74,.8)); }
+.dorso { width:34px; aspect-ratio:100/156; border-radius:5px; background:repeating-linear-gradient(45deg,#7a1d17 0 4px,#a32b22 4px 8px); border:2px solid #fffcf2; }
+.centro { text-align:center; } .centro small { color:#bcd; font-size:11px; display:block; margin-bottom:4px; letter-spacing:.06em; text-transform:uppercase; }
+.fila { display:flex; justify-content:center; gap:8px; }
+.tuyo small { color:#bcd; font-size:11px; text-align:center; display:block; margin-bottom:4px; letter-spacing:.06em; text-transform:uppercase; }
+.pts { font-family:var(--font-serif); font-weight:700; color:var(--amber); }
+.msg { text-align:center; min-height:44px; font-size:14px; }
+.acc { display:flex; flex-wrap:wrap; gap:8px; justify-content:center; }
+.btn { background:var(--amber); color:#1a1205; border:0; border-radius:8px; padding:9px 14px; font-weight:800; cursor:pointer; }
+.btn.alt { background:none; color:var(--amber); border:1px solid var(--amber); }
+.btn:disabled { opacity:.45; cursor:default; }
+.res table { width:100%; border-collapse:collapse; font-size:13px; } .res td,.res th { padding:4px 6px; text-align:left; border-bottom:1px solid var(--line); }
+.res .lose { color:var(--bad); font-weight:800; } .res .win { color:var(--good); font-weight:800; }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div><h1>31</h1><p class="sub">Junta 31 puntos con tres cartas del mismo palo. Tú contra Doña Carmen, Don Pedro y Yoli.</p></div>
+    <button class="rulesbtn" id="rulesBtn" aria-expanded="false" aria-controls="rules">Reglas</button>
+  </header>
+
+  <section class="panel" id="rules" hidden>
+    <h2>Cómo se juega</h2>
+    <ul>
+      <li>Se juega con la baraja española de 40 cartas. Cada jugador recibe 3 cartas y se ponen otras 3 boca arriba en el centro.</li>
+      <li>Tu puntaje es la suma de las cartas de <b>un mismo palo</b> (el mejor palo que tengas). El <b>as vale 11</b>; la sota, el caballo y el rey valen <b>10</b>; las demás valen lo que dicen.</li>
+      <li><b>Tres cartas iguales</b> (por ejemplo tres 5) valen <b>30,5</b>.</li>
+      <li>En tu turno haces una de estas cosas: <b>cambiar una carta</b> de tu mano por una del centro, <b>cambiar las tres</b>, <b>pasar</b> o <b>golpear</b> la mesa.</li>
+      <li>Si alguien consigue <b>31 exacto</b>, enseña su mano y la ronda termina de una vez.</li>
+      <li>Al <b>golpear</b>, avisas que crees tener buen puntaje. Cada uno de los demás juega un último turno y se enseñan todas las manos.</li>
+      <li>El que tenga el <b>puntaje más bajo pierde una vida</b>. Si empatan los más bajos, pierden todos. Si golpeaste y quedaste de último, pierdes <b>dos vidas</b>.</li>
+      <li>Cada quien empieza con <b>3 vidas</b>. El que se queda sin vidas sale, y gana el último que quede.</li>
+    </ul>
+  </section>
+
+  <div class="mesa">
+    <div class="rivales" id="rivales"></div>
+    <div class="centro"><small>El centro: toca una para cambiarla</small><div class="fila" id="centro"></div></div>
+    <div class="tuyo"><small>Tu mano · <span class="pts" id="miPts">0</span> puntos</small><div class="fila" id="mano"></div></div>
+  </div>
+
+  <div class="msg" id="msg"></div>
+  <div class="acc">
+    <button class="btn" id="bTres">Cambiar las 3</button>
+    <button class="btn alt" id="bPasar">Pasar</button>
+    <button class="btn" id="bGolpe">✊ Golpear</button>
+  </div>
+  <div class="panel res" id="res" hidden></div>
+  <div class="acc"><button class="btn alt" id="bNueva" hidden>Siguiente ronda</button><button class="btn alt" id="bReinicio" hidden>Jugar otra vez</button></div>
+</div>
+<script src="cartas.js"></script>
+<script>
+(function () {
+  "use strict";
+  var $ = function (i) { return document.getElementById(i); };
+  var NOMBRES = ["Tú", "Doña Carmen", "Don Pedro", "Yoli"];
+  var jug = [], centro = [], mazo = [], turno = 0, golpeo = -1, restantes = 0, fin = false, sel = -1, ocupado = false, dealer = 0;
+
+  function baraja() {
+    var m = [];
+    Cartas.suits.forEach(function (s) { Cartas.ranks.forEach(function (r) { m.push({ r: r, s: s }); }); });
+    for (var i = m.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var t = m[i]; m[i] = m[j]; m[j] = t; }
+    return m;
+  }
+  function valor(c) { return c.r === 1 ? 11 : (c.r >= 10 ? 10 : c.r); }
+  function puntos(mano) {
+    if (mano.length === 3 && mano[0].r === mano[1].r && mano[1].r === mano[2].r) return 30.5;
+    var por = {}, best = 0;
+    mano.forEach(function (c) { por[c.s] = (por[c.s] || 0) + valor(c); });
+    Object.keys(por).forEach(function (s) { if (por[s] > best) best = por[s]; });
+    return best;
+  }
+  function fmt(n) { return String(n).replace(".", ","); }
+  function vivos() { return jug.filter(function (p) { return p.vidas > 0; }); }
+
+  function nuevaRonda() {
+    fin = false; golpeo = -1; restantes = 0; sel = -1; ocupado = false;
+    mazo = baraja();
+    jug.forEach(function (p) { p.mano = p.vidas > 0 ? [mazo.pop(), mazo.pop(), mazo.pop()] : []; p.golpe = false; });
+    centro = [mazo.pop(), mazo.pop(), mazo.pop()];
+    $("res").hidden = true; $("bNueva").hidden = true; $("bReinicio").hidden = true;
+    do { dealer = (dealer + 1) % 4; } while (jug[dealer].vidas <= 0);
+    turno = dealer;
+    do { turno = (turno + 1) % 4; } while (jug[turno].vidas <= 0);
+    msg("Ronda nueva. " + (turno === 0 ? "Empiezas tú." : "Empieza " + jug[turno].nombre + "."));
+    dibujar();
+    revisar31();
+    if (!fin) siguiente();
+  }
+  function msg(t) { $("msg").textContent = t; }
+
+  function carta(c, cls, fn) {
+    var b = document.createElement("button");
+    b.type = "button"; b.className = "carta " + (cls || ""); b.innerHTML = Cartas.svg(c.r, c.s);
+    b.setAttribute("aria-label", Cartas.nombre(c.r) + " de " + c.s);
+    if (fn) { b.classList.add("btn"); b.addEventListener("click", fn); } else b.tabIndex = -1;
+    return b;
+  }
+  function dibujar() {
+    var rv = $("rivales"); rv.innerHTML = "";
+    for (var i = 1; i < 4; i++) {
+      var p = jug[i], d = document.createElement("div");
+      d.className = "rival" + (turno === i && !fin ? " turno" : "") + (p.vidas <= 0 ? " fuera" : "");
+      var v = ""; for (var k = 0; k < 3; k++) v += k < p.vidas ? "❤️" : "🖤";
+      var man = "";
+      if (fin && p.mano.length) { d.innerHTML = "<b>" + p.nombre + "</b><span class='vidas'>" + v + "</span>"; var m = document.createElement("div"); m.className = "manito"; p.mano.forEach(function (c) { var x = carta(c); x.style.width = "29px"; m.appendChild(x); }); d.appendChild(m); var s = document.createElement("div"); s.innerHTML = "<span class='pts'>" + fmt(puntos(p.mano)) + "</span>"; d.appendChild(s); }
+      else { for (k = 0; k < p.mano.length; k++) man += "<span class='dorso'></span>"; d.innerHTML = "<b>" + p.nombre + (p.golpe ? " ✊" : "") + "</b><span class='vidas'>" + v + "</span><div class='manito'>" + man + "</div>"; }
+      rv.appendChild(d);
+    }
+    var ce = $("centro"); ce.innerHTML = "";
+    centro.forEach(function (c, i) { ce.appendChild(carta(c, "", (turno === 0 && !fin && !ocupado && sel >= 0) ? function () { cambiar(0, sel, i); } : null)); });
+    var ma = $("mano"); ma.innerHTML = "";
+    jug[0].mano.forEach(function (c, i) { ma.appendChild(carta(c, i === sel ? "sel" : "", (turno === 0 && !fin && !ocupado) ? function () { sel = (sel === i ? -1 : i); if (sel >= 0) msg("Ahora toca la carta del centro que quieres."); dibujar(); } : null)); });
+    $("miPts").textContent = jug[0].mano.length ? fmt(puntos(jug[0].mano)) : "0";
+    var mi = turno === 0 && !fin && !ocupado && jug[0].vidas > 0;
+    $("bTres").disabled = !mi; $("bPasar").disabled = !mi; $("bGolpe").disabled = !mi || golpeo >= 0;
+  }
+  function cambiar(i, h, c) {
+    var p = jug[i], t = p.mano[h]; p.mano[h] = centro[c]; centro[c] = t;
+    sel = -1;
+    msg(i === 0 ? "Cambiaste una carta." : p.nombre + " cambió una carta.");
+    terminarTurno(i);
+  }
+  function cambiarTres(i) {
+    var p = jug[i], t = p.mano; p.mano = centro; centro = t; sel = -1;
+    msg(i === 0 ? "Cambiaste las tres cartas." : p.nombre + " cambió las tres cartas.");
+    terminarTurno(i);
+  }
+  function golpear(i) {
+    golpeo = i; jug[i].golpe = true; restantes = vivos().length - 1;
+    msg((i === 0 ? "¡Golpeaste la mesa!" : jug[i].nombre + " golpeó la mesa.") + " Los demás juegan un último turno.");
+    terminarTurno(i, true);
+  }
+  function revisar31() {
+    var g = jug.filter(function (p) { return p.vidas > 0 && puntos(p.mano) === 31; });
+    if (g.length) { msg("¡" + (g[0].nombre === "Tú" ? "Tienes" : g[0].nombre + " tiene") + " 31!"); acabar(); return true; }
+    return false;
+  }
+  function terminarTurno(i, yaGolpe) {
+    dibujar();
+    if (revisar31()) return;
+    if (golpeo >= 0 && !yaGolpe) restantes--;
+    if (golpeo >= 0 && restantes <= 0) { acabar(); return; }
+    do { turno = (turno + 1) % 4; } while (jug[turno].vidas <= 0);
+    dibujar(); siguiente();
+  }
+  function siguiente() {
+    if (fin) return;
+    if (turno === 0) { ocupado = false; msg("Tu turno: toca una carta tuya y luego una del centro; o cambia las tres, pasa o golpea."); dibujar(); return; }
+    ocupado = true; dibujar();
+    setTimeout(botJuega, 1100);
+  }
+  function mejorCambio(p) {
+    var best = { pts: puntos(p.mano), h: -1, c: -1 };
+    for (var h = 0; h < 3; h++) for (var c = 0; c < 3; c++) {
+      var m = p.mano.slice(); m[h] = centro[c]; var x = puntos(m);
+      if (x > best.pts) best = { pts: x, h: h, c: c };
+    }
+    var t = puntos(centro); if (t > best.pts + 0.4) best = { pts: t, tres: true };
+    return best;
+  }
+  function botJuega() {
+    if (fin) return;
+    var p = jug[turno], i = turno, ya = puntos(p.mano), b = mejorCambio(p);
+    if (golpeo < 0 && ya >= 26 && Math.random() < 0.55 + (ya - 26) * 0.1) { golpear(i); return; }
+    if (b.tres) { cambiarTres(i); return; }
+    if (b.h >= 0) { cambiar(i, b.h, b.c); return; }
+    if (golpeo < 0 && ya >= 22 && Math.random() < 0.3) { golpear(i); return; }
+    msg(p.nombre + " pasó."); terminarTurno(i);
+  }
+  function acabar() {
+    fin = true; ocupado = true; sel = -1;
+    var vs = vivos(), min = 99;
+    vs.forEach(function (p) { p.pt = puntos(p.mano); if (p.pt < min) min = p.pt; });
+    var h = "<h2>Se enseñan las manos</h2><table><tr><th>Jugador</th><th>Puntos</th><th>Resultado</th></tr>";
+    var quedan;
+    vs.forEach(function (p) {
+      var pierde = p.pt === min, quita = 0;
+      if (pierde) quita = (p.golpe ? 2 : 1);
+      p.vidas = Math.max(0, p.vidas - quita);
+      h += "<tr><td>" + p.nombre + (p.golpe ? " ✊" : "") + "</td><td>" + fmt(p.pt) + "</td><td class='" + (pierde ? "lose" : "win") + "'>" + (pierde ? "pierde " + quita + (quita === 1 ? " vida" : " vidas") : (p.pt === 31 ? "¡31!" : "se salva")) + "</td></tr>";
+    });
+    $("res").innerHTML = h + "</table>"; $("res").hidden = false;
+    dibujar();
+    quedan = vivos();
+    if (jug[0].vidas <= 0) { msg("Te quedaste sin vidas. ¡Ganó " + quedan[0].nombre + "!"); $("bReinicio").hidden = false; }
+    else if (quedan.length === 1) { msg("🎉 ¡Ganaste, chamo! Eres el último con vidas."); $("bReinicio").hidden = false; }
+    else { msg("Fin de la ronda."); $("bNueva").hidden = false; }
+    $("bTres").disabled = $("bPasar").disabled = $("bGolpe").disabled = true;
+    // ver las manos rivales
+    dibujar();
+  }
+  function reinicio() {
+    jug = NOMBRES.map(function (n) { return { nombre: n, vidas: 3, mano: [], golpe: false }; });
+    dealer = Math.floor(Math.random() * 4);
+    nuevaRonda();
+  }
+
+  $("bTres").addEventListener("click", function () { if (turno === 0 && !fin && !ocupado) cambiarTres(0); });
+  $("bPasar").addEventListener("click", function () { if (turno === 0 && !fin && !ocupado) { msg("Pasaste."); terminarTurno(0); } });
+  $("bGolpe").addEventListener("click", function () { if (turno === 0 && !fin && !ocupado && golpeo < 0) golpear(0); });
+  $("bNueva").addEventListener("click", nuevaRonda);
+  $("bReinicio").addEventListener("click", reinicio);
+  $("rulesBtn").addEventListener("click", function () { var r = $("rules"), a = r.hidden; r.hidden = !a; this.setAttribute("aria-expanded", String(a)); });
+  reinicio();
+})();
+</script>
+</body>
+</html>

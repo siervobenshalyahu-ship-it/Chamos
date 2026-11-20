@@ -1,0 +1,605 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Caída, el juego de cartas venezolano, de Chamos.">
+<title>Caída Chamos</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Manrope:wght@400;600;800&display=swap">
+<style>
+/* Concepto: una mesa de caída de barrio, de noche. Mismo paño verde y acento ámbar del dominó; cartas de baraja española de 40. */
+:root {
+  --bg: #080c18;
+  --panel: #0e1424;
+  --line: rgba(255, 255, 255, .10);
+  --ink: #eef1f7;
+  --muted: #9aa4b8;
+  --amber: #f4b54a;
+  --felt: #0f2b22;
+  --felt-2: #0a1f19;
+  --ivory: #f3ecd9;
+  --ivory-edge: #cfc5a8;
+  --pip: #1a1510;
+  --good: #5fd39a;
+  --bad: #ef7a6e;
+  --font-serif: "Fraunces", "Iowan Old Style", Georgia, serif;
+  --font-sans: "Manrope", system-ui, -apple-system, "Segoe UI", sans-serif;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { margin: 0; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.5;
+  padding-block: 14px 28px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+button { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+.app { max-width: 520px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; }
+
+header { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
+h1 { font-family: var(--font-serif); font-size: 26px; line-height: 1.1; margin: 0; font-weight: 700; text-wrap: balance; }
+.sub { color: var(--muted); font-size: 12px; margin: 2px 0 0; }
+.rulesbtn { background: none; border: 1px solid var(--line); border-radius: 8px; padding: 6px 12px; color: var(--muted); cursor: pointer; font-weight: 600; font-size: 13px; }
+.rulesbtn:hover { color: var(--ink); border-color: var(--amber); }
+
+.score { display: flex; align-items: center; gap: 6px; }
+.team { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 3px 10px; min-width: 0; display: flex; align-items: baseline; gap: 6px; flex: 1 1 0; white-space: nowrap; }
+.team b { font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); font-weight: 800; }
+.team span { font-family: var(--font-serif); font-size: 19px; line-height: 1.2; font-weight: 700; font-variant-numeric: tabular-nums; }
+.team.us span { color: var(--amber); }
+.team .pend { font-style: normal; font-size: 10px; color: var(--amber); font-weight: 800; margin-left: auto; overflow: hidden; text-overflow: ellipsis; }
+.goal { display: flex; align-items: center; gap: 4px; color: var(--muted); font-size: 10px; letter-spacing: .06em; text-transform: uppercase; font-weight: 800; flex: none; }
+.goal select { background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 6px; padding: 2px 3px; font: inherit; font-size: 12px; letter-spacing: 0; }
+
+.table { background: radial-gradient(120% 90% at 50% 20%, var(--felt) 0%, var(--felt-2) 100%); border: 1px solid var(--line); border-radius: 14px; padding: 10px 10px 12px; display: flex; flex-direction: column; gap: 8px; box-shadow: 0 24px 60px rgba(0, 0, 0, .45); }
+.opp { display: flex; justify-content: space-between; align-items: center; gap: 10px; background: rgba(0, 0, 0, .28); border: 1px solid transparent; border-radius: 10px; padding: 5px 12px; transition: border-color .2s, background .2s; }
+.opp.turn { border-color: var(--amber); background: rgba(244, 181, 74, .10); }
+.opp .nm { font-weight: 800; font-size: 14px; }
+.opp .tm { color: var(--muted); font-size: 12px; }
+.backs { display: flex; gap: 4px; min-height: 24px; align-items: center; }
+.backs i { width: 15px; height: 22px; border-radius: 4px; border: 1px solid var(--ivory-edge); background: repeating-linear-gradient(45deg, #1d3f9e 0 4px, #16327f 4px 8px); display: block; }
+
+.info { display: flex; justify-content: space-between; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; min-height: 26px; }
+.chip { background: rgba(0, 0, 0, .3); border: 1px solid var(--line); border-radius: 999px; padding: 2px 10px; font-weight: 800; color: var(--amber); font-variant-numeric: tabular-nums; }
+
+.board { --cw: 60px; min-height: 250px; display: flex; flex-wrap: wrap; justify-content: center; align-content: center; align-items: center; gap: 8px; padding: 4px 0; }
+.board .empty { color: var(--muted); font-size: 13px; text-align: center; width: 100%; padding: 18px 0; }
+
+.pc { --cw: 56px; width: var(--cw); height: calc(var(--cw) * 1.56); flex: none; display: block; padding: 0; margin: 0; border: 0; border-radius: calc(var(--cw) * .09); background: none; box-shadow: 0 2px 0 rgba(0, 0, 0, .35), 0 3px 8px rgba(0, 0, 0, .45); }
+.pc svg { width: 100%; height: 100%; display: block; }
+.board .pc { --cw: 60px; }
+.board .pc.last { outline: 2px solid var(--amber); outline-offset: 2px; }
+
+.tray { display: flex; align-items: center; flex-wrap: wrap; gap: 5px 6px; background: rgba(0, 0, 0, .26); border: 1px solid rgba(255, 255, 255, .06); border-radius: 10px; padding: 5px 8px; min-height: 46px; }
+.tray .who { font-size: 10px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin-right: 2px; flex: none; }
+.tray .vacia { font-size: 12px; color: var(--muted); opacity: .8; }
+.tray svg { display: block; flex: none; filter: drop-shadow(0 2px 2px rgba(0, 0, 0, .55)); }
+.tray .chapa { width: 34px; height: 34px; }
+.tray .piedra { width: 22px; height: 16px; }
+.tray .pop { animation: pop .4s ease-out; }
+.tray .cambiar { margin-left: auto; padding: 6px 10px; font-size: 12px; }
+@keyframes pop { 0% { transform: scale(.3); opacity: 0; } 60% { transform: scale(1.2); opacity: 1; } 100% { transform: scale(1); } }
+.log { color: var(--muted); font-size: 13px; text-align: center; min-height: 40px; }
+.log b { color: var(--ink); }
+.log .pts { color: var(--amber); font-weight: 800; }
+
+.me { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+.me.turn { border-color: var(--amber); }
+.mehead { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+.mehead b { color: var(--ink); font-size: 14px; }
+.hand { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; min-height: calc(70px * 1.56 + 6px); }
+.hand button.pc { --cw: 70px; cursor: default; font: inherit; transition: transform .15s, outline-color .15s; outline: 2px solid transparent; outline-offset: 2px; }
+.hand button.pc.can { cursor: pointer; }
+.hand button.pc.can:hover { transform: translateY(-6px); outline-color: var(--amber); }
+.hand button.pc.cap { box-shadow: 0 0 0 2px rgba(95, 211, 154, .85), 0 3px 8px rgba(0, 0, 0, .45); }
+.hand button.pc.caida { box-shadow: 0 0 0 3px var(--amber), 0 3px 8px rgba(0, 0, 0, .45); }
+.hint { color: var(--muted); font-size: 12px; text-align: center; min-height: 18px; }
+.hint b { color: var(--amber); }
+.hint .btn { margin-bottom: 6px; }
+
+.btn { background: var(--amber); color: #1a1205; border: 0; border-radius: 8px; padding: 9px 14px; font-weight: 800; cursor: pointer; }
+.btn.ghost { background: transparent; color: var(--ink); border: 1px solid var(--line); }
+.btn:hover { filter: brightness(1.08); }
+
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; font-size: 14px; }
+.panel h2 { font-family: var(--font-serif); font-size: 20px; margin: 0 0 6px; }
+.panel ul { margin: 6px 0 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }
+
+.overlay { position: fixed; inset: 0; background: rgba(4, 7, 14, .78); display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 20; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 20px; width: 100%; max-width: 420px; display: flex; flex-direction: column; gap: 12px; box-shadow: 0 30px 80px rgba(0, 0, 0, .6); }
+.card h2 { font-family: var(--font-serif); font-size: 26px; margin: 0; text-wrap: balance; }
+.card p { margin: 0; color: var(--muted); }
+.rows { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; font-size: 14px; font-variant-numeric: tabular-nums; }
+.rows b { text-align: right; }
+.win { color: var(--good); } .lose { color: var(--bad); }
+
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+@media (max-width: 380px) { h1 { font-size: 24px; } .hand button.pc { --cw: 62px; } .board .pc { --cw: 52px; } .board { gap: 6px; } }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <header>
+    <div>
+      <h1>Caída Chamos</h1>
+      <p class="sub">Baraja española de 40 cartas. Tú contra Don Pedro.</p>
+    </div>
+    <button class="rulesbtn" id="rulesBtn" aria-expanded="false" aria-controls="rules">Reglas</button>
+  </header>
+
+  <section class="panel" id="rules" hidden>
+    <h2>Cómo se juega</h2>
+    <ul>
+      <li>La baraja tiene 40 cartas: del 1 al 7, sota (10), caballo (11) y rey (12), en oros, copas, espadas y bastos. El palo no importa, solo el número.</li>
+      <li>Se ponen 4 cartas boca arriba en la mesa y cada jugador recibe 3. Cuando se acaban, se reparten 3 más, hasta terminar el mazo (6 vueltas).</li>
+      <li>En tu turno tiras una carta. Si no hay otra del mismo número en la mesa, se queda allí. Si la hay, te la llevas, y también las siguientes en escalera hacia arriba (si tiras un 4 y hay 4, 5 y 6, te llevas las tres).</li>
+      <li><b>Caída:</b> si tiras el mismo número que la carta que acaba de dejar el otro jugador, le caes. Te la llevas y cobras puntos: 1 a 7 vale 1, la sota 2, el caballo 3 y el rey 4. No hay caída en la primera jugada de una vuelta.</li>
+      <li><b>Mesa limpia:</b> si tu jugada deja la mesa vacía, sumas 4 puntos (no cuenta en la última jugada de la mano).</li>
+      <li>Al terminar la mano, las cartas que quedan en la mesa son de quien hizo la última captura. Cada carta que pase de 20 en tu montón vale 1 punto.</li>
+      <li>Gana quien llegue primero a la meta, incluso a mitad de mano.</li>
+      <li><b>Piedras y chapas:</b> cada punto que ganas es una <b>piedra</b> sobre la mesa. Cuando juntes 12 piedras puedes cambiarlas por una <b>chapa</b> de refresco, que vale 12 puntos. El total no cambia: es solo para llevar la cuenta.</li>
+      <li><b>Cantos:</b> con las 3 cartas que recibes en cada vuelta puedes cantar una combinación antes de tirar tu primera carta. Lo que no cantas no se cobra, y los puntos se suman al cerrar la mano, antes de contar las cartas. Vale el canto más alto de tu mano:
+        <ul>
+          <li><b>Ronda</b> (dos cartas iguales y una distinta): 1 punto del 1 al 7, 2 la sota, 3 el caballo, 4 el rey.</li>
+          <li><b>Trivilín</b> (tres iguales): 5 puntos. Si es de reyes (tres 12), o si lo tienes en la primera y en la última vuelta, mata la partida y ganas al instante.</li>
+          <li><b>Patrulla</b> (tres números seguidos, como 4-5-6 o 7-sota-caballo): 6 puntos.</li>
+          <li><b>Vigía</b> (dos iguales y una carta de número vecino, como 6-6-7): 7 puntos.</li>
+          <li><b>Registro</b> (1, caballo y rey): 8 puntos.</li>
+          <li><b>Registríco</b> (1, sota y caballo): 10 puntos.</li>
+          <li><b>Casa chica</b> (1, caballo y caballo): 11 puntos.</li>
+          <li><b>Casa grande</b> (1, rey y rey): 12 puntos.</li>
+        </ul>
+      </li>
+      <li><b>Cantos iguales:</b> si los dos cantan lo mismo en una vuelta, solo cobra uno. En una ronda gana la que tenga la tercera carta más alta; en lo demás pierde quien reparte.</li>
+      <li><b>Echar la mesa:</b> quien reparte cuenta 1-2-3-4 o 4-3-2-1 al poner las 4 cartas. Por cada carta que coincida con el número que toca, suma ese número. Si no acierta ninguna (mal echada), el primero en jugar suma 1 punto.</li>
+      <li>Si los dos pasan de la meta, gana quien tenga más. Si empatan, se saca carta y gana la más alta.</li>
+      <li>En esta versión la captura es automática.</li>
+    </ul>
+  </section>
+
+  <div class="score" aria-live="polite">
+    <div class="team us"><b>Tú</b><span id="sUs">0</span><i class="pend" id="pUs"></i></div>
+    <div class="team"><b>Pedro</b><span id="sThem">0</span><i class="pend" id="pThem"></i></div>
+    <label class="goal">Meta
+      <select id="goal" aria-label="Meta de puntos"><option>12</option><option selected>24</option><option>36</option></select>
+    </label>
+  </div>
+
+  <main class="table">
+    <div class="opp" id="opp">
+      <div><div class="nm">Don Pedro</div><div class="tm" id="oppPile"></div></div>
+      <div class="backs" id="backs"></div>
+    </div>
+    <div class="tray" id="trayOpp" aria-label="Piedras y chapas de Don Pedro"></div>
+    <div class="info"><span id="vuelta"></span><span class="chip" id="deck"></span></div>
+    <div class="board" id="board"></div>
+    <div class="log" id="log" aria-live="polite"></div>
+    <div class="tray" id="trayMe" aria-label="Tus piedras y chapas"></div>
+  </main>
+
+  <section class="me" id="me">
+    <div class="mehead"><span><b>Tu mano</b> · <span id="myPile"></span></span><span id="myturn"></span></div>
+    <div class="hand" id="hand"></div>
+    <div class="hint" id="hint"></div>
+  </section>
+</div>
+
+<div class="overlay" id="overlay" hidden></div>
+
+<script src="cartas.js"></script>
+<script>
+(function () {
+  "use strict";
+  var FAST = !!window.__fast;
+  var NAMES = ["Tú", "Don Pedro"];
+  var SUITS = ["oros", "copas", "espadas", "bastos"];
+  var RANKS = [1, 2, 3, 4, 5, 6, 7, 10, 11, 12];
+  var ORD = {};
+  RANKS.forEach(function (r, i) { ORD[r] = i; });
+  var RNAME = { 1: "As", 10: "Sota", 11: "Caballo", 12: "Rey" };
+
+  var S = null;
+  var total = [0, 0];
+  var tok = [{ stones: 0, caps: 0 }, { stones: 0, caps: 0 }];   /* piedras (1 punto) y chapas (12 puntos) de cada jugador */
+  var seen = [{ stones: 0, caps: 0 }, { stones: 0, caps: 0 }];
+  var CAPCOL = [["#a8281f", "#e0453a"], ["#1d7a3f", "#3bad66"], ["#b8860b", "#ebbb35"], ["#23499a", "#4a80dc"]];
+
+  function addPts(p, n) {
+    if (!n) return;
+    total[p] += n;
+    tok[p].stones += n;
+    if (p === 1) while (tok[1].stones >= 12) { tok[1].stones -= 12; tok[1].caps++; }   /* Don Pedro cambia solo */
+  }
+  function resetTok() { tok = [{ stones: 0, caps: 0 }, { stones: 0, caps: 0 }]; seen = [{ stones: 0, caps: 0 }, { stones: 0, caps: 0 }]; }
+
+  function chapaSVG(i) {
+    var c = CAPCOL[i % CAPCOL.length], pts = [], n = 20;
+    for (var k = 0; k < n * 2; k++) {
+      var a = (k / (n * 2)) * Math.PI * 2, r = k % 2 ? 13.4 : 15.6;
+      pts.push((16 + Math.cos(a) * r).toFixed(2) + " " + (16 + Math.sin(a) * r).toFixed(2));
+    }
+    return '<svg class="chapa" viewBox="0 0 32 32" aria-hidden="true" focusable="false">' +
+      '<path d="M' + pts.join("L") + 'Z" fill="' + c[0] + '" stroke="rgba(0,0,0,.45)" stroke-width=".8" stroke-linejoin="round"/>' +
+      '<circle cx="16" cy="16" r="11.2" fill="' + c[1] + '" stroke="rgba(0,0,0,.3)" stroke-width=".7"/>' +
+      '<circle cx="16" cy="16" r="8.6" fill="none" stroke="rgba(255,255,255,.4)" stroke-width=".8"/>' +
+      '<path d="M8.4 12.2Q12 6.2 19.6 7.2" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="1.5" stroke-linecap="round"/>' +
+      '<text x="16" y="19.6" text-anchor="middle" font-family="Manrope, system-ui, sans-serif" font-weight="800" font-size="9.5" fill="#fff" stroke="rgba(0,0,0,.35)" stroke-width=".5" paint-order="stroke">12</text></svg>';
+  }
+  var ROCK = [
+    "M3 9Q2 3.6 8 2.4Q14 1 18 4Q21 7 19 11.5Q16 15 9.5 14.6Q4 14 3 9Z",
+    "M2.5 8Q4 2.8 10 2Q17 1.6 19.6 6.4Q21 11 16.6 13.8Q10 15.6 5 13Q2 11 2.5 8Z",
+    "M3.4 10.4Q1.6 5.4 7 3Q13 .8 18 3.6Q21.6 7 18.6 12Q14 15.4 8.4 14.2Q4.6 13.4 3.4 10.4Z"
+  ];
+  var ROCKCOL = [["#8b8d93", "#b9bbc1"], ["#7a7c82", "#a6a8ae"], ["#96989e", "#c4c6cb"]];
+  function piedraSVG(i) {
+    var c = ROCKCOL[i % 3];
+    return '<svg class="piedra" viewBox="0 0 22 17" aria-hidden="true" focusable="false">' +
+      '<path d="' + ROCK[i % 3] + '" fill="' + c[0] + '" stroke="#55575d" stroke-width=".9" stroke-linejoin="round"/>' +
+      '<path d="M5.4 7Q8 3.6 13 4" fill="none" stroke="' + c[1] + '" stroke-width="1.6" stroke-linecap="round"/>' +
+      '<path d="M6 12.4Q11 14 16 11.4" fill="none" stroke="rgba(0,0,0,.25)" stroke-width="1.2" stroke-linecap="round"/></svg>';
+  }
+  function trayHTML(p, name) {
+    var t = tok[p], h = '<span class="who">' + name + "</span>", i, pop;
+    for (i = 0; i < t.caps; i++) { pop = i >= seen[p].caps; h += pop ? '<span class="pop">' + chapaSVG(i + p) + "</span>" : chapaSVG(i + p); }
+    for (i = 0; i < t.stones; i++) { pop = i >= seen[p].stones; h += pop ? '<span class="pop">' + piedraSVG(i) + "</span>" : piedraSVG(i); }
+    if (!t.caps && !t.stones) h += '<span class="vacia">Aún sin piedras</span>';
+    seen[p] = { stones: t.stones, caps: t.caps };
+    return h;
+  }
+  function renderTrays() {
+    $("trayOpp").innerHTML = trayHTML(1, "Don Pedro");
+    var h = trayHTML(0, "Tú");
+    if (tok[0].stones >= 12) h += '<button type="button" class="btn cambiar" id="cambiar">Cambiar 12 piedras por 1 chapa</button>';
+    $("trayMe").innerHTML = h;
+    var b = $("cambiar");
+    if (b) b.onclick = function () {
+      if (tok[0].stones < 12) return;
+      tok[0].stones -= 12; tok[0].caps++;
+      say("Cambiaste <span class='pts'>12 piedras por 1 chapa</span> (12 puntos).");
+      renderTrays();
+    };
+  }
+  var dealer = 1;
+  var timer = null;
+  var finished = false;
+
+  function $(id) { return document.getElementById(id); }
+  function goal() { return parseInt($("goal").value, 10); }
+  function caidaPts(r) { return r <= 7 ? 1 : (r === 10 ? 2 : (r === 11 ? 3 : 4)); }
+  function cardName(c) { return c.r + " de " + c.s; }
+
+  function cardInner(c) { return Cartas.svg(c.r, c.s); }
+
+  function newDeck() {
+    var d = [], id = 0;
+    SUITS.forEach(function (s) { RANKS.forEach(function (r) { d.push({ r: r, s: s, id: id++ }); }); });
+    for (var k = d.length - 1; k > 0; k--) { var j = Math.floor(Math.random() * (k + 1)); var t = d[k]; d[k] = d[j]; d[j] = t; }
+    return d;
+  }
+
+  function say(html) { $("log").innerHTML = html; }
+
+  /* El trivilín mata la partida si es de reyes o si es el de la primera y la última vuelta. */
+  function trivKills(p, bc) { return bc.name === "Trivilín" && (bc.rank === 12 || (S.trivFirst[p] && S.vuelta === 6)); }
+  function cantoLabel(bc, p) { return trivKills(p, bc) ? "Trivilín, ¡mata la partida!" : bc.name + " (+" + bc.pts + ")"; }
+
+  /* Registra el canto de p. Devuelve "kill", "ok", "won" (gana el desempate) o "void" (lo pierde). */
+  function declare(p, bc) {
+    var other = 1 - p, o = S.cantoThis[other];
+    S.canted[p] = true;
+    if (trivKills(p, bc)) return "kill";
+    if (bc.name === "Trivilín" && S.vuelta === 1) S.trivFirst[p] = true;
+    if (o && o.name === bc.name) {
+      var winner;
+      if (bc.name.indexOf("Ronda") === 0 && bc.third !== o.third) winner = bc.third > o.third ? p : other;
+      else winner = 1 - S.dealer;
+      if (winner === p) { S.pend[other] -= o.pts; S.cantoThis[other] = null; S.cantoThis[p] = bc; S.pend[p] += bc.pts; return "won"; }
+      return "void";
+    }
+    S.cantoThis[p] = bc;
+    S.pend[p] += bc.pts;
+    return "ok";
+  }
+
+  /* Mejor canto de una mano de 3 cartas (o null). */
+  function bestCanto(h) {
+    if (h.length !== 3) return null;
+    var rs = h.map(function (c) { return c.r; }).sort(function (a, b) { return ORD[a] - ORD[b]; });
+    var key = rs.join("-"), best = null;
+    var third = 0;
+    function add(name, pts) { if (!best || pts > best.pts) best = { name: name, pts: pts, rank: a, third: third }; }
+    var a = rs[0], b = rs[1], c = rs[2];
+    if (a === b && b === c) add("Trivilín", 5);
+    if (key === "1-11-12") add("Registro", 8);
+    if (key === "1-10-11") add("Registríco", 10);
+    if (key === "1-11-11") add("Casa chica", 11);
+    if (key === "1-12-12") add("Casa grande", 12);
+    if (a !== b && b !== c && ORD[b] === ORD[a] + 1 && ORD[c] === ORD[b] + 1) add("Patrulla", 6);
+    var pair = a === b ? a : (b === c ? b : null);
+    if (pair !== null && !(a === b && b === c)) {
+      var other = a === b ? c : a;
+      third = ORD[other];
+      if (Math.abs(ORD[other] - ORD[pair]) === 1) add("Vigía", 7);
+      add("Ronda de " + pair, caidaPts(pair));
+    }
+    return best;
+  }
+
+  function leader() { return total[0] === total[1] ? (Math.random() < 0.5 ? 0 : 1) : (total[0] > total[1] ? 0 : 1); }
+
+  function startHand() {
+    clearTimeout(timer);
+    var d = newDeck();
+    S = { deck: d, table: d.splice(0, 4), hands: [[], []], piles: [0, 0], gone: {}, turn: 0, last: null, lastCap: null, vuelta: 0, over: false, dealer: dealer, pend: [0, 0], canted: [false, false], cantoThis: [null, null], trivFirst: [false, false], prefix: "" };
+    RANKS.forEach(function (r) { S.gone[r] = 0; });
+    $("overlay").hidden = true;
+    deal();
+    var order = Math.random() < 0.5 ? [1, 2, 3, 4] : [4, 3, 2, 1], hit = 0, first = S.turn, m;
+    S.table.forEach(function (c, i) { if (c.r === order[i]) hit += c.r; });
+    if (hit) { addPts(dealer, hit); m = "Reparte <b>" + NAMES[dealer] + "</b> y cuenta " + order.join("-") + ": acierta y suma <span class='pts'>+" + hit + "</span>."; }
+    else { addPts(first, 1); m = "Reparte <b>" + NAMES[dealer] + "</b> y cuenta " + order.join("-") + ": mal echada, <b>" + NAMES[first] + "</b> suma <span class='pts'>+1</span>."; }
+    say(m + " Empieza <b>" + NAMES[first] + "</b>.");
+    render();
+    if (total[0] >= goal() || total[1] >= goal()) return endGame(leader());
+    next();
+  }
+
+  function deal() {
+    S.vuelta++;
+    S.last = null;
+    S.canted = [false, false];
+    S.cantoThis = [null, null];
+    S.hands[0] = S.deck.splice(0, 3);
+    S.hands[1] = S.deck.splice(0, 3);
+    sortHand(S.hands[0]);
+    S.turn = 1 - S.dealer;
+  }
+  function sortHand(h) { h.sort(function (a, b) { return ORD[a.r] - ORD[b.r]; }); }
+
+  function tableHas(r) { return S.table.some(function (t) { return t.r === r; }); }
+
+  /* Simula una captura: devuelve las cartas de la mesa que te llevarías. */
+  function captureSet(r) {
+    var got = [], rank = r;
+    while (true) {
+      var m = S.table.filter(function (t) { return t.r === rank; });
+      if (!m.length) break;
+      got = got.concat(m);
+      var ni = ORD[rank] + 1;
+      if (ni >= RANKS.length) break;
+      rank = RANKS[ni];
+    }
+    return got;
+  }
+  function isCaida(p, r) { return !!(S.last && S.last.by !== p && S.last.card.r === r && tableHas(r)); }
+  function isLastPlay() { return S.hands[0].length === 0 && S.hands[1].length === 0 && S.deck.length === 0; }
+
+  function play(p, idx) {
+    if (S.over) return;
+    var note = "";
+    if (p === 0 && S.hands[0].length === 3 && !S.canted[0]) {
+      var missed = bestCanto(S.hands[0]);
+      if (missed) note = ' <span class="pts">No cantaste ' + missed.name + ": no cobras.</span>";
+    }
+    var c = S.hands[p].splice(idx, 1)[0];
+    var r = c.r, pts = 0;
+    var msg = S.prefix ? S.prefix + "jugó " + cardName(c) : "<b>" + NAMES[p] + "</b> jugó " + cardName(c);
+    S.prefix = "";
+    var last = S.hands[0].length === 0 && S.hands[1].length === 0 && S.deck.length === 0;
+
+    if (tableHas(r)) {
+      var caida = isCaida(p, r);
+      var got = captureSet(r);
+      var ids = {};
+      got.forEach(function (t) { ids[t.id] = 1; S.gone[t.r]++; });
+      S.table = S.table.filter(function (t) { return !ids[t.id]; });
+      S.gone[r]++;                       /* la carta jugada */
+      S.piles[p] += got.length + 1;
+      S.lastCap = p;
+      S.last = null;
+      msg += " y se llevó " + (got.length + 1) + (got.length + 1 === 1 ? " carta" : " cartas") + ".";
+      if (caida) { pts += caidaPts(r); msg += ' <span class="pts">¡Caída! +' + caidaPts(r) + "</span>"; }
+      if (S.table.length === 0 && !last) { pts += 4; msg += ' <span class="pts">¡Mesa limpia! +4</span>'; }
+    } else {
+      S.table.push(c);
+      S.last = { card: c, by: p };
+      msg += ".";
+    }
+    addPts(p, pts);
+    say(msg + note);
+
+    if (total[p] + S.pend[p] >= goal()) { addPts(p, S.pend[p]); S.pend[p] = 0; return endGame(p); }
+    if (last) return endHand();
+    if (S.hands[0].length === 0 && S.hands[1].length === 0) deal();
+    else S.turn = 1 - p;
+    render();
+    next();
+  }
+
+  function next() {
+    clearTimeout(timer);
+    if (S.over || S.turn !== 1) return;
+    timer = setTimeout(function () {
+      if (S.over || S.turn !== 1) return;
+      botTurn();
+    }, FAST ? 0 : 950);
+  }
+
+  function botTurn() {
+    if (S.hands[1].length === 3 && !S.canted[1]) {
+      var bc = bestCanto(S.hands[1]);
+      if (bc) {
+        var lab = cantoLabel(bc, 1), res = declare(1, bc);
+        if (res === "kill") {
+          say('<b>Don Pedro</b> cantó <span class="pts">' + lab + "</span>");
+          return endGame(1, "Don Pedro cantó Trivilín y mató la partida.");
+        }
+        var extra = res === "void" ? " (empata contigo y pierde el desempate)" : (res === "won" ? " (gana el desempate: tu canto no vale)" : "");
+        S.prefix = '<b>Don Pedro</b> cantó <span class="pts">' + lab + "</span>" + extra + " y ";
+      }
+    }
+    play(1, botChoose(1));
+  }
+
+  function botChoose(p) {
+    var h = S.hands[p], best = -1e9, bi = 0;
+    h.forEach(function (c, i) {
+      var sc = evalPlay(p, c) + Math.random() * 0.3;
+      if (sc > best) { best = sc; bi = i; }
+    });
+    return bi;
+  }
+  function evalPlay(p, c) {
+    var r = c.r;
+    if (tableHas(r)) {
+      var got = captureSet(r), n = got.length + 1, sc = 5 + n;
+      if (isCaida(p, r)) sc += caidaPts(r) * 2;
+      if (got.length === S.table.length && !isLastPlay()) sc += 8;
+      return sc;
+    }
+    var mine = S.hands[p].filter(function (x) { return x.r === r; }).length;
+    var unseen = 4 - S.gone[r] - mine;
+    if (unseen < 0) unseen = 0;
+    return -unseen * (caidaPts(r) + 0.5);
+  }
+
+  function endHand() {
+    S.over = true;
+    clearTimeout(timer);
+    var left = S.table.length;
+    if (S.lastCap !== null) S.piles[S.lastCap] += left;
+    S.table = [];
+    var cantos = [S.pend[0], S.pend[1]];
+    addPts(0, cantos[0]); addPts(1, cantos[1]);
+    S.pend = [0, 0];
+    var bonus = [Math.max(0, S.piles[0] - 20), Math.max(0, S.piles[1] - 20)];
+    addPts(0, bonus[0]); addPts(1, bonus[1]);
+    render();
+    var done = total[0] >= goal() || total[1] >= goal();
+    var h = '<div class="card"><h2>Mano terminada</h2>';
+    h += '<div class="rows"><span>Tus cartas</span><b>' + S.piles[0] + "</b><span>Cartas de Don Pedro</span><b>" + S.piles[1] + "</b>";
+    h += "<span>Cantos (tú)</span><b>+" + cantos[0] + "</b><span>Cantos (Don Pedro)</span><b>+" + cantos[1] + "</b>";
+    h += "<span>Puntos por cartas (tú)</span><b>+" + bonus[0] + "</b><span>Puntos por cartas (Don Pedro)</span><b>+" + bonus[1] + "</b>";
+    h += "<span>Marcador</span><b>" + total[0] + " – " + total[1] + "</b></div>";
+    if (S.lastCap !== null && left) h += "<p>Las " + left + " cartas de la mesa fueron para " + NAMES[S.lastCap] + ".</p>";
+    if (done) {
+      renderScore();
+      return showEnd(leader());
+    }
+    h += '<button class="btn" id="again">Siguiente mano</button></div>';
+    $("overlay").innerHTML = h;
+    $("overlay").hidden = false;
+    $("again").onclick = function () { dealer = 1 - dealer; startHand(); };
+    $("again").focus();
+    renderScore();
+  }
+
+  function endGame(w, why) {
+    S.over = true;
+    clearTimeout(timer);
+    renderScore();
+    render();
+    showEnd(w, why);
+  }
+  function showEnd(w, why) {
+    finished = true;
+    var h = '<div class="card"><h2 class="' + (w === 0 ? "win" : "lose") + '">' + (w === 0 ? "¡Ganaste, chamo!" : "Ganó Don Pedro") + "</h2>";
+    if (why) h += "<p>" + why + "</p>";
+    h += "<p>Marcador final: " + total[0] + " – " + total[1] + ".</p>";
+    h += '<button class="btn" id="again">Jugar otra partida</button></div>';
+    $("overlay").innerHTML = h;
+    $("overlay").hidden = false;
+    $("again").onclick = function () { total = [0, 0]; resetTok(); finished = false; dealer = 1; startHand(); };
+    $("again").focus();
+  }
+
+  function renderScore() { $("sUs").textContent = total[0]; $("sThem").textContent = total[1]; renderTrays(); }
+
+  function render() {
+    renderScore();
+    var tb = S.table.slice().sort(function (a, b) { return ORD[a.r] - ORD[b.r]; });
+    var bd = $("board");
+    if (!tb.length) bd.innerHTML = '<div class="empty">Mesa limpia</div>';
+    else bd.innerHTML = tb.map(function (c) {
+      var isLast = S.last && S.last.card.id === c.id;
+      return '<div class="pc' + (isLast ? " last" : "") + '" title="' + cardName(c) + '">' + cardInner(c) + "</div>";
+    }).join("");
+
+    var myTurn = S.turn === 0 && !S.over;
+    var hd = "";
+    S.hands[0].forEach(function (c, i) {
+      var cls = "pc";
+      if (myTurn) {
+        cls += " can";
+        if (isCaida(0, c.r)) cls += " caida";
+        else if (tableHas(c.r)) cls += " cap";
+      }
+      hd += '<button type="button" class="' + cls + '" data-i="' + i + '" aria-label="' + cardName(c) + '"' + (myTurn ? "" : " disabled") + ">" + cardInner(c) + "</button>";
+    });
+    $("hand").innerHTML = hd;
+    Array.prototype.forEach.call($("hand").querySelectorAll("button"), function (b) {
+      b.onclick = function () { if (S.turn === 0 && !S.over) play(0, parseInt(b.getAttribute("data-i"), 10)); };
+    });
+
+    var bk = "";
+    for (var i = 0; i < S.hands[1].length; i++) bk += "<i></i>";
+    $("backs").innerHTML = bk;
+    $("opp").className = "opp" + (S.turn === 1 && !S.over ? " turn" : "");
+    $("me").className = "me" + (myTurn ? " turn" : "");
+    $("oppPile").textContent = "Montón: " + S.piles[1] + " cartas";
+    $("pUs").textContent = S.pend[0] ? "+" + S.pend[0] + " en cantos" : "";
+    $("pThem").textContent = S.pend[1] ? "+" + S.pend[1] + " en cantos" : "";
+    $("myPile").textContent = "Montón: " + S.piles[0];
+    $("myturn").textContent = S.over ? "" : (myTurn ? "Tu turno" : "Juega Don Pedro…");
+    $("vuelta").textContent = "Vuelta " + Math.min(S.vuelta, 6) + " de 6";
+    $("deck").textContent = "Mazo: " + S.deck.length;
+
+    var hint = "", bc = (myTurn && S.hands[0].length === 3 && !S.canted[0]) ? bestCanto(S.hands[0]) : null;
+    if (bc) {
+      hint = '<button type="button" class="btn" id="cantar">Cantar ' + cantoLabel(bc, 0) + "</button><br>Cántalo antes de tirar o no lo cobras.";
+    } else if (myTurn) {
+      var cai = S.hands[0].filter(function (c) { return isCaida(0, c.r); });
+      if (cai.length) hint = "<b>¡Tienes caída!</b> Tira el " + cai[0].r + " sobre la carta marcada.";
+      else if (S.hands[0].some(function (c) { return tableHas(c.r); })) hint = "Las cartas con borde verde se llevan algo de la mesa.";
+      else hint = "Ninguna carta captura. Tira la que menos te comprometa.";
+    }
+    $("hint").innerHTML = hint;
+    if (bc) {
+      $("cantar").onclick = function () {
+        var lab = cantoLabel(bc, 0), res = declare(0, bc);
+        if (res === "kill") {
+          say("<b>Tú</b> cantaste <span class='pts'>" + lab + "</span>");
+          return endGame(0, "Cantaste Trivilín y mataste la partida.");
+        }
+        var extra = res === "void" ? " Don Pedro cantó lo mismo y gana el desempate: no cobras." : (res === "won" ? " Ganas el desempate: Don Pedro pierde su canto." : "");
+        say("<b>Tú</b> cantaste <span class='pts'>" + lab + "</span>." + extra + " Ahora tira una carta.");
+        render();
+      };
+    }
+  }
+
+  $("rulesBtn").onclick = function () {
+    var r = $("rules"), open = r.hidden;
+    r.hidden = !open;
+    this.setAttribute("aria-expanded", open ? "true" : "false");
+  };
+  $("goal").onchange = function () {
+    if (S && !S.over && (total[0] >= goal() || total[1] >= goal())) { endGame(leader()); }
+  };
+
+  startHand();
+})();
+</script>
+</body>
+</html>

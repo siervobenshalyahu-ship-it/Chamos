@@ -1,0 +1,428 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Dominó venezolano de mesa en parejas, de Chamos.">
+<title>Dominó Chamos</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Manrope:wght@400;600;800&display=swap">
+<style>
+/* Concepto: una mesa de dominó de barrio, de noche. Paño verde oscuro sobre azul noche, fichas marfil, un solo acento ámbar para el turno y las jugadas. */
+:root {
+  --bg: #080c18;
+  --panel: #0e1424;
+  --line: rgba(255, 255, 255, .10);
+  --ink: #eef1f7;
+  --muted: #9aa4b8;
+  --amber: #f4b54a;
+  --felt: #0f2b22;
+  --felt-2: #0a1f19;
+  --ivory: #f3ecd9;
+  --ivory-edge: #cfc5a8;
+  --pip: #1a1510;
+  --good: #5fd39a;
+  --bad: #ef7a6e;
+  --font-serif: "Fraunces", "Iowan Old Style", Georgia, serif;
+  --font-sans: "Manrope", system-ui, -apple-system, "Segoe UI", sans-serif;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { margin: 0; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.5;
+  padding-block: 14px 28px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+button { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+.app { max-width: 520px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; }
+
+header { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
+h1 { font-family: var(--font-serif); font-size: 30px; line-height: 1.1; margin: 0; font-weight: 700; text-wrap: balance; }
+.sub { color: var(--muted); font-size: 13px; margin: 2px 0 0; }
+.rulesbtn { background: none; border: 1px solid var(--line); border-radius: 8px; padding: 6px 12px; color: var(--muted); cursor: pointer; font-weight: 600; font-size: 13px; }
+.rulesbtn:hover { color: var(--ink); border-color: var(--amber); }
+
+.score { display: grid; grid-template-columns: 1fr 1fr auto; gap: 10px; align-items: stretch; }
+.team { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; min-width: 0; }
+.team b { display: block; font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); font-weight: 800; }
+.team span { font-family: var(--font-serif); font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.team.us span { color: var(--amber); }
+.goal { display: flex; flex-direction: column; justify-content: center; align-items: flex-end; color: var(--muted); font-size: 12px; text-align: right; gap: 2px; }
+.goal select { background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 6px; padding: 3px 6px; font: inherit; }
+
+.table { background: radial-gradient(120% 90% at 50% 20%, var(--felt) 0%, var(--felt-2) 100%); border: 1px solid var(--line); border-radius: 14px; padding: 10px 8px 12px; display: flex; flex-direction: column; gap: 8px; box-shadow: 0 24px 60px rgba(0, 0, 0, .45); }
+.seats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.seat { background: rgba(0, 0, 0, .28); border: 1px solid transparent; border-radius: 10px; padding: 5px 4px; text-align: center; min-width: 0; transition: border-color .2s, background .2s; }
+.seat.turn { border-color: var(--amber); background: rgba(244, 181, 74, .10); }
+.seat .nm { font-weight: 800; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.seat .tm { color: var(--muted); font-size: 10px; letter-spacing: .06em; text-transform: uppercase; }
+.seat .bk { display: flex; justify-content: center; gap: 2px; margin-top: 3px; min-height: 12px; flex-wrap: wrap; }
+.seat .bk i { width: 6px; height: 12px; border-radius: 2px; background: var(--ivory-edge); display: block; opacity: .85; }
+.seat .pas { color: var(--amber); font-size: 10px; font-weight: 800; min-height: 12px; }
+
+.ends { display: flex; justify-content: space-between; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; min-height: 26px; }
+.end { background: rgba(0, 0, 0, .3); border: 1px solid var(--line); border-radius: 999px; padding: 2px 10px; font-weight: 800; color: var(--amber); font-variant-numeric: tabular-nums; }
+
+.board { --u: 23px; min-height: 270px; display: flex; flex-direction: column; justify-content: center; gap: 6px; padding: 6px 0; }
+.board .row { display: flex; justify-content: center; align-items: center; gap: 2px; min-height: calc(var(--u) * 2 + 2px); }
+.board .empty { color: var(--muted); font-size: 14px; text-align: center; width: 100%; padding: 14px 0; }
+.board .tile.extremo { outline: 2px solid var(--amber); outline-offset: 1px; }
+
+.tile { display: block; position: relative; background: linear-gradient(160deg, #fbf7ea 0%, #f1e8cc 55%, #e2d6b3 100%); border-radius: calc(var(--u) * .24); border: 1px solid #bfb28d; box-shadow: inset 0 1px 0 rgba(255, 255, 255, .85), inset 0 -2px 3px rgba(120, 100, 55, .18), 0 2px 0 #9a8d6c, 0 3px 7px rgba(0, 0, 0, .45); flex: none; }
+.tile svg { display: block; width: 100%; height: 100%; }
+.tile.h { width: calc(var(--u) * 2); height: var(--u); }
+.tile.v { width: var(--u); height: calc(var(--u) * 2); }
+.tile .hf { width: var(--u); height: var(--u); display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr); padding: calc(var(--u) * .14); position: relative; }
+.tile .hf i { width: calc(var(--u) * .2); height: calc(var(--u) * .2); border-radius: 50%; background: var(--pip); place-self: center; display: block; }
+.tile.h .hf + .hf::before { content: ""; position: absolute; left: 0; top: 18%; bottom: 18%; width: 1px; background: var(--ivory-edge); }
+.tile.v .hf + .hf::before { content: ""; position: absolute; top: 0; left: 18%; right: 18%; height: 1px; background: var(--ivory-edge); }
+
+.log { color: var(--muted); font-size: 13px; text-align: center; min-height: 20px; }
+.log b { color: var(--ink); }
+
+.me { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+.me.turn { border-color: var(--amber); }
+.mehead { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+.mehead b { color: var(--ink); font-size: 14px; }
+.hand { --u: 30px; display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; min-height: calc(var(--u) * 2 + 8px); }
+.hand .tile { cursor: default; padding: 0; transition: transform .15s, opacity .15s; }
+.hand .tile.ok { cursor: pointer; outline: 2px solid transparent; }
+.hand .tile.ok:hover, .hand .tile.sel { transform: translateY(-6px); outline-color: var(--amber); }
+.hand .tile.no { opacity: .4; }
+.sides { display: flex; gap: 8px; justify-content: center; min-height: 40px; }
+.btn { background: var(--amber); color: #1a1205; border: 0; border-radius: 8px; padding: 9px 14px; font-weight: 800; cursor: pointer; }
+.btn.ghost { background: transparent; color: var(--ink); border: 1px solid var(--line); }
+.btn:hover { filter: brightness(1.08); }
+
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; font-size: 14px; }
+.panel h2 { font-family: var(--font-serif); font-size: 20px; margin: 0 0 6px; }
+.panel ul { margin: 6px 0 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }
+
+.overlay { position: fixed; inset: 0; background: rgba(4, 7, 14, .78); display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 20; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 20px; width: 100%; max-width: 420px; display: flex; flex-direction: column; gap: 12px; box-shadow: 0 30px 80px rgba(0, 0, 0, .6); }
+.card h2 { font-family: var(--font-serif); font-size: 26px; margin: 0; text-wrap: balance; }
+.card p { margin: 0; color: var(--muted); }
+.rows { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; font-size: 14px; font-variant-numeric: tabular-nums; }
+.rows b { text-align: right; }
+.win { color: var(--good); } .lose { color: var(--bad); }
+
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+@media (max-width: 380px) { h1 { font-size: 26px; } .hand { --u: 27px; } .board { --u: 20px; } }
+</style>
+</head>
+<body>
+
+
+<div class="app">
+  <header>
+    <div>
+      <h1>Dominó Chamos</h1>
+      <p class="sub">Mesa de cuatro, en parejas. Tú y tu compa contra Doña Carmen y Don Pedro.</p>
+    </div>
+    <button class="rulesbtn" id="rulesBtn" aria-expanded="false" aria-controls="rules">Reglas</button>
+  </header>
+
+  <section class="panel" id="rules" hidden>
+    <h2>Cómo se juega</h2>
+    <ul>
+      <li>Son 28 fichas, del doble blanco al doble seis. Cada jugador recibe 7 y no se roba.</li>
+      <li>La primera mano abre quien tenga el doble seis. Después abre la pareja que ganó la mano anterior.</li>
+      <li>Se juega en sentido contrario a las agujas del reloj. Pones una ficha que coincida con un extremo de la cadena. Si no tienes, pasas.</li>
+      <li>Termina la mano cuando alguien se queda sin fichas, o cuando se tranca: cuatro pases seguidos.</li>
+      <li>Si alguien se pega, su pareja suma los puntos de todas las fichas que quedan en la mesa. Si se tranca, gana la pareja con menos puntos en la mano y suma el total.</li>
+      <li>Gana la primera pareja que llegue a la meta.</li>
+    </ul>
+  </section>
+
+  <div class="score" aria-live="polite">
+    <div class="team us"><b>Nosotros</b><span id="sUs">0</span></div>
+    <div class="team"><b>Ellos</b><span id="sThem">0</span></div>
+    <label class="goal">Meta
+      <select id="goal"><option>50</option><option selected>100</option><option>200</option></select>
+    </label>
+  </div>
+
+  <main class="table">
+    <div class="seats" id="seats"></div>
+    <div class="ends"><span>Extremos de la cadena</span><span id="ends"></span></div>
+    <div class="board" id="board"></div>
+    <div class="log" id="log" aria-live="polite"></div>
+  </main>
+
+  <section class="me" id="me">
+    <div class="mehead"><span><b>Tu mano</b></span><span id="myturn"></span></div>
+    <div class="hand" id="hand"></div>
+    <div class="sides" id="sides"></div>
+  </section>
+</div>
+
+<div class="overlay" id="overlay" hidden></div>
+
+<script>
+(function () {
+  "use strict";
+  var FAST = !!window.__fast;
+  var NAMES = ["Tú", "Doña Carmen", "Tu compa", "Don Pedro"];   /* 0 sur, 1 este, 2 norte, 3 oeste: sentido contrario a las agujas */
+  var TEAM = [0, 1, 0, 1];
+  var PIPS = [[], [4], [0, 8], [0, 4, 8], [0, 2, 6, 8], [0, 2, 4, 6, 8], [0, 2, 3, 5, 6, 8]];
+
+  var S = null;             /* estado de la mano */
+  var total = [0, 0];       /* marcador */
+  var lastWinnerTeam = null, lastStarter = 0, firstHand = true;
+  var timer = null;
+
+  function $(id) { return document.getElementById(id); }
+  function esc(s) { return String(s).replace(/[&<>]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]; }); }
+
+  /* Ficha en SVG: puntos grandes y oscuros, división con pivote dorado. */
+  var CX = [11, 25, 39];
+  function pips(n, ox, oy, vert) {
+    var o = "";
+    PIPS[n].forEach(function (i) {
+      var c = i % 3, r = Math.floor(i / 3);
+      var x = ox + CX[vert ? r : c], y = oy + CX[vert ? c : r];   /* en vertical, las filas del 6 quedan paralelas a la raya */
+      o += '<circle cx="' + x + '" cy="' + y + '" r="5.8" fill="#17110b"/><circle cx="' + (x - 1.8) + '" cy="' + (y - 2) + '" r="1.6" fill="#ffffff" fill-opacity=".3"/>';
+    });
+    return o;
+  }
+  function tileHTML(a, b, orient, extra) {
+    var h = orient === "h", vb = h ? "0 0 100 50" : "0 0 50 100", body;
+    if (h) {
+      body = pips(a, 0, 0) + pips(b, 50, 0) +
+        '<path d="M50 8V42" stroke="#a89b78" stroke-width="1.8" stroke-linecap="round"/><circle cx="50" cy="25" r="2.6" fill="#c9a24a" stroke="#8a6a1c" stroke-width=".8"/>';
+    } else {
+      body = pips(a, 0, 0, true) + pips(b, 0, 50, true) +
+        '<path d="M8 50H42" stroke="#a89b78" stroke-width="1.8" stroke-linecap="round"/><circle cx="25" cy="50" r="2.6" fill="#c9a24a" stroke="#8a6a1c" stroke-width=".8"/>';
+    }
+    return '<div class="tile ' + orient + (extra ? " " + extra : "") + '" data-a="' + a + '" data-b="' + b + '"><svg viewBox="' + vb + '" aria-hidden="true" focusable="false">' + body + "</svg></div>";
+  }
+
+  function newDeck() {
+    var d = [];
+    for (var i = 0; i <= 6; i++) for (var j = i; j <= 6; j++) d.push([i, j]);
+    for (var k = d.length - 1; k > 0; k--) { var r = Math.floor(Math.random() * (k + 1)); var t = d[k]; d[k] = d[r]; d[r] = t; }
+    return d;
+  }
+  function sum(hand) { return hand.reduce(function (s, t) { return s + t[0] + t[1]; }, 0); }
+
+  function startHand() {
+    clearTimeout(timer);
+    var d = newDeck();
+    S = { hands: [d.slice(0, 7), d.slice(7, 14), d.slice(14, 21), d.slice(21, 28)], chain: [], L: null, R: null, turn: 0, passes: 0, over: false, sel: null, passed: [false, false, false, false], first: firstHand };
+    if (firstHand) {
+      for (var p = 0; p < 4; p++) if (S.hands[p].some(function (t) { return t[0] === 6 && t[1] === 6; })) S.turn = p;
+    } else {
+      S.turn = lastStarter;
+    }
+    S.hands.forEach(function (h) { h.sort(function (x, y) { return (y[0] + y[1]) - (x[0] + x[1]); }); });
+    $("overlay").hidden = true;
+    say("Nueva mano. Empieza <b>" + esc(NAMES[S.turn]) + "</b>" + (firstHand ? " con el doble seis." : "."));
+    render();
+    next();
+  }
+
+  function moves(p) {
+    var h = S.hands[p], out = [];
+    if (S.chain.length === 0) {
+      h.forEach(function (t, i) {
+        if (!S.first || (t[0] === 6 && t[1] === 6)) out.push({ i: i, side: "C" });
+      });
+      return out;
+    }
+    h.forEach(function (t, i) {
+      if ((t[0] === S.L || t[1] === S.L) && S.L !== S.R) out.push({ i: i, side: "L" });
+      if (t[0] === S.R || t[1] === S.R) out.push({ i: i, side: "R" });
+    });
+    return out;
+  }
+
+  function play(p, i, side) {
+    var t = S.hands[p].splice(i, 1)[0];
+    if (S.chain.length === 0) {
+      S.chain.push([t[0], t[1]]); S.L = t[0]; S.R = t[1];
+    } else if (side === "L") {
+      var o = t[1] === S.L ? [t[0], t[1]] : [t[1], t[0]];
+      S.chain.unshift(o); S.L = o[0];
+    } else {
+      var q = t[0] === S.R ? [t[0], t[1]] : [t[1], t[0]];
+      S.chain.push(q); S.R = q[1];
+    }
+    S.passes = 0; S.passed = [false, false, false, false]; S.sel = null;
+    say("<b>" + esc(NAMES[p]) + "</b> jugó " + t[0] + "·" + t[1] + ".");
+    if (S.hands[p].length === 0) return endHand("domino", p);
+    S.turn = (p + 1) % 4;
+    render(); next();
+  }
+
+  function pass(p) {
+    S.passes++; S.passed[p] = true; S.sel = null;
+    say("<b>" + esc(NAMES[p]) + "</b> pasó.");
+    if (S.passes >= 4) return endHand("tranque", p);
+    S.turn = (p + 1) % 4;
+    render(); next();
+  }
+
+  function botChoose(p) {
+    var ms = moves(p), h = S.hands[p];
+    var count = {};
+    h.forEach(function (t) { count[t[0]] = (count[t[0]] || 0) + 1; if (t[1] !== t[0]) count[t[1]] = (count[t[1]] || 0) + 1; });
+    var best = null, bs = -1e9;
+    ms.forEach(function (m) {
+      var t = h[m.i], score = t[0] + t[1] + (t[0] === t[1] ? 3 : 0);
+      var keep;                                  /* número que queda libre en el extremo */
+      if (m.side === "L") keep = t[1] === S.L ? t[0] : t[1];
+      else if (m.side === "R") keep = t[0] === S.R ? t[1] : t[0];
+      else keep = t[0];
+      score += (count[keep] || 0) * 1.5;
+      /* evita dejar abierto el número que tu pareja pasó */
+      var partner = (p + 2) % 4;
+      score += Math.random() * 2;
+      if (S.passed[partner]) score += 0;
+      if (score > bs) { bs = score; best = m; }
+    });
+    return best;
+  }
+
+  function next() {
+    if (S.over) return;
+    var p = S.turn, ms = moves(p);
+    if (p === 0) {
+      if (ms.length === 0) { timer = setTimeout(function () { pass(0); }, FAST ? 0 : 1100); say("No tienes ficha para jugar. Pasas."); }
+      else if (ms.length === 1) { /* nada: el jugador toca la ficha */ }
+      render();
+      return;
+    }
+    timer = setTimeout(function () {
+      if (S.over) return;
+      var ms2 = moves(p);
+      if (ms2.length === 0) pass(p);
+      else { var m = botChoose(p); play(p, m.i, m.side); }
+    }, FAST ? 0 : 750 + Math.random() * 450);
+  }
+
+  function endHand(kind, p) {
+    S.over = true; clearTimeout(timer);
+    var pts = S.hands.map(sum), all = pts[0] + pts[1] + pts[2] + pts[3];
+    var winnerTeam = null, text;
+    if (kind === "domino") {
+      winnerTeam = TEAM[p]; text = "<b>" + esc(NAMES[p]) + "</b> se pegó.";
+    } else {
+      var a = pts[0] + pts[2], b = pts[1] + pts[3];
+      if (a < b) winnerTeam = 0; else if (b < a) winnerTeam = 1;
+      text = "Tranque. Nosotros: " + a + " puntos. Ellos: " + b + ".";
+    }
+    if (winnerTeam !== null) total[winnerTeam] += all;
+    var goal = parseInt($("goal").value, 10);
+    var gameOver = total[0] >= goal || total[1] >= goal;
+    lastWinnerTeam = winnerTeam; firstHand = false;
+    if (winnerTeam !== null) lastStarter = kind === "domino" ? p : (winnerTeam === 0 ? 0 : 1); else lastStarter = (S.turn + 1) % 4;
+    render();
+    var title, cls = "";
+    if (gameOver) {
+      var us = total[0] >= goal && total[0] >= total[1];
+      title = us ? "¡Ganaron la partida!" : "Ellos ganaron la partida"; cls = us ? "win" : "lose";
+    } else if (winnerTeam === null) title = "Mano empatada";
+    else if (winnerTeam === 0) { title = "Ganó tu pareja"; cls = "win"; }
+    else { title = "Ganó la otra pareja"; cls = "lose"; }
+    var rows = "";
+    for (var i = 0; i < 4; i++) rows += "<span>" + esc(NAMES[i]) + "</span><b>" + pts[i] + (S.hands[i].length ? " (" + S.hands[i].length + " fichas)" : "") + "</b>";
+    $("overlay").innerHTML = '<div class="card" role="dialog" aria-modal="true" aria-labelledby="ot"><h2 id="ot" class="' + cls + '">' + title + "</h2><p>" + text +
+      (winnerTeam === null ? " Nadie suma." : " " + (winnerTeam === 0 ? "Sumas " : "Suman ") + all + " puntos.") + '</p><div class="rows">' + rows +
+      '</div><p>Marcador: Nosotros <b style="color:var(--ink)">' + total[0] + "</b> · Ellos <b style=\"color:var(--ink)\">" + total[1] + "</b> · Meta " + goal +
+      '</p><button class="btn" id="again">' + (gameOver ? "Nueva partida" : "Siguiente mano") + "</button></div>";
+    $("overlay").hidden = false;
+    $("again").focus();
+    $("again").onclick = function () {
+      if (gameOver) { total = [0, 0]; firstHand = true; lastStarter = 0; }
+      startHand();
+    };
+  }
+
+  function say(html) { $("log").innerHTML = html; }
+
+  /* Cadena en serpiente: una fila de izquierda a derecha, la siguiente de derecha a izquierda. */
+  function snake() {
+    var bd = $("board"), u = parseFloat(getComputedStyle(bd).getPropertyValue("--u")) || 21;
+    var W = bd.clientWidth - 8, gap = 2, rows = [[]], used = 0, n = S.chain.length;
+    S.chain.forEach(function (t, i) {
+      var w = (t[0] === t[1] ? u : u * 2) + gap;
+      if (used + w > W && rows[rows.length - 1].length) { rows.push([]); used = 0; }
+      rows[rows.length - 1].push({ t: t, i: i });
+      used += w;
+    });
+    return rows.map(function (r, ri) {
+      var rev = ri % 2 === 1, items = rev ? r.slice().reverse() : r;
+      return '<div class="row">' + items.map(function (o) {
+        var a = rev ? o.t[1] : o.t[0], b = rev ? o.t[0] : o.t[1];
+        return tileHTML(a, b, a === b ? "v" : "h", o.i === 0 || o.i === n - 1 ? "extremo" : "");
+      }).join("") + "</div>";
+    }).join("");
+  }
+
+  function render() {
+    $("sUs").textContent = total[0]; $("sThem").textContent = total[1];
+    var order = [3, 2, 1];
+    $("seats").innerHTML = order.map(function (p) {
+      var bk = ""; for (var i = 0; i < S.hands[p].length; i++) bk += "<i></i>";
+      return '<div class="seat' + (S.turn === p && !S.over ? " turn" : "") + '"><div class="nm">' + esc(NAMES[p]) + '</div><div class="tm">' + (p === 2 ? "Tu pareja" : "Rival") + " · " + S.hands[p].length + '</div><div class="bk">' + bk + '</div><div class="pas">' + (S.passed[p] ? "pasó" : "") + "</div></div>";
+    }).join("");
+    $("ends").innerHTML = S.chain.length ? '<span class="end">' + S.L + '</span> ← → <span class="end">' + S.R + "</span>" : "—";
+    $("board").innerHTML = S.chain.length ? snake() : '<div class="empty">La mesa está vacía. Empieza ' + esc(NAMES[S.turn]) + ".</div>";
+
+    var my = S.turn === 0 && !S.over, ms = my ? moves(0) : [];
+    var okIdx = {}; ms.forEach(function (m) { okIdx[m.i] = true; });
+    $("me").classList.toggle("turn", my);
+    $("myturn").textContent = my ? (ms.length ? "Es tu turno" : "Sin ficha") : (S.over ? "" : "Espera tu turno");
+    $("hand").innerHTML = S.hands[0].map(function (t, i) {
+      var cls = my ? (okIdx[i] ? "ok" : "no") : ""; if (S.sel === i) cls += " sel";
+      return tileHTML(t[0], t[1], "v", cls).replace('class="tile', 'data-i="' + i + '" tabindex="' + (okIdx[i] ? 0 : -1) + '" role="button" aria-label="Ficha ' + t[0] + " con " + t[1] + '" class="tile');
+    }).join("");
+    var sides = "";
+    if (my && S.sel !== null) {
+      var opts = ms.filter(function (m) { return m.i === S.sel; });
+      if (opts.length > 1) sides = '<button class="btn" data-side="L">← Izquierda (' + S.L + ')</button><button class="btn" data-side="R">Derecha (' + S.R + ') →</button>';
+    }
+    $("sides").innerHTML = sides;
+  }
+
+  function choose(i) {
+    if (!S || S.over || S.turn !== 0) return;
+    var opts = moves(0).filter(function (m) { return m.i === i; });
+    if (!opts.length) return;
+    if (opts.length === 1) return play(0, i, opts[0].side);
+    S.sel = i; render();
+  }
+
+  $("hand").addEventListener("click", function (e) {
+    var el = e.target.closest(".tile"); if (!el) return; choose(parseInt(el.getAttribute("data-i"), 10));
+  });
+  $("hand").addEventListener("keydown", function (e) {
+    if (e.key !== "Enter" && e.key !== " ") return;
+    var el = e.target.closest(".tile"); if (!el) return; e.preventDefault(); choose(parseInt(el.getAttribute("data-i"), 10));
+  });
+  $("sides").addEventListener("click", function (e) {
+    var b = e.target.closest("[data-side]"); if (!b || S.sel === null) return;
+    play(0, S.sel, b.getAttribute("data-side"));
+  });
+  $("rulesBtn").addEventListener("click", function () {
+    var r = $("rules"); r.hidden = !r.hidden; this.setAttribute("aria-expanded", String(!r.hidden));
+  });
+  $("goal").addEventListener("change", function () { total = [0, 0]; firstHand = true; lastStarter = 0; startHand(); });
+  window.addEventListener("resize", function () { if (S) render(); });
+  window.__dom = { state: function () { return S; }, total: function () { return total; }, moves: moves };
+  startHand();
+})();
+</script>
+
+</body>
+</html>

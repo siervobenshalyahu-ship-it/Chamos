@@ -1,0 +1,579 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Ajilei, el juego de cartas venezolano de apuestas, de Chamos.">
+<title>Ajilei Chamos</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Manrope:wght@400;600;800&display=swap">
+<style>
+/* Concepto: una mesa de ajilei de barrio, de noche. Mismo paño verde y acento ámbar que la caída; las apuestas se hacen con chapas de refresco. */
+:root {
+  --bg: #080c18;
+  --panel: #0e1424;
+  --line: rgba(255, 255, 255, .10);
+  --ink: #eef1f7;
+  --muted: #9aa4b8;
+  --amber: #f4b54a;
+  --felt: #0f2b22;
+  --felt-2: #0a1f19;
+  --good: #5fd39a;
+  --bad: #ef7a6e;
+  --font-serif: "Fraunces", "Iowan Old Style", Georgia, serif;
+  --font-sans: "Manrope", system-ui, -apple-system, "Segoe UI", sans-serif;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { margin: 0; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.5;
+  padding-block: 14px 28px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+a { color: var(--amber); }
+button { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+.app { max-width: 520px; margin: 0 auto; display: flex; flex-direction: column; gap: 12px; }
+
+header { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
+h1 { font-family: var(--font-serif); font-size: 26px; line-height: 1.1; margin: 0; font-weight: 700; text-wrap: balance; }
+.sub { color: var(--muted); font-size: 12px; margin: 2px 0 0; }
+.rulesbtn { background: none; border: 1px solid var(--line); border-radius: 8px; padding: 6px 12px; color: var(--muted); cursor: pointer; font-weight: 600; font-size: 13px; }
+.rulesbtn:hover { color: var(--ink); border-color: var(--amber); }
+
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; font-size: 14px; }
+.panel h2 { font-family: var(--font-serif); font-size: 20px; margin: 0 0 6px; }
+.panel ul { margin: 6px 0 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }
+
+.table { background: radial-gradient(120% 90% at 50% 20%, var(--felt) 0%, var(--felt-2) 100%); border: 1px solid var(--line); border-radius: 14px; padding: 10px; display: flex; flex-direction: column; gap: 10px; box-shadow: 0 24px 60px rgba(0, 0, 0, .45); }
+.seats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.seat { background: rgba(0, 0, 0, .28); border: 1px solid transparent; border-radius: 10px; padding: 6px 4px; text-align: center; min-width: 0; transition: border-color .2s, background .2s; }
+.seat.turn { border-color: var(--amber); background: rgba(244, 181, 74, .10); }
+.seat.out { opacity: .45; }
+.seat .nm { font-weight: 800; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.seat .ch { display: flex; align-items: center; justify-content: center; gap: 4px; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.seat .ch svg { width: 14px; height: 14px; }
+.seat .bk { display: flex; justify-content: center; gap: 2px; margin-top: 4px; min-height: 22px; flex-wrap: wrap; }
+.seat .bk i { width: 12px; height: 20px; border-radius: 3px; border: 1px solid #cfc5a8; background: repeating-linear-gradient(45deg, #1d3f9e 0 3px, #16327f 3px 6px); display: block; }
+.seat .st { color: var(--amber); font-size: 10px; font-weight: 800; min-height: 14px; letter-spacing: .04em; text-transform: uppercase; }
+
+.center { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 8px 0 2px; min-height: 150px; justify-content: center; }
+.stage { color: var(--muted); font-size: 12px; letter-spacing: .06em; text-transform: uppercase; font-weight: 800; }
+.pote { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.pile { display: flex; flex-wrap: wrap; justify-content: center; gap: 0; max-width: 260px; min-height: 36px; }
+.pile svg { width: 32px; height: 32px; margin: -2px -5px; filter: drop-shadow(0 2px 2px rgba(0, 0, 0, .55)); }
+.potetxt { font-family: var(--font-serif); font-size: 22px; font-weight: 700; color: var(--amber); }
+.potetxt small { font-family: var(--font-sans); font-size: 11px; color: var(--muted); font-weight: 800; letter-spacing: .08em; text-transform: uppercase; margin-left: 4px; }
+.log { color: var(--muted); font-size: 13px; text-align: center; min-height: 58px; }
+.log div { opacity: .75; }
+.log div:last-child { opacity: 1; color: var(--ink); }
+.log b { color: var(--ink); }
+.log .pts { color: var(--amber); font-weight: 800; }
+
+.me { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+.me.turn { border-color: var(--amber); }
+.mehead { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+.mehead b { color: var(--ink); font-size: 14px; }
+.mehead .ch { display: inline-flex; align-items: center; gap: 4px; }
+.mehead .ch svg { width: 16px; height: 16px; }
+.hand { display: flex; justify-content: center; gap: 6px; min-height: calc(60px * 1.56 + 6px); align-items: flex-end; }
+.pc { --cw: 60px; width: var(--cw); height: calc(var(--cw) * 1.56); flex: none; display: block; padding: 0; margin: 0; border: 0; border-radius: calc(var(--cw) * .09); background: none; box-shadow: 0 2px 0 rgba(0, 0, 0, .35), 0 3px 8px rgba(0, 0, 0, .45); position: relative; font: inherit; transition: transform .15s, outline-color .15s; outline: 2px solid transparent; outline-offset: 2px; cursor: default; }
+.pc svg { width: 100%; height: 100%; display: block; }
+.pc.pick { cursor: pointer; }
+.pc.pick:hover { transform: translateY(-4px); }
+.pc.mark { transform: translateY(-12px); outline-color: var(--bad); }
+.pc .tag { position: absolute; left: 50%; bottom: -9px; transform: translateX(-50%); background: var(--amber); color: #1a1205; font-size: 9px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; border-radius: 999px; padding: 1px 6px; white-space: nowrap; }
+.pc.mark .tag { background: var(--bad); }
+.hint { color: var(--muted); font-size: 12px; text-align: center; min-height: 18px; }
+.hint b { color: var(--amber); }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; min-height: 40px; }
+.btn { background: var(--amber); color: #1a1205; border: 0; border-radius: 8px; padding: 9px 14px; font-weight: 800; cursor: pointer; }
+.btn.ghost { background: transparent; color: var(--ink); border: 1px solid var(--line); }
+.btn.danger { background: transparent; color: var(--bad); border: 1px solid rgba(239, 122, 110, .5); }
+.btn:hover { filter: brightness(1.08); }
+
+.overlay { position: fixed; inset: 0; background: rgba(4, 7, 14, .8); display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 20; overflow-y: auto; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; width: 100%; max-width: 440px; display: flex; flex-direction: column; gap: 12px; box-shadow: 0 30px 80px rgba(0, 0, 0, .6); margin: auto; }
+.card h2 { font-family: var(--font-serif); font-size: 24px; margin: 0; text-wrap: balance; }
+.card p { margin: 0; color: var(--muted); }
+.card .lbl { font-size: 12px; color: var(--muted); }
+.win { color: var(--good); } .lose { color: var(--bad); }
+.rv { display: flex; flex-direction: column; gap: 8px; }
+.rvrow { background: rgba(255, 255, 255, .04); border: 1px solid var(--line); border-radius: 10px; padding: 8px; display: flex; flex-direction: column; gap: 6px; }
+.rvrow.w { border-color: var(--good); background: rgba(95, 211, 154, .08); }
+.rvrow.f { opacity: .55; }
+.rvhead { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 13px; }
+.rvhead b { font-size: 14px; }
+.rvhead span { color: var(--amber); font-weight: 800; font-variant-numeric: tabular-nums; }
+.rvcards { display: flex; gap: 4px; }
+.rvcards .pc { --cw: 40px; box-shadow: 0 1px 0 rgba(0, 0, 0, .35), 0 2px 5px rgba(0, 0, 0, .4); }
+.cutrow { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; text-align: center; font-size: 12px; }
+.cutrow .pc { --cw: 62px; margin: 0 auto 4px; }
+.cutrow .w b { color: var(--amber); }
+
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+@media (max-width: 380px) { h1 { font-size: 24px; } .pc { --cw: 54px; } .hand { gap: 4px; } .rvcards .pc { --cw: 36px; } .cutrow .pc { --cw: 54px; } }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <header>
+    <div>
+      <h1>Ajilei Chamos</h1>
+      <p class="sub">Baraja española de 40 cartas. Cuatro en la mesa, apuestas con chapas.</p>
+    </div>
+    <button class="rulesbtn" id="rulesBtn" aria-expanded="false" aria-controls="rules">Reglas</button>
+  </header>
+
+  <section class="panel" id="rules" hidden>
+    <h2>Cómo se juega</h2>
+    <ul>
+      <li>Baraja española sin 8 ni 9. Cada <b>as vale 11</b>, el <b>siete 7</b>, el <b>seis 6</b> y todas las demás cartas valen <b>10</b>.</li>
+      <li>Solo suman las cartas <b>del mismo palo</b>. Tu mano vale lo que sumes en tu mejor palo.</li>
+      <li>El <b>siete de oros es el comodín</b>: vale 10 en el palo que más te convenga.</li>
+      <li>Cada mano se juega con tres rondas de apuestas (<b>envites</b>): con 2 cartas, con 5 cartas y después de descartar. En cada una puedes <b>pasar</b> si nadie ha apostado, o <b>apostar</b>. Si alguien apostó, puedes <b>ir</b>, <b>subir</b> o <b>retirarte</b>.</li>
+      <li><b>Ajilei:</b> cinco cartas del mismo palo (con el comodín cuenta). Tras el segundo envite, quien lo tenga lo muestra y la mano termina: gana al que no lo tenga.</li>
+      <li>Si no hay ajilei, cada jugador <b>descarta de 0 a 5 cartas</b> y recibe otras. Luego viene el tercer envite y se muestran las manos: gana el total más alto. En empate gana el <b>mano</b>, el primero en hablar.</li>
+      <li>El que gana se lleva todo el <b>pote</b>. Si todos se retiran menos uno, ese se lo lleva sin mostrar cartas.</li>
+      <li>En esta versión: cada uno empieza con 20 chapas, se pone 1 de entrada en cada mano, cada apuesta o subida es de 1 chapa (máximo 2 subidas por envite) y el juego termina cuando te quedas sin chapas o te quedas con todas.</li>
+    </ul>
+  </section>
+
+  <main class="table">
+    <div class="seats" id="seats"></div>
+    <div class="center">
+      <div class="stage" id="stage"></div>
+      <div class="pote"><div class="pile" id="pile"></div><div class="potetxt" id="potetxt"></div></div>
+      <div class="log" id="log" aria-live="polite"></div>
+    </div>
+  </main>
+
+  <section class="me" id="me">
+    <div class="mehead"><span><b>Tu mano</b></span><span class="ch" id="mych"></span></div>
+    <div class="hand" id="hand"></div>
+    <div class="hint" id="hint"></div>
+    <div class="actions" id="actions"></div>
+  </section>
+</div>
+
+<div class="overlay" id="overlay" hidden></div>
+
+<script src="cartas.js"></script>
+<script>
+(function () {
+  "use strict";
+  var FAST = !!window.__fast;
+  var NAMES = ["Tú", "Don Pedro", "Doña Carmen", "Tío Luis"];
+  var SUITS = Cartas.suits;
+  var START_CHIPS = 20;
+  var VAL = { 1: 11, 7: 7, 6: 6 };
+  var CUT = { 12: 9, 11: 8, 10: 7, 7: 6, 6: 5, 5: 4, 4: 3, 3: 2, 2: 1, 1: 0 };   /* carta alta: rey ... as */
+  var SUITRANK = { copas: 3, bastos: 2, espadas: 1, oros: 0 };
+  var SUITNAME = { oros: "oros", copas: "copas", espadas: "espadas", bastos: "bastos" };
+
+  var G = null;   /* partida: chapas, vivos, pie */
+  var H = null;   /* mano */
+  var B = null;   /* envite en curso */
+  var timer = null;
+
+  function $(id) { return document.getElementById(id); }
+  function val(r) { return VAL[r] || 10; }
+  function cardName(c) { return c.r + " de " + c.s; }
+  function wait(fn, ms) { clearTimeout(timer); timer = setTimeout(fn, FAST ? 0 : ms); }
+
+  function chapaSVG(i) {
+    var cols = [["#a8281f", "#e0453a"], ["#1d7a3f", "#3bad66"], ["#b8860b", "#ebbb35"], ["#23499a", "#4a80dc"]], c = cols[i % 4], pts = [], n = 20;
+    for (var k = 0; k < n * 2; k++) {
+      var a = (k / (n * 2)) * Math.PI * 2, r = k % 2 ? 13.4 : 15.6;
+      pts.push((16 + Math.cos(a) * r).toFixed(2) + " " + (16 + Math.sin(a) * r).toFixed(2));
+    }
+    return '<svg viewBox="0 0 32 32" aria-hidden="true" focusable="false">' +
+      '<path d="M' + pts.join("L") + 'Z" fill="' + c[0] + '" stroke="rgba(0,0,0,.45)" stroke-width=".8" stroke-linejoin="round"/>' +
+      '<circle cx="16" cy="16" r="11.2" fill="' + c[1] + '" stroke="rgba(0,0,0,.3)" stroke-width=".7"/>' +
+      '<circle cx="16" cy="16" r="8.6" fill="none" stroke="rgba(255,255,255,.4)" stroke-width=".8"/>' +
+      '<path d="M8.4 12.2Q12 6.2 19.6 7.2" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="1.5" stroke-linecap="round"/></svg>';
+  }
+
+  function newDeck() {
+    var d = [], id = 0;
+    SUITS.forEach(function (s) { Cartas.ranks.forEach(function (r) { d.push({ r: r, s: s, id: id++ }); }); });
+    for (var k = d.length - 1; k > 0; k--) { var j = Math.floor(Math.random() * (k + 1)); var t = d[k]; d[k] = d[j]; d[j] = t; }
+    return d;
+  }
+
+  /* Valor de una mano: mejor palo, con el siete de oros como comodín de 10. */
+  function analyze(hand) {
+    var com = false, sum = {}, cnt = {}, best = null, aj = null;
+    SUITS.forEach(function (s) { sum[s] = 0; cnt[s] = 0; });
+    hand.forEach(function (c) {
+      if (c.r === 7 && c.s === "oros") { com = true; return; }
+      sum[c.s] += val(c.r); cnt[c.s]++;
+    });
+    SUITS.forEach(function (s) {
+      var tot = sum[s] + (com ? 10 : 0), n = cnt[s] + (com ? 1 : 0);
+      if (!best || tot > best.tot || (tot === best.tot && n > best.n)) best = { suit: s, tot: tot, n: n };
+      if (n === 5 && hand.length === 5) aj = { suit: s, tot: tot, n: n };
+    });
+    return { suit: best.suit, tot: best.tot, n: best.n, com: com, ajilei: !!aj, ajTot: aj ? aj.tot : 0 };
+  }
+
+  function isCom(c) { return c.r === 7 && c.s === "oros"; }
+
+  /* ---------- partida ---------- */
+  function startGame() {
+    clearTimeout(timer);
+    G = { chips: [START_CHIPS, START_CHIPS, START_CHIPS, START_CHIPS], alive: [true, true, true, true], pie: 0, n: 0 };
+    H = null; B = null;
+    var d = newDeck(), draw = [d[0], d[1], d[2], d[3]], win = 0, i;
+    for (i = 1; i < 4; i++) {
+      var a = draw[i], b = draw[win];
+      if (CUT[a.r] > CUT[b.r] || (CUT[a.r] === CUT[b.r] && SUITRANK[a.s] > SUITRANK[b.s])) win = i;
+    }
+    G.pie = win;
+    var h = '<div class="card"><h2>Corte de carta alta</h2><p>Cada uno saca una carta. La más alta (rey, caballo, sota, 7, 6, 5, 4, 3, 2, as) reparte y es el <b>pie</b>. El siguiente es el <b>mano</b>: habla primero y gana los empates.</p><div class="cutrow">';
+    draw.forEach(function (c, i) {
+      h += '<div class="' + (i === win ? "w" : "") + '"><div class="pc">' + Cartas.svg(c.r, c.s) + "</div><b>" + NAMES[i] + "</b></div>";
+    });
+    h += "</div><p>Reparte <b style='color:var(--amber)'>" + NAMES[win] + "</b>.</p>";
+    h += '<button class="btn" id="go">Empezar</button></div>';
+    $("overlay").innerHTML = h; $("overlay").hidden = false;
+    $("go").onclick = function () { $("overlay").hidden = true; startHand(); };
+    $("go").focus();
+    renderIdle();
+  }
+
+  function nextAlive(i) {
+    for (var k = 1; k <= 4; k++) { var p = (i + k) % 4; if (G.alive[p]) return p; }
+    return i;
+  }
+
+  function startHand() {
+    clearTimeout(timer);
+    G.n++;
+    var h = { deck: newDeck(), hands: [[], [], [], []], inHand: [false, false, false, false], folded: [false, false, false, false], pot: 0, mano: 0, stage: 0, over: false, phase: "", log: [], sel: [], disc: [0, 0, 0, 0], reveal: false };
+    H = h; B = null;
+    for (var p = 0; p < 4; p++) if (G.alive[p]) { h.inHand[p] = true; G.chips[p] -= 1; h.pot += 1; }
+    h.mano = nextAlive(G.pie);
+    say("Reparte <b>" + NAMES[G.pie] + "</b> (pie). Habla primero <b>" + NAMES[h.mano] + "</b> (mano). Cada uno pone 1 chapa de entrada.");
+    deal(2);
+    startBetting(1);
+  }
+
+  function orderFrom(start) {
+    var r = [];
+    for (var k = 0; k < 4; k++) { var p = (start + k) % 4; if (H.inHand[p] && !H.folded[p]) r.push(p); }
+    return r;
+  }
+  function active() { return orderFrom(0); }
+
+  function deal(n) {
+    orderFrom(H.mano).forEach(function (p) {
+      for (var i = 0; i < n; i++) H.hands[p].push(H.deck.pop());
+      sortHand(H.hands[p]);
+    });
+  }
+  function sortHand(h) { h.sort(function (a, b) { return SUITS.indexOf(a.s) - SUITS.indexOf(b.s) || a.r - b.r; }); }
+
+  function say(html) { H = H || { log: [] }; H.log.push(html); if (H.log.length > 3) H.log.shift(); }
+
+  /* ---------- apuestas ---------- */
+  function startBetting(stage) {
+    H.stage = stage; H.phase = "bet"; H.sel = [];
+    B = { L: 0, inAmt: [0, 0, 0, 0], acted: [false, false, false, false], raises: 0, turn: orderFrom(H.mano)[0] };
+    render();
+    next();
+  }
+  function maxL() {
+    var m = 1e9;
+    active().forEach(function (p) { m = Math.min(m, B.inAmt[p] + G.chips[p]); });
+    return m;
+  }
+  function pay(p, n) { G.chips[p] -= n; H.pot += n; }
+  function canBet() { return B.L === 0 && maxL() >= 1; }
+  function canRaise() { return B.L > 0 && B.raises < 2 && B.L + 1 <= maxL(); }
+
+  function next() {
+    clearTimeout(timer);
+    if (!H || H.over || H.phase !== "bet") return;
+    if (B.turn === 0) { render(); return; }
+    wait(botBet, 850);
+  }
+
+  function act(p, type) {
+    if (!H || H.over || H.phase !== "bet" || B.turn !== p) return;
+    var nm = "<b>" + NAMES[p] + "</b>";
+    if (type === "check") { B.acted[p] = true; say(nm + " pasó."); }
+    else if (type === "bet") {
+      pay(p, 1); B.L = 1; B.inAmt[p] = 1; B.acted = [false, false, false, false]; B.acted[p] = true; B.raises = 0;
+      say(nm + ' apostó <span class="pts">1 chapa</span>.');
+    } else if (type === "call") {
+      var to = B.L - B.inAmt[p]; pay(p, to); B.inAmt[p] = B.L; B.acted[p] = true;
+      say(nm + " fue" + (to ? " (" + to + (to === 1 ? " chapa)" : " chapas)") : "") + ".");
+    } else if (type === "raise") {
+      var nl = B.L + 1; pay(p, nl - B.inAmt[p]); B.L = nl; B.inAmt[p] = nl;
+      B.acted = [false, false, false, false]; B.acted[p] = true; B.raises++;
+      say(nm + ' subió a <span class="pts">' + nl + (nl === 1 ? " chapa" : " chapas") + "</span>.");
+    } else if (type === "fold") {
+      H.folded[p] = true; say(nm + " se retiró.");
+    }
+    afterAct(p);
+  }
+
+  function afterAct(p) {
+    var act = active();
+    if (act.length === 1) return winPot(act[0], "fold");
+    var done = act.every(function (q) { return B.acted[q] && B.inAmt[q] === B.L; });
+    if (done) return endBetting();
+    for (var k = 1; k <= 4; k++) {
+      var q = (p + k) % 4;
+      if (H.inHand[q] && !H.folded[q] && (!B.acted[q] || B.inAmt[q] < B.L)) { B.turn = q; break; }
+    }
+    render(); next();
+  }
+
+  /* Fuerza de la mano de 0 a 1, según la etapa. */
+  function strength(p) {
+    var a = analyze(H.hands[p]), s;
+    if (H.stage === 1) {
+      if (a.n >= 2) s = 0.55 + Math.min(0.4, (a.tot - 14) / 40);
+      else s = 0.15 + Math.min(0.3, a.tot / 40);
+    } else if (H.stage === 2) {
+      s = a.n >= 5 ? 1 : a.n === 4 ? 0.8 : a.n === 3 ? 0.5 : 0.2;
+      s += Math.min(0.1, (a.tot - 30) / 100);
+    } else {
+      s = a.tot >= 45 ? 1 : a.tot >= 40 ? 0.85 : a.tot >= 35 ? 0.65 : a.tot >= 31 ? 0.5 : a.tot >= 25 ? 0.32 : 0.14;
+    }
+    return s + (Math.random() - 0.5) * 0.18;
+  }
+
+  function botBet() {
+    var p = B.turn, s = strength(p), bluff = Math.random() < 0.08;
+    if (B.L === 0) {
+      if (canBet() && (s > 0.62 || (bluff && s > 0.2))) return act(p, "bet");
+      return act(p, "check");
+    }
+    var need = B.L - B.inAmt[p];
+    if (s < 0.3 && !bluff && need > 0) return act(p, "fold");
+    if (s > 0.82 && canRaise() && Math.random() < 0.55) return act(p, "raise");
+    return act(p, "call");
+  }
+
+  function endBetting() {
+    if (H.stage === 1) {
+      deal(3);
+      say("El pie reparte 3 cartas más a cada uno.");
+      return startBetting(2);
+    }
+    if (H.stage === 2) return ajileyCheck();
+    return showdown();
+  }
+
+  /* ---------- ajilei, descarte y resultado ---------- */
+  function ajileyCheck() {
+    var best = null;
+    orderFrom(H.mano).forEach(function (p) {
+      var a = analyze(H.hands[p]);
+      if (a.ajilei && (!best || a.ajTot > best.tot)) best = { p: p, tot: a.ajTot };
+    });
+    if (best) return winPot(best.p, "ajilei");
+    say("Nadie tiene ajilei. Toca descartar.");
+    H.phase = "discard";
+    H.dOrder = orderFrom(H.mano); H.dIdx = 0;
+    discardNext();
+  }
+
+  function discardNext() {
+    if (H.dIdx >= H.dOrder.length) { say("Terminó el descarte."); return startBetting(3); }
+    var p = H.dOrder[H.dIdx];
+    if (p === 0) { H.sel = []; render(); return; }
+    render();
+    wait(function () {
+      var a = analyze(H.hands[p]), ids = [];
+      H.hands[p].forEach(function (c) { if (!(isCom(c) || c.s === a.suit)) ids.push(c.id); });
+      applyDiscard(p, ids);
+      H.dIdx++;
+      discardNext();
+    }, 800);
+  }
+
+  function applyDiscard(p, ids) {
+    var keep = H.hands[p].filter(function (c) { return ids.indexOf(c.id) < 0; });
+    for (var i = 0; i < ids.length; i++) keep.push(H.deck.pop());
+    sortHand(keep);
+    H.hands[p] = keep;
+    H.disc[p] = ids.length;
+    say("<b>" + NAMES[p] + "</b> " + (ids.length ? "cambió <b>" + ids.length + (ids.length === 1 ? " carta" : " cartas") + "</b>." : "se quedó con las suyas."));
+  }
+
+  function showdown() {
+    var best = null;
+    orderFrom(H.mano).forEach(function (p) {
+      var a = analyze(H.hands[p]);
+      if (!best || a.tot > best.tot) best = { p: p, tot: a.tot };
+    });
+    winPot(best.p, "showdown");
+  }
+
+  function winPot(p, kind) {
+    clearTimeout(timer);
+    H.over = true; H.phase = "end";
+    var pot = H.pot;
+    G.chips[p] += pot;
+    H.pot = 0;
+    render();
+    var title, why;
+    if (kind === "fold") { title = p === 0 ? "¡Te llevas el pote!" : NAMES[p] + " se lleva el pote"; why = "Todos los demás se retiraron."; }
+    else if (kind === "ajilei") { title = p === 0 ? "¡Ajilei! Ganaste" : "Ajilei de " + NAMES[p]; why = "Cinco cartas del mismo palo."; }
+    else { title = p === 0 ? "¡Ganaste la mano!" : "Gana " + NAMES[p]; why = "Mejor total de un mismo palo."; }
+    var h = '<div class="card"><h2 class="' + (p === 0 ? "win" : "") + '">' + title + "</h2>";
+    h += "<p>" + why + " Se lleva <b style='color:var(--amber)'>" + pot + (pot === 1 ? " chapa" : " chapas") + "</b>.</p>";
+    if (kind !== "fold") {
+      h += '<div class="rv">';
+      orderFrom(H.mano).concat(H.inHand.map(function (x, i) { return x && H.folded[i] ? i : -1; }).filter(function (i) { return i >= 0; })).forEach(function (q) {
+        var a = analyze(H.hands[q]), folded = H.folded[q];
+        h += '<div class="rvrow' + (q === p ? " w" : "") + (folded ? " f" : "") + '"><div class="rvhead"><b>' + NAMES[q] + "</b><span>" + (folded ? "se retiró" : a.tot + " en " + SUITNAME[a.suit] + (a.ajilei ? " · ajilei" : "")) + "</span></div>";
+        h += '<div class="rvcards">' + H.hands[q].map(function (c) { return '<div class="pc" title="' + cardName(c) + '">' + Cartas.svg(c.r, c.s) + "</div>"; }).join("") + "</div></div>";
+      });
+      h += "</div>";
+    }
+    h += '<button class="btn" id="siguiente">Siguiente mano</button>';
+    h += '<button class="btn ghost" id="plantarme">Plantarme con mis chapas</button></div>';
+    $("overlay").innerHTML = h; $("overlay").hidden = false;
+    $("siguiente").onclick = afterHand;
+    $("plantarme").onclick = function () { endGame("planted"); };
+    $("siguiente").focus();
+  }
+
+  function afterHand() {
+    var msgs = [];
+    for (var p = 0; p < 4; p++) if (G.alive[p] && G.chips[p] < 1) { G.alive[p] = false; msgs.push(NAMES[p]); }
+    if (!G.alive[0]) return endGame("lost");
+    var alive = G.alive.filter(Boolean).length;
+    if (alive === 1) return endGame("won");
+    G.pie = nextAlive(G.pie);
+    $("overlay").hidden = true;
+    startHand();
+    if (msgs.length) { say("<b>" + msgs.join(", ") + "</b> se quedó sin chapas y salió de la mesa."); render(); }
+  }
+
+  function endGame(kind) {
+    clearTimeout(timer);
+    var me = G.chips[0], t, d;
+    if (kind === "lost") { t = "Te quedaste sin chapas"; d = "Fin de la partida. ¡Revancha!"; }
+    else if (kind === "won") { t = "¡Ganaste, chamo!"; d = "Te quedaste con todas las chapas de la mesa."; }
+    else { t = "Te plantaste"; d = "Terminas con " + me + (me === 1 ? " chapa" : " chapas") + (me > START_CHIPS ? ": ganaste " + (me - START_CHIPS) + "." : me < START_CHIPS ? ": perdiste " + (START_CHIPS - me) + "." : ", igual que al empezar."); }
+    var h = '<div class="card"><h2 class="' + (kind === "won" ? "win" : kind === "lost" ? "lose" : "") + '">' + t + "</h2><p>" + d + "</p>";
+    h += '<div class="rv">' + [0, 1, 2, 3].map(function (i) { return '<div class="rvrow"><div class="rvhead"><b>' + NAMES[i] + "</b><span>" + G.chips[i] + (G.alive[i] ? "" : " · fuera") + "</span></div></div>"; }).join("") + "</div>";
+    h += '<button class="btn" id="again">Jugar otra partida</button></div>';
+    $("overlay").innerHTML = h; $("overlay").hidden = false;
+    $("again").onclick = startGame;
+    $("again").focus();
+  }
+
+  /* ---------- pantalla ---------- */
+  function renderIdle() {
+    $("seats").innerHTML = ""; $("hand").innerHTML = ""; $("actions").innerHTML = ""; $("hint").textContent = "";
+    $("stage").textContent = "Corte de carta alta"; $("pile").innerHTML = ""; $("potetxt").textContent = ""; $("log").innerHTML = ""; $("mych").innerHTML = "";
+  }
+
+  function render() {
+    if (!H) return;
+    var turnP = H.phase === "bet" && B ? B.turn : (H.phase === "discard" ? H.dOrder[H.dIdx] : -1);
+    var seats = "";
+    [1, 2, 3].forEach(function (p) {
+      var out = !G.alive[p] || !H.inHand[p], fold = H.folded[p], bk = "";
+      if (!out && !fold) for (var i = 0; i < H.hands[p].length; i++) bk += "<i></i>";
+      var st = out ? "fuera" : fold ? "retirado" : (p === G.pie ? "pie" : "") + (p === H.mano ? (p === G.pie ? " · mano" : "mano") : "");
+      if (!out && !fold && B && H.phase === "bet" && B.inAmt[p]) st += (st ? " · " : "") + B.inAmt[p] + " en juego";
+      seats += '<div class="seat' + (turnP === p && !H.over ? " turn" : "") + (out || fold ? " out" : "") + '"><div class="nm">' + NAMES[p] + '</div><div class="ch">' + chapaSVG(p) + G.chips[p] + '</div><div class="bk">' + bk + '</div><div class="st">' + st + "</div></div>";
+    });
+    $("seats").innerHTML = seats;
+
+    var labels = { 1: "Envite 1 de 3 · 2 cartas", 2: "Envite 2 de 3 · 5 cartas", 3: "Envite 3 de 3 · después del descarte" };
+    $("stage").textContent = H.phase === "discard" ? "Descarte" : (H.over ? "Fin de la mano" : labels[H.stage] || "");
+    var pile = "";
+    for (var i = 0; i < Math.min(H.pot, 16); i++) pile += chapaSVG(i);
+    $("pile").innerHTML = pile;
+    $("potetxt").innerHTML = H.pot + "<small>" + (H.pot === 1 ? "chapa en el pote" : "chapas en el pote") + "</small>";
+    $("log").innerHTML = H.log.map(function (l) { return "<div>" + l + "</div>"; }).join("");
+
+    var meIn = H.inHand[0] && !H.folded[0];
+    var myTurn = !H.over && ((H.phase === "bet" && B && B.turn === 0) || (H.phase === "discard" && H.dOrder[H.dIdx] === 0));
+    $("me").className = "me" + (myTurn ? " turn" : "");
+    $("mych").innerHTML = chapaSVG(0) + "<span>" + G.chips[0] + (G.chips[0] === 1 ? " chapa" : " chapas") + "</span>";
+
+    var discarding = H.phase === "discard" && myTurn;
+    var hd = "";
+    if (meIn || H.folded[0]) {
+      H.hands[0].forEach(function (c) {
+        var mark = discarding && H.sel.indexOf(c.id) >= 0;
+        hd += '<button type="button" class="pc' + (discarding ? " pick" : "") + (mark ? " mark" : "") + '" data-id="' + c.id + '" aria-label="' + cardName(c) + (mark ? ", marcada para descartar" : "") + '"' + (discarding ? "" : " disabled") + ">" + Cartas.svg(c.r, c.s) + (isCom(c) ? '<span class="tag">Comodín</span>' : (mark ? '<span class="tag">Descartar</span>' : "")) + "</button>";
+      });
+    }
+    $("hand").innerHTML = hd;
+    Array.prototype.forEach.call($("hand").querySelectorAll("button"), function (b) {
+      b.onclick = function () {
+        if (!discarding) return;
+        var id = parseInt(b.getAttribute("data-id"), 10), k = H.sel.indexOf(id);
+        if (k >= 0) H.sel.splice(k, 1); else H.sel.push(id);
+        render();
+      };
+    });
+
+    var hint = "", acts = "";
+    if (H.folded[0] && !H.over) hint = "Te retiraste de esta mano. Mira cómo termina.";
+    else if (meIn && H.hands[0].length) {
+      var a = analyze(H.hands[0]);
+      hint = "Tu mejor palo: <b>" + SUITNAME[a.suit] + " " + a.tot + "</b>" + (a.com ? " (con comodín)" : "") + (a.ajilei ? " · ¡Ajilei!" : "");
+    }
+    if (!H.over && H.phase === "bet" && B && B.turn === 0) {
+      if (B.L === 0) {
+        acts += '<button type="button" class="btn ghost" data-a="check">Pasar</button>';
+        if (canBet()) acts += '<button type="button" class="btn" data-a="bet">Apostar 1 chapa</button>';
+        acts += '<button type="button" class="btn danger" data-a="fold">Retirarme</button>';
+      } else {
+        var need = B.L - B.inAmt[0];
+        acts += '<button type="button" class="btn" data-a="call">Ir' + (need ? " (" + need + (need === 1 ? " chapa)" : " chapas)") : "") + "</button>";
+        if (canRaise()) acts += '<button type="button" class="btn ghost" data-a="raise">Subir a ' + (B.L + 1) + "</button>";
+        acts += '<button type="button" class="btn danger" data-a="fold">Retirarme</button>';
+      }
+    } else if (discarding) {
+      var n = H.sel.length;
+      hint = "Toca las cartas que quieras cambiar. " + (a ? "Tu mejor palo: <b>" + SUITNAME[a.suit] + " " + a.tot + "</b>." : "");
+      acts += '<button type="button" class="btn" data-a="discard">' + (n ? "Cambiar " + n + (n === 1 ? " carta" : " cartas") : "Quedarme con estas") + "</button>";
+    } else if (!H.over && meIn) {
+      hint = hint + (hint ? " · " : "") + "Esperando…";
+    }
+    $("hint").innerHTML = hint;
+    $("actions").innerHTML = acts;
+    Array.prototype.forEach.call($("actions").querySelectorAll("button"), function (b) {
+      b.onclick = function () {
+        var t = b.getAttribute("data-a");
+        if (t === "discard") { applyDiscard(0, H.sel.slice()); H.sel = []; H.dIdx++; return discardNext(); }
+        act(0, t);
+      };
+    });
+  }
+
+  $("rulesBtn").onclick = function () {
+    var r = $("rules"), open = r.hidden;
+    r.hidden = !open;
+    this.setAttribute("aria-expanded", open ? "true" : "false");
+  };
+
+  if (FAST) window.__aj = { G: function () { return G; }, H: function () { return H; }, B: function () { return B; }, analyze: analyze };
+  startGame();
+})();
+</script>
+</body>
+</html>

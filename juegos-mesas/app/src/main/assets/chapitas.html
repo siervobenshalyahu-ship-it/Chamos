@@ -1,0 +1,922 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Chapitas Maní Tostón: el juego de chapitas de la calle venezolana, con bate de escoba y chapas de botella.">
+<title>Chapitas Maní Tostón</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Manrope:wght@400;600;800&display=swap">
+<style>
+/* Concepto: una tarde en la calle del barrio. Asfalto gris, rayas de tiza, chapas de botella y un palo de escoba. */
+:root {
+  --bg: #080c18;
+  --panel: #0e1424;
+  --line: rgba(255, 255, 255, .10);
+  --ink: #eef1f7;
+  --muted: #9aa4b8;
+  --amber: #f4b54a;
+  --mani: #c98a4a;
+  --toston: #e8b93a;
+  --good: #5fd39a;
+  --bad: #ef7a6e;
+  --font-serif: "Fraunces", "Iowan Old Style", Georgia, serif;
+  --font-sans: "Manrope", system-ui, -apple-system, "Segoe UI", sans-serif;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { margin: 0; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.5;
+  padding-block: 14px 28px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+a { color: var(--amber); }
+button { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+.app { max-width: 760px; margin: 0 auto; display: flex; flex-direction: column; gap: 10px; }
+
+header { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
+h1 { font-family: var(--font-serif); font-size: 26px; line-height: 1.1; margin: 0; font-weight: 700; text-wrap: balance; }
+.sub { color: var(--muted); font-size: 12px; margin: 2px 0 0; }
+.rulesbtn { background: none; border: 1px solid var(--line); border-radius: 8px; padding: 6px 12px; color: var(--muted); cursor: pointer; font-weight: 600; font-size: 13px; }
+.rulesbtn:hover { color: var(--ink); border-color: var(--amber); }
+
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; font-size: 14px; }
+.panel h2 { font-family: var(--font-serif); font-size: 20px; margin: 0 0 6px; }
+.panel ul { margin: 6px 0 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }
+
+.opts { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; font-size: 12px; color: var(--muted); }
+.opts label { display: inline-flex; align-items: center; gap: 4px; text-transform: uppercase; letter-spacing: .06em; font-weight: 800; font-size: 10px; }
+.opts select { background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 6px; padding: 2px 4px; font: inherit; font-size: 12px; letter-spacing: 0; text-transform: none; }
+
+.board { display: grid; grid-template-columns: auto 1fr auto; gap: 6px 10px; align-items: center; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; }
+.line { grid-column: 1 / -1; display: grid; gap: 2px 0; font-variant-numeric: tabular-nums; font-size: 13px; }
+.line .r { display: grid; align-items: center; }
+.line .r span { text-align: center; min-width: 0; padding: 1px 0; }
+.line .r span:first-child { text-align: left; font-weight: 800; padding-left: 2px; }
+.line .r.h span { color: var(--muted); font-size: 10px; font-weight: 800; letter-spacing: .06em; }
+.line .tot { font-family: var(--font-serif); font-weight: 700; font-size: 16px; }
+.line .cur { background: rgba(244, 181, 74, .16); border-radius: 4px; }
+.line .m { color: var(--mani); } .line .t { color: var(--toston); }
+
+.hud { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; justify-content: space-between; font-size: 12px; color: var(--muted); }
+.hud b { color: var(--ink); }
+.dots { display: inline-flex; gap: 4px; vertical-align: middle; }
+.dots i { width: 10px; height: 10px; border-radius: 50%; border: 1.5px solid var(--muted); display: block; }
+.dots i.on { background: var(--amber); border-color: var(--amber); }
+.dots.out i.on { background: var(--bad); border-color: var(--bad); }
+.lbl { font-size: 10px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; margin-right: 4px; }
+
+.field { position: relative; border-radius: 14px; overflow: hidden; border: 1px solid var(--line); box-shadow: 0 24px 60px rgba(0, 0, 0, .45); background: #3b3e47; touch-action: manipulation; }
+@media (max-width: 560px) { .field { margin-inline: -12px; border-radius: 0; } }
+.field svg { display: block; width: 100%; height: auto; }
+.chalk { fill: none; stroke: rgba(255, 255, 255, .85); stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; filter: url(#tiza); }
+.chalk-f { fill: rgba(255, 255, 255, .06); stroke: none; }
+.cuadro { fill: rgba(255, 255, 255, .07); stroke: rgba(255, 255, 255, .9); stroke-width: 3.4; stroke-linejoin: round; filter: url(#tiza); }
+.base { fill: #f4f1e6; stroke: rgba(0, 0, 0, .25); stroke-width: 1; }
+.roca { fill: #8d8b86; stroke: #3d3b38; stroke-width: 1.6; stroke-linejoin: round; }
+.roca-l { fill: #b4b1aa; stroke: none; }
+.roca-s { fill: none; stroke: rgba(0, 0, 0, .35); stroke-width: 1; stroke-linecap: round; }
+.ctext { fill: rgba(255, 255, 255, .5); font-family: var(--font-sans); font-size: 10px; font-weight: 800; letter-spacing: .14em; text-anchor: middle; }
+.ring { fill: none; stroke: var(--amber); stroke-width: 2; stroke-dasharray: 4 4; opacity: 0; }
+.ring.on { opacity: 1; animation: spin 2.4s linear infinite; transform-origin: 180px 352px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.pop { font-family: var(--font-serif); font-weight: 700; text-anchor: middle; paint-order: stroke; stroke: rgba(0, 0, 0, .6); stroke-width: 4px; stroke-linejoin: round; }
+.status { position: absolute; left: 8px; right: 8px; top: 15%; text-align: center; background: rgba(8, 12, 24, .72); border: 1px solid var(--line); border-radius: 10px; padding: 5px 10px; font-size: 13px; color: var(--ink); min-height: 32px; display: flex; align-items: center; justify-content: center; text-wrap: balance; }
+.status b { color: var(--amber); }
+
+.controls { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; min-height: 52px; }
+.btn { background: var(--amber); color: #1a1205; border: 0; border-radius: 10px; padding: 11px 16px; font-weight: 800; cursor: pointer; }
+.btn.big { font-size: 20px; padding: 14px 28px; flex: 1 1 100%; letter-spacing: .02em; }
+.btn.ghost { background: transparent; color: var(--ink); border: 1px solid var(--line); }
+.btn[disabled] { opacity: .45; cursor: default; }
+.btn:hover:not([disabled]) { filter: brightness(1.08); }
+.pitchrow { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; width: 100%; }
+.pitchrow .btn { display: flex; flex-direction: column; gap: 2px; align-items: center; padding: 10px 6px; }
+.pitchrow .btn small { font-weight: 600; font-size: 11px; opacity: .75; }
+.hint { color: var(--muted); font-size: 12px; text-align: center; min-height: 18px; }
+.log { color: var(--muted); font-size: 13px; text-align: center; min-height: 40px; }
+.log div { opacity: .7; }
+.log div:last-child { opacity: 1; color: var(--ink); }
+.log b { color: var(--ink); }
+
+.overlay { position: fixed; inset: 0; background: rgba(4, 7, 14, .8); display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 20; overflow-y: auto; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; width: 100%; max-width: 420px; display: flex; flex-direction: column; gap: 12px; box-shadow: 0 30px 80px rgba(0, 0, 0, .6); margin: auto; }
+.card h2 { font-family: var(--font-serif); font-size: 26px; margin: 0; text-wrap: balance; }
+.card p { margin: 0; color: var(--muted); }
+.win { color: var(--good); } .lose { color: var(--bad); }
+
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+@media (max-width: 380px) { h1 { font-size: 24px; } .line { font-size: 12px; } }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <header>
+    <div>
+      <h1>Chapitas Maní Tostón</h1>
+      <p class="sub">Bate de escoba y chapas de botella. Tú bateas con Maní.</p>
+    </div>
+    <button class="rulesbtn" id="rulesBtn" aria-expanded="false" aria-controls="rules">Reglas</button>
+  </header>
+
+  <section class="panel" id="rules" hidden>
+    <h2>Cómo se juega</h2>
+    <ul>
+      <li>La pelota es una <b>chapa de botella</b> y el bate es un <b>palo de escoba</b>. Se juega en una calle asfaltada, como el béisbol pero con la zona marcada con tiza.</li>
+      <li>Son dos equipos de siete: <b>Maní</b> (tú) y <b>Tostón</b>. Cada mitad termina con <b>3 outs</b>, y entonces cambian los equipos al bate. <b>El primero que llegue a 10 carreras gana</b> (puedes cambiar la meta a 5 o 15).</li>
+      <li><b>Bateando:</b> el pícher lanza la chapa y tú tocas <b>¡Batear!</b> justo cuando llega al plato. Entre más justo el tiempo, mejor el golpe.</li>
+      <li><b>Lanzando:</b> tú eliges el lanzamiento (rápida, curva o lenta). El bateador trata de adivinarlo: si lo adivina, pega más fuerte.</li>
+      <li><b>Defensa:</b> pícher, cácher, un jugador en cada base y dos en el fondo (jardín izquierdo y jardín derecho). El más cercano sale corriendo a atrapar la chapa.</li>
+      <li><b>Strike:</b> fallas el swing o no tiras. <b>Tres strikes</b> son un out. Un <b>foul</b> cuenta como strike, pero no puede ser el tercero.</li>
+      <li><b>Out:</b> tres strikes, una chapa bateada que atrapan en el aire, o un hit en el que la chapa llega a la base antes que el corredor.</li>
+      <li><b>Sencillo:</b> la chapa cae en la zona cercana: el bateador llega a primera y los corredores avanzan una base.</li>
+      <li><b>Doblete:</b> cae en la zona marcada DOBLETE: el bateador llega a segunda y los corredores avanzan dos bases.</li>
+      <li><b>Jonrón:</b> cae más allá de la línea: anotan el bateador y todos los corredores.</li>
+    </ul>
+  </section>
+
+  <div class="opts">
+    <label>Carreras para ganar <select id="meta"><option value="5">5</option><option value="10" selected>10</option><option value="15">15</option></select></label>
+    <label>Sonido <input type="checkbox" id="snd" checked></label>
+    <label>Outs <select id="outsMax"><option value="2">2</option><option value="3" selected>3</option></select></label>
+  </div>
+
+  <div class="board" aria-live="polite">
+    <div class="line" id="line"></div>
+  </div>
+
+  <div class="hud" id="hud"></div>
+
+  <div class="field" id="fieldWrap">
+    <svg id="field" viewBox="0 -70 360 500" role="img" aria-label="Calle con la zona de juego marcada con tiza: plato, primera, segunda y tercera base, punto de lanzamiento y línea de jonrón. Calle de barrio con niños y jóvenes de distintos tamaños, tres jugadores cubriendo las bases, unos sin camisa, descalzos, con cholas o con zapatos rotos, juegan.">
+      <defs>
+        <filter id="tiza" x="-5%" y="-5%" width="110%" height="110%">
+          <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="4" result="r"/>
+          <feDisplacementMap in="SourceGraphic" in2="r" scale="2.6"/>
+        </filter>
+        <pattern id="bump" width="18" height="11" patternUnits="userSpaceOnUse" patternTransform="skewX(-25)"><rect width="18" height="11" fill="#e8c13a"/><rect width="9" height="11" fill="#1b1c20"/></pattern>
+        <radialGradient id="vinieta" cx="50%" cy="55%" r="75%"><stop offset="60%" stop-color="#000" stop-opacity="0"/><stop offset="100%" stop-color="#000" stop-opacity=".45"/></radialGradient>
+        <pattern id="asf" width="24" height="24" patternUnits="userSpaceOnUse">
+          <rect width="24" height="24" fill="#3b3e47"/>
+          <circle cx="4" cy="6" r="1" fill="#464a54"/><circle cx="15" cy="3" r=".8" fill="#2f323a"/><circle cx="20" cy="14" r="1.1" fill="#464a54"/>
+          <circle cx="8" cy="19" r=".9" fill="#2f323a"/><circle cx="2" cy="13" r=".6" fill="#50545f"/><circle cx="13" cy="12" r=".7" fill="#50545f"/>
+        </pattern>
+      </defs>
+      <rect y="-70" width="360" height="500" fill="url(#asf)"/>
+      <rect x="0" y="-70" width="14" height="500" fill="#8c8e93"/><rect x="346" y="-70" width="14" height="500" fill="#8c8e93"/>
+      <path d="M14 -70V430M346 -70V430" stroke="#2a2b30" stroke-width="3"/>
+      <path d="M12 -70V430M348 -70V430" stroke="#e8c13a" stroke-width="2.4" stroke-dasharray="9 7" opacity=".85"/>
+      <g id="barrio" pointer-events="none">
+        <!-- casas del barrio al fondo -->
+        <rect x="14" y="-70" width="332" height="64" fill="#23252e"/>
+        <rect x="14" y="-62" width="72" height="56" fill="#c9694a"/><rect x="14" y="-67" width="72" height="7" fill="#7c828c"/>
+        <rect x="86" y="-52" width="62" height="46" fill="#5fa58a"/><rect x="86" y="-57" width="62" height="7" fill="#7c828c"/>
+        <rect x="148" y="-64" width="76" height="58" fill="#d9b44a"/><rect x="148" y="-69" width="76" height="7" fill="#7c828c"/>
+        <rect x="224" y="-54" width="60" height="48" fill="#4a74b5"/><rect x="224" y="-59" width="60" height="7" fill="#7c828c"/>
+        <rect x="284" y="-60" width="62" height="54" fill="#b5517a"/><rect x="284" y="-65" width="62" height="7" fill="#7c828c"/>
+        <path d="M14 -64h72M86 -54h62M148 -66h76M224 -56h60M284 -62h62" stroke="rgba(0,0,0,.35)" stroke-width="1.4" stroke-dasharray="3 3"/>
+        <rect x="24" y="-48" width="16" height="18" fill="#1b1d25"/><path d="M24 -42h16M24 -36h16M32 -48v18" stroke="#9aa0ab" stroke-width="1"/>
+        <rect x="50" y="-40" width="18" height="34" fill="#3a2a20"/><circle cx="64" cy="-23" r="1.3" fill="#e8c13a"/>
+        <rect x="96" y="-40" width="16" height="16" fill="#1b1d25"/><path d="M96 -32h16M104 -40v16" stroke="#9aa0ab" stroke-width="1"/>
+        <rect x="122" y="-36" width="16" height="30" fill="#2d3a63"/>
+        <rect x="154" y="-58" width="64" height="14" rx="2" fill="#a52a2a" stroke="#e8c13a" stroke-width="1.2"/><text x="186" y="-48" text-anchor="middle" font-size="8.5" font-weight="900" fill="#ffe27a" font-family="sans-serif">BODEGA EL CHAMO</text>
+        <rect x="160" y="-38" width="52" height="30" fill="#1b1d25"/><path d="M160 -30h52M160 -22h52M173 -38v30M186 -38v30M199 -38v30" stroke="#9aa0ab" stroke-width="1"/>
+        <rect x="232" y="-42" width="16" height="16" fill="#1b1d25"/><path d="M232 -34h16M240 -42v16" stroke="#9aa0ab" stroke-width="1"/>
+        <rect x="258" y="-40" width="18" height="34" fill="#e8e0cc"/>
+        <text x="315" y="-30" text-anchor="middle" font-size="9" font-weight="900" fill="#ffe27a" font-family="sans-serif" transform="rotate(-6 315 -30)">MANÍ</text>
+        <text x="317" y="-18" text-anchor="middle" font-size="9" font-weight="900" fill="#5fe0c0" font-family="sans-serif" transform="rotate(-6 317 -18)">♥ TOSTÓN</text>
+        <rect x="14" y="-6" width="332" height="6" fill="#6b6d73"/><path d="M14 -6H346" stroke="rgba(255,255,255,.25)" stroke-width="1"/>
+        <!-- poste y cables -->
+        <rect x="5" y="-70" width="5" height="190" fill="#4b4e57"/><rect x="0" y="-52" width="22" height="3" fill="#4b4e57"/><circle cx="3" cy="-52" r="2" fill="#bfc4cf"/><circle cx="19" cy="-52" r="2" fill="#bfc4cf"/>
+        <path d="M19 -52Q100 -36 180 -50T346 -54M19 -51Q110 -30 200 -44T346 -46" fill="none" stroke="#14151a" stroke-width="1.1"/>
+        <!-- carro viejo estacionado -->
+        <g transform="translate(262 8)"><ellipse cx="38" cy="30" rx="42" ry="5" fill="rgba(0,0,0,.35)"/>
+          <path d="M2 24V14Q2 9 8 9H22L32 0H56L66 9H74Q78 9 78 14V24Z" fill="#3a8f7a" stroke="#1d3d36" stroke-width="1.3"/>
+          <path d="M26 9L34 2H54L61 9Z" fill="#aee0e8" stroke="#1d3d36" stroke-width="1"/><path d="M44 2V9" stroke="#1d3d36" stroke-width="1"/>
+          <rect x="3" y="15" width="9" height="5" fill="#8a4b2a" opacity=".8"/><rect x="58" y="12" width="11" height="4" fill="#8a4b2a" opacity=".7"/>
+          <circle cx="18" cy="25" r="7" fill="#1a1a1e"/><circle cx="18" cy="25" r="3" fill="#8e929c"/><circle cx="62" cy="25" r="7" fill="#1a1a1e"/><circle cx="62" cy="25" r="3" fill="#8e929c"/></g>
+        <!-- líneas de la calle y policía acostado -->
+        <path d="M177 0V96M183 0V96" stroke="#e8c13a" stroke-width="2.2" stroke-dasharray="16 10" opacity=".8"/>
+        <path d="M60 0V86M300 0V86" stroke="rgba(255,255,255,.55)" stroke-width="2" stroke-dasharray="12 12"/>
+        <rect x="14" y="36" width="332" height="11" fill="url(#bump)" opacity=".92"/><path d="M14 36H346M14 47H346" stroke="rgba(0,0,0,.4)" stroke-width="1"/>
+        <!-- huecos, tapas y charcos -->
+        <ellipse cx="68" cy="152" rx="15" ry="7" fill="#1d1e24"/><ellipse cx="68" cy="150" rx="12" ry="5" fill="#2a2c34"/><path d="M54 150Q60 144 68 144" stroke="rgba(255,255,255,.12)" fill="none"/>
+        <circle cx="294" cy="146" r="10" fill="#2e3036" stroke="#6b6e78" stroke-width="1.6"/><path d="M286 146H302M294 138V154M288 140L300 152M300 140L288 152" stroke="#53565f" stroke-width="1"/>
+        <ellipse cx="92" cy="106" rx="24" ry="7" fill="#46618c" opacity=".7"/><ellipse cx="86" cy="104" rx="10" ry="2.4" fill="rgba(255,255,255,.35)"/>
+        <path d="M230 120Q250 112 268 122Q258 130 242 128Z" fill="#24262d" opacity=".8"/><path d="M40 218Q56 210 72 222" stroke="#202228" stroke-width="2" fill="none"/>
+        <!-- cauchos viejos -->
+        <g transform="translate(318 104)"><ellipse cx="0" cy="8" rx="13" ry="5" fill="rgba(0,0,0,.35)"/><ellipse cx="0" cy="4" rx="12" ry="6" fill="#16171b"/><ellipse cx="0" cy="3" rx="6" ry="3" fill="#3d3f47"/><ellipse cx="0" cy="-3" rx="12" ry="6" fill="#1b1c21"/><ellipse cx="0" cy="-4" rx="6" ry="3" fill="#464851"/></g>
+        <!-- perro de la cuadra -->
+        <g transform="translate(36 70)"><ellipse cx="6" cy="12" rx="13" ry="3.5" fill="rgba(0,0,0,.3)"/><path d="M-4 10Q-6 -2 4 -2L14 0Q18 -6 22 -4L24 2L18 4Q18 10 16 12Z" fill="#b98a4a" stroke="#6a4a22" stroke-width="1"/><circle cx="20" cy="-3" r="4" fill="#b98a4a" stroke="#6a4a22" stroke-width="1"/><path d="M18 -8L16 -3" stroke="#6a4a22" stroke-width="2"/><circle cx="22" cy="-4" r=".8" fill="#222"/><path d="M-4 8Q-12 4 -10 -2" stroke="#b98a4a" stroke-width="2.4" fill="none"/></g>
+        <!-- silla plástica y cava de hielo -->
+        <g transform="translate(318 200)"><ellipse cx="4" cy="22" rx="14" ry="3.5" fill="rgba(0,0,0,.3)"/><path d="M0 0H14V8H0Z" fill="#e8e2d0" stroke="#a49f8c" stroke-width="1"/><path d="M0 8V22M14 8V22M2 8V14H12V8" stroke="#e8e2d0" stroke-width="2.4" fill="none"/><path d="M0 0V-16H12V0" fill="#e8e2d0" stroke="#a49f8c" stroke-width="1"/></g>
+        <g transform="translate(30 250)"><ellipse cx="12" cy="14" rx="16" ry="3.5" fill="rgba(0,0,0,.3)"/><rect x="0" y="0" width="24" height="14" rx="2" fill="#2a78c8" stroke="#16456f" stroke-width="1"/><rect x="-1" y="-3" width="26" height="5" rx="1.5" fill="#f1efe8" stroke="#a49f8c" stroke-width=".8"/></g>
+      </g>
+      <!-- zona buena -->
+      <path class="chalk-f" d="M180 352L21 193A225 225 0 0 1 339 193Z"/>
+      <path class="chalk" stroke-dasharray="14 3 10 4" d="M180 352L21 193M180 352L339 193"/>
+      <path class="chalk" stroke-dasharray="16 4 8 3" d="M21 193A225 225 0 0 1 339 193"/>
+      <text class="ctext" x="180" y="116">JONRÓN</text>
+      <path class="chalk" stroke-dasharray="10 5" d="M74 246A150 150 0 0 1 286 246"/>
+      <text class="ctext" x="132" y="158" style="font-size:9px">DOBLETE</text>
+      <text class="ctext" x="232" y="158" style="font-size:9px">DOBLETE</text>
+      <text class="ctext" x="104" y="236" style="font-size:8px">SENCILLO</text>
+      <text class="ctext" x="256" y="236" style="font-size:8px">SENCILLO</text>
+      <text class="ctext" x="52" y="372" style="font-size:9px">FOUL</text>
+      <text class="ctext" x="308" y="372" style="font-size:9px">FOUL</text>
+      <!-- cuadro pintado con tiza -->
+      <path class="cuadro" d="M180 352L262 270L180 188L98 270Z"/>
+      <path class="chalk" stroke-dasharray="3 5" d="M180 352L180 270" opacity=".6"/>
+      <circle class="chalk" cx="180" cy="270" r="9"/>
+      <!-- bases: piedras grandes -->
+      <g transform="translate(262 270)"><ellipse cx="2" cy="9" rx="17" ry="6" fill="rgba(0,0,0,.4)"/><path class="roca" d="M-14 5L-17 -4L-9 -12L3 -14L14 -8L17 2L10 10L-5 11Z"/><path class="roca-l" d="M-9 -10L3 -12L10 -6L0 -4L-10 -4Z"/><path class="roca-s" d="M-3 -1L4 3M6 -5L9 0"/></g>
+      <g transform="translate(180 188)"><ellipse cx="2" cy="9" rx="17" ry="6" fill="rgba(0,0,0,.4)"/><path class="roca" d="M-15 3L-12 -8L-2 -14L10 -11L17 -2L13 8L0 11L-10 9Z"/><path class="roca-l" d="M-10 -6L-2 -12L8 -9L2 -3L-9 -2Z"/><path class="roca-s" d="M2 2L9 5M-7 4L-3 8"/></g>
+      <g transform="translate(98 270)"><ellipse cx="2" cy="9" rx="17" ry="6" fill="rgba(0,0,0,.4)"/><path class="roca" d="M-16 0L-8 -11L5 -14L15 -6L16 4L7 11L-8 10Z"/><path class="roca-l" d="M-7 -9L5 -12L12 -6L2 -3L-8 -4Z"/><path class="roca-s" d="M-2 3L5 1M8 -2L11 3"/></g>
+      <g transform="translate(180 352)"><ellipse cx="2" cy="8" rx="15" ry="5" fill="rgba(0,0,0,.4)"/><path class="roca" d="M-13 -4L-5 -11L8 -10L14 -2L11 7L-4 9L-12 4Z"/><path class="roca-l" d="M-5 -9L7 -8L11 -3L0 -3Z"/><path class="roca-s" d="M-3 2L4 4"/></g>
+      <circle class="ring" id="ring" cx="180" cy="352" r="17"/>
+      <g id="runners"></g>
+      <g id="actors"></g>
+      <g id="capg" transform="translate(-50 -50)">
+        <ellipse id="capsh" cx="0" cy="9" rx="5" ry="2" fill="rgba(0,0,0,.35)"/>
+        <g id="capb"></g>
+      </g>
+      <g id="fx"></g>
+      <rect y="-70" width="360" height="500" fill="url(#vinieta)" pointer-events="none"/>
+    </svg>
+    <div class="status" id="status">Preparando la calle…</div>
+  </div>
+
+  <div class="controls" id="controls"></div>
+  <div class="hint" id="hint"></div>
+  <div class="log" id="log" aria-live="polite"></div>
+</div>
+
+<div class="overlay" id="overlay" hidden></div>
+
+<script>
+(function () {
+  "use strict";
+  var FAST = !!window.__fast;
+  var ESC = 0.56;   /* tamaño de los jugadores */
+  var REDUCE = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var HOME = { x: 180, y: 352 }, PITCH = { x: 180, y: 270 };
+  var BASEPOS = [{ x: 262, y: 270 }, { x: 180, y: 188 }, { x: 98, y: 270 }];
+  var R_HR = 225;
+
+  var TEAMS = [
+    { name: "Maní", cls: "m", extras: [{ n: "Pelón", alto: 60, ancho: 1.3, camisa: "franela", colCamisa: "#2f6fc2", calzado: "cholas", skin: "#b9774a", hair: "#1a1210" }, { n: "Flaco", alto: 92, ancho: 0.7, camisa: "no", calzado: "rotos", gorra: true, skin: "#8a5636", hair: "#14100d" }, { n: "Catire", alto: 72, ancho: 1.0, camisa: "no", calzado: "descalzo", skin: "#e0b48c", hair: "#c9a44a" }, { n: "Mono", alto: 76, ancho: 1.2, camisa: "no", calzado: "descalzo", skin: "#d29a6c", hair: "#3a2516" }, { n: "Tuti", alto: 58, ancho: 1.0, camisa: "no", calzado: "cholas", gorra: true, skin: "#9a6340", hair: "#1c140e" }], shorts: "#8a5a2b", players: [{ n: "Chucho", tall: true, alto: 96, ancho: 0.72, camisa: "no", calzado: "descalzo", skin: "#a0663f", hair: "#1a1210" }, { n: "Carlitos", tall: false, alto: 56, ancho: 1.7, camisa: "no", calzado: "cholas", skin: "#c98a5e", hair: "#2a1a10" }] },
+    { name: "Tostón", cls: "t", extras: [{ n: "Moncho", alto: 62, ancho: 1.6, camisa: "no", calzado: "rotos", skin: "#6f4429", hair: "#0e0b09" }, { n: "Zurdo", alto: 88, ancho: 0.8, camisa: "franela", colCamisa: "#3aa86b", calzado: "descalzo", gorra: true, skin: "#c28a5c", hair: "#2a1a10" }, { n: "Pipo", alto: 70, ancho: 1.1, camisa: "no", calzado: "cholas", skin: "#a86f48", hair: "#1a1210" }, { n: "Nené", alto: 84, ancho: 1.35, camisa: "no", calzado: "rotos", skin: "#b9774a", hair: "#1a1210" }, { n: "Cacao", alto: 66, ancho: 0.75, camisa: "no", calzado: "descalzo", skin: "#6e4129", hair: "#120d0a" }], shorts: "#e8b93a", players: [{ n: "Gabo", tall: true, alto: 82, ancho: 1.45, camisa: "franela", calzado: "rotos", skin: "#7d4d31", hair: "#14100d" }, { n: "Yeyo", tall: false, alto: 68, ancho: 0.82, camisa: "no", calzado: "rotos", gorra: true, skin: "#d49a6a", hair: "#3a2314" }] }
+  ];
+  TEAMS.forEach(function (t) {
+    t.all = t.players.concat(t.extras);
+    t.all.forEach(function (p) { if (p.tall === undefined) p.tall = p.alto >= 80; });
+  });
+  var RSTAND = [{ x: 250, y: 278 }, { x: 158, y: 198 }, { x: 110, y: 278 }];
+  var HOMEPT = { x: 190, y: 366 }, STANCE = { x: 142, y: 368 };
+  var WAIT = [{ x: 262, y: 416 }, { x: 296, y: 408 }, { x: 330, y: 418 }, { x: 236, y: 424 }, { x: 70, y: 420 }, { x: 104, y: 412 }, { x: 38, y: 410 }];
+  var PITCHES = {
+    rapida: { label: "rápida", T: 720, k: 0.8, curve: 0 },
+    curva: { label: "curva", T: 1150, k: 1, curve: 1 },
+    lenta: { label: "lenta", T: 1500, k: 1.25, curve: 0 }
+  };
+  var PKEYS = ["rapida", "curva", "lenta"];
+
+  var S = null;
+  var runId = 0;
+  var swingReq = null;
+  var timers = [];
+
+  function $(id) { return document.getElementById(id); }
+  function rnd(a, b) { return a + Math.random() * (b - a); }
+  function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+  function now() { return performance.now(); }
+  function sleep(ms) {
+    return new Promise(function (res) { var t = setTimeout(res, FAST ? Math.min(ms, 8) : (REDUCE ? ms * 0.5 : ms)); timers.push(t); });
+  }
+  function dur(ms) { return FAST ? 25 : (REDUCE ? ms * 0.5 : ms); }
+  function tween(ms, fn) {
+    return new Promise(function (res) {
+      var t0 = now(), d = dur(ms);
+      function step() {
+        var p = Math.min(1, (now() - t0) / d);
+        fn(p);
+        if (p < 1) requestAnimationFrame(step); else res();
+      }
+      requestAnimationFrame(step);
+    });
+  }
+
+  /* ---------- dibujo: niños y jóvenes descalzos y sin camisa ---------- */
+  function kid(o) {
+    var H = o.alto || (o.tall ? 86 : 64), ancho = o.ancho || 1, hr = H * 0.14 * (0.9 + ancho * 0.1), w = H * 0.27 * ancho;
+    var headCy = -H + hr + 2, neck = headCy + hr - 1, hip = -H * 0.42, sh = hip + H * 0.2;
+    var skin = o.skin, shade = "rgba(0,0,0,.18)", g = "";
+    var scy = o.crouch ? 0.82 : 1;
+    g += '<g transform="translate(' + o.x + " " + o.y + ") rotate(" + (o.rot || 0) + ") scale(" + (o.flip ? -ESC : ESC) + " " + (scy * ESC) + ')">';
+    g += '<ellipse cx="0" cy="1" rx="' + (w * 0.95) + '" ry="4" fill="rgba(0,0,0,.35)"/>';
+    g += '<g transform="translate(0 ' + (-(o.lift || 0)) + ')">';
+    /* piernas y calzado */
+    var lw = H * 0.1 * (0.8 + ancho * 0.2), lx = w * 0.38, fx = w * 0.34 + (ancho > 1.2 ? 2 : 0);
+    g += '<rect x="' + (-lx) + '" y="' + sh + '" width="' + lw + '" height="' + (-sh - 2) + '" rx="' + (H * 0.04) + '" fill="' + skin + '"/>';
+    g += '<rect x="' + (lx - lw) + '" y="' + sh + '" width="' + lw + '" height="' + (-sh - 2) + '" rx="' + (H * 0.04) + '" fill="' + skin + '"/>';
+    [-1, 1].forEach(function (s) {
+      var cx = s * fx, rx = H * 0.075, ry = H * 0.03;
+      if (o.calzado === "cholas") {
+        g += '<ellipse cx="' + cx + '" cy="-1" rx="' + (rx * 1.15) + '" ry="' + (ry * 1.1) + '" fill="#2a8fd0" stroke="#145a86" stroke-width=".6"/>';
+        g += '<ellipse cx="' + cx + '" cy="-2.2" rx="' + rx + '" ry="' + ry + '" fill="' + skin + '"/>';
+        g += '<path d="M' + (cx - rx * 0.7) + " -1.5L" + cx + " -4.5L" + (cx + rx * 0.7) + ' -1.5" fill="none" stroke="#e8e8e8" stroke-width="1.2" stroke-linecap="round"/>';
+      } else if (o.calzado === "rotos") {
+        g += '<path d="M' + (cx - rx * 1.25) + " 0Q" + (cx - rx * 1.3) + " -" + (H * 0.09) + " " + (cx - rx * 0.2) + " -" + (H * 0.1) + "L" + (cx + rx * 1.35) + " -" + (H * 0.04) + "L" + (cx + rx * 1.4) + ' 0Z" fill="#5a4a3c" stroke="#2b221a" stroke-width=".7"/>';
+        g += '<ellipse cx="' + (cx + rx * 1.0) + '" cy="-' + (H * 0.035) + '" rx="' + (rx * 0.38) + '" ry="' + (H * 0.022) + '" fill="' + skin + '" stroke="#2b221a" stroke-width=".5"/>';
+        g += '<path d="M' + (cx - rx * 0.6) + " -" + (H * 0.075) + "l" + (rx * 0.5) + " 1.2m" + (rx * 0.3) + ' 0l' + (rx * 0.5) + ' 1.2" stroke="#d8d2c4" stroke-width=".9" stroke-linecap="round" fill="none"/>';
+        g += '<path d="M' + (cx - rx * 1.25) + " 0H" + (cx + rx * 1.4) + '" stroke="#ddd" stroke-width="1.4" stroke-dasharray="3 2"/>';
+      } else {
+        g += '<ellipse cx="' + cx + '" cy="-1.5" rx="' + rx + '" ry="' + ry + '" fill="' + skin + '"/>';
+        g += '<ellipse cx="' + cx + '" cy="-.5" rx="' + rx + '" ry="' + (H * 0.018) + '" fill="' + shade + '"/>';
+      }
+    });
+    /* torso sin camisa */
+    g += '<path d="M' + (-w / 2) + " " + (neck + 3) + "Q" + (-w / 2 - 1) + " " + hip + " " + (-w / 2 + 1) + " " + hip + "H" + (w / 2 - 1) + "Q" + (w / 2 + 1) + " " + hip + " " + (w / 2) + " " + (neck + 3) + 'Z" fill="' + skin + '"/>';
+    if (ancho > 1.2 && o.camisa === "no") g += '<ellipse cx="0" cy="' + (hip - H * 0.06) + '" rx="' + (w * 0.62) + '" ry="' + (H * 0.1) + '" fill="' + skin + '" stroke="rgba(0,0,0,.15)" stroke-width=".8"/><circle cx="0" cy="' + (hip - H * 0.05) + '" r=".9" fill="rgba(0,0,0,.35)"/>';
+    if (o.camisa === "franela") {
+      var fw = w * 0.62 + 2;
+      g += '<path d="M' + (-fw) + " " + (neck + 2) + "L" + (-fw - 4) + " " + (neck + H * 0.17) + "L" + (-fw + 1) + " " + (neck + H * 0.2) + "L" + (-fw + 1) + " " + (hip - 1) + "Q0 " + (hip + 4) + " " + (fw - 1) + " " + (hip - 1) + "L" + (fw - 1) + " " + (neck + H * 0.2) + "L" + (fw + 4) + " " + (neck + H * 0.17) + "L" + fw + " " + (neck + 2) + "Q0 " + (neck + 7) + " " + (-fw) + " " + (neck + 2) + 'Z" fill="' + (o.colCamisa || "#c2402f") + '" stroke="rgba(0,0,0,.3)" stroke-width=".8"/>';
+      g += '<path d="M' + (-fw + 3) + " " + (hip - 2) + "l3 -4l3 4l3 -4l3 4" + '" stroke="rgba(0,0,0,.25)" stroke-width=".9" fill="none"/>';
+      g += '<circle cx="' + (fw * 0.3) + '" cy="' + (hip - H * 0.12) + '" r="2.2" fill="' + skin + '"/>';
+    }
+    /* short */
+    g += '<path d="M' + (-w / 2 - 1) + " " + hip + "H" + (w / 2 + 1) + "L" + (w / 2 + 3) + " " + sh + "H" + (-w / 2 - 3) + 'Z" fill="' + o.shorts + '" stroke="rgba(0,0,0,.25)" stroke-width=".8"/>';
+    g += '<path d="M' + (-w / 2 - 1) + " " + (hip + 1.5) + "H" + (w / 2 + 1) + '" stroke="rgba(0,0,0,.25)" stroke-width="1.5"/>';
+    /* brazos */
+    var sy = neck + H * 0.06, aw = H * 0.075, arms = "";
+    function arm(x1, y1, x2, y2) { arms += '<path d="M' + x1 + " " + y1 + "L" + x2 + " " + y2 + '" stroke="' + skin + '" stroke-width="' + aw + '" stroke-linecap="round"/>'; }
+    if (o.pose === "bat") { arm(-w / 2 + 2, sy, w * 0.55, neck + H * 0.2); arm(w / 2 - 2, sy, w * 0.7, neck + H * 0.17); }
+    else if (o.pose === "swing") { arm(-w / 2 + 2, sy, w * 1.1, neck + H * 0.3); arm(w / 2 - 2, sy, w * 1.2, neck + H * 0.26); }
+    else if (o.pose === "throw") { arm(-w / 2 + 2, sy, -w * 0.9, neck + H * 0.34); arm(w / 2 - 2, sy, w * 1.3, -H * 0.98); }
+    else if (o.pose === "windup") { arm(-w / 2 + 2, sy, -w * 0.5, neck + H * 0.3); arm(w / 2 - 2, sy, w * 0.9, -H * 1.04); }
+    else if (o.pose === "catch") { arm(-w / 2 + 2, sy, -w * 0.9, neck + H * 0.3); arm(w / 2 - 2, sy, w * 0.9, neck + H * 0.3); }
+    else if (o.pose === "run") { arm(-w / 2 + 2, sy, -w * 0.95, neck + H * 0.3); arm(w / 2 - 2, sy, w * 0.95, hip - 4); }
+    else if (o.pose === "ready") { arm(-w / 2 + 2, sy, -w * 0.85, hip + H * 0.06); arm(w / 2 - 2, sy, w * 0.85, hip + H * 0.06); }
+    else if (o.pose === "dive") { arm(-w / 2 + 2, sy, -w * 0.5, -H * 1.08); arm(w / 2 - 2, sy, w * 0.5, -H * 1.08); }
+    else if (o.pose === "clap") { var co = o.clapOpen ? w * 0.55 : w * 0.1; arm(-w / 2 + 2, sy, co, neck + H * 0.25); arm(w / 2 - 2, sy, -co, neck + H * 0.25); }
+    else if (o.pose === "lament") { arm(-w / 2 + 2, sy, -hr * 0.85, headCy + hr * 0.1); arm(w / 2 - 2, sy, hr * 0.85, headCy + hr * 0.1); }
+    else if (o.pose === "cheer") { arm(-w / 2 + 2, sy, -w * 1.1, -H * 1.02); arm(w / 2 - 2, sy, w * 1.1, -H * 1.02); }
+    else { arm(-w / 2 + 2, sy, -w * 0.7, hip + 2); arm(w / 2 - 2, sy, w * 0.7, hip + 2); }
+    g += arms;
+    /* cabeza */
+    g += '<rect x="' + (-hr * 0.35) + '" y="' + (headCy + hr * 0.6) + '" width="' + (hr * 0.7) + '" height="' + (hr * 0.8) + '" fill="' + skin + '"/>';
+    g += '<circle cx="0" cy="' + headCy + '" r="' + hr + '" fill="' + skin + '"/>';
+    g += '<path d="M' + (-hr) + " " + (headCy - 1) + "Q" + (-hr) + " " + (headCy - hr * 1.15) + " 0 " + (headCy - hr * 1.12) + "Q" + hr + " " + (headCy - hr * 1.15) + " " + hr + " " + (headCy - 1) + "Q" + (hr * 0.5) + " " + (headCy - hr * 0.55) + " 0 " + (headCy - hr * 0.5) + "Q" + (-hr * 0.5) + " " + (headCy - hr * 0.55) + " " + (-hr) + " " + (headCy - 1) + 'Z" fill="' + o.hair + '"/>';
+    if (o.gorra) g += '<path d="M' + (-hr * 1.05) + " " + (headCy - hr * 0.2) + "Q" + (-hr * 1.05) + " " + (headCy - hr * 1.3) + " 0 " + (headCy - hr * 1.28) + "Q" + (hr * 1.05) + " " + (headCy - hr * 1.3) + " " + (hr * 1.05) + " " + (headCy - hr * 0.2) + "L" + (hr * 1.8) + " " + (headCy - hr * 0.1) + "L" + (hr * 1.05) + " " + (headCy - hr * 0.45) + 'Z" fill="#2d6a4f" stroke="rgba(0,0,0,.3)" stroke-width=".7"/>';
+    g += '<circle cx="' + (-hr * 0.38) + '" cy="' + (headCy + 1) + '" r="1" fill="#1a1210"/><circle cx="' + (hr * 0.38) + '" cy="' + (headCy + 1) + '" r="1" fill="#1a1210"/>';
+    g += '<path d="M' + (-hr * 0.35) + " " + (headCy + hr * 0.45) + "Q0 " + (headCy + hr * 0.8) + " " + (hr * 0.35) + " " + (headCy + hr * 0.45) + '" fill="none" stroke="#1a1210" stroke-width=".9" stroke-linecap="round"/>';
+    if (o.shout) g += '<ellipse cx="0" cy="' + (headCy + hr * 0.55) + '" rx="' + (hr * 0.3) + '" ry="' + (hr * 0.4) + '" fill="#3a0d0d"/>';
+    g += "</g></g>";
+    return g;
+  }
+
+  function chapaPath(r) {
+    var pts = [], n = 12;
+    for (var k = 0; k < n * 2; k++) { var a = (k / (n * 2)) * Math.PI * 2, rr = k % 2 ? r * 0.82 : r; pts.push((Math.cos(a) * rr).toFixed(2) + " " + (Math.sin(a) * rr).toFixed(2)); }
+    return "M" + pts.join("L") + "Z";
+  }
+  $("capb").innerHTML = '<path d="' + chapaPath(6) + '" fill="#d4a62a" stroke="#6b4e0a" stroke-width=".8"/><circle r="3.4" fill="#f1cf62" stroke="#6b4e0a" stroke-width=".5"/>';
+
+  function setCap(x, y, z) {
+    $("capg").setAttribute("transform", "translate(" + x.toFixed(1) + " " + (y - (z || 0)).toFixed(1) + ")");
+    $("capsh").setAttribute("cy", (9 + (z || 0)).toFixed(1));
+    $("capsh").setAttribute("rx", (5 - Math.min(3, (z || 0) / 30)).toFixed(1));
+  }
+  function hideCap() { $("capg").setAttribute("transform", "translate(-60 -60)"); }
+
+  /* ---------- actores ---------- */
+  var poses = { batter: "bat", pitcher: "idle", catcher: "catch", wait: "idle" };
+  var batAngle = -18;
+  function batterTeam() { return S.half; }   /* 0 = Maní batea primero, 1 = Tostón */
+  /* defensores: uno cubriendo cada base (primera, segunda y tercera) */
+  var FL = [];
+  function initFielders() {
+    FL = [{ hx: 286, hy: 288 }, { hx: 208, hy: 206 }, { hx: 72, hy: 288 }, { hx: 84, hy: 150 }, { hx: 276, hy: 150 }].map(function (f) { return { x: f.hx, y: f.hy, hx: f.hx, hy: f.hy, pose: "ready", rot: 0, flip: false }; });
+  }
+  initFielders();
+  function aspecto(p, team, extra) {
+    var o = { tall: p.tall, alto: p.alto, ancho: p.ancho, camisa: p.camisa, colCamisa: p.colCamisa, calzado: p.calzado, gorra: p.gorra, skin: p.skin, hair: p.hair, shorts: team.shorts };
+    for (var k in extra) o[k] = extra[k];
+    var e = emoFor(team, p, o);
+    if (e) { o.pose = e.pose; o.lift = e.lift; o.shout = e.shout; o.clapOpen = e.open; }
+    return o;
+  }
+  /* ---------- emociones: saltos, manos arriba, aplausos y gritos ---------- */
+  var emo = null;
+  function emoFor(team, p, o) {
+    if (!emo) return null;
+    var party = team === TEAMS[emo.party], sad = emo.sad !== null && team === TEAMS[emo.sad];
+    if (!party && !sad) return null;
+    if (o.crouch || { run: 1, dive: 1, throw: 1, windup: 1, swing: 1, bat: 1 }[o.pose]) return null;
+    var idx = team.all.indexOf(p), t = (now() - emo.t0) / 1000, ph = t * 6 + idx * 1.7;
+    if (sad) return { pose: "lament", lift: 0, shout: Math.sin(t * 5 + idx) > 0.6, open: false };
+    var up = idx % 3 !== 1;
+    return { pose: up ? "cheer" : "clap", lift: Math.abs(Math.sin(ph)) * (emo.big ? 15 : 10), shout: idx % 2 === 0 && Math.sin(ph * 0.8) > -0.3, open: Math.sin(t * 16 + idx) > 0 };
+  }
+  var SND = { on: true, ctx: null };
+  function ac() {
+    if (FAST || !SND.on) return null;
+    try {
+      if (!SND.ctx) SND.ctx = new (window.AudioContext || window.webkitAudioContext)();
+      if (SND.ctx.state === "suspended") SND.ctx.resume();
+      return SND.ctx;
+    } catch (e) { return null; }
+  }
+  function noiseBurst(c, t, len, gain, f0, f1, type) {
+    var n = Math.floor(c.sampleRate * len), buf = c.createBuffer(1, n, c.sampleRate), d = buf.getChannelData(0);
+    for (var i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, type === "clap" ? 3 : 1);
+    var src = c.createBufferSource(); src.buffer = buf;
+    var fl = c.createBiquadFilter(); fl.type = type === "clap" ? "highpass" : "bandpass"; fl.frequency.setValueAtTime(f0, t);
+    if (f1) fl.frequency.linearRampToValueAtTime(f1, t + len);
+    var g = c.createGain();
+    if (type === "clap") g.gain.setValueAtTime(gain, t);
+    else { g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(gain, t + len * 0.3); g.gain.linearRampToValueAtTime(0.0001, t + len); }
+    src.connect(fl); fl.connect(g); g.connect(c.destination); src.start(t);
+  }
+  function yell(c, t, f0, f1, len, gain) {
+    var o = c.createOscillator(), g = c.createGain(), fl = c.createBiquadFilter();
+    o.type = "sawtooth"; o.frequency.setValueAtTime(f0, t); o.frequency.linearRampToValueAtTime(f1, t + len);
+    fl.type = "lowpass"; fl.frequency.value = 1100;
+    g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(gain, t + len * 0.2); g.gain.linearRampToValueAtTime(0.0001, t + len);
+    o.connect(fl); fl.connect(g); g.connect(c.destination); o.start(t); o.stop(t + len + 0.05);
+  }
+  function sfx(kind) {
+    var c = ac(); if (!c) return;
+    var t = c.currentTime + 0.02, i;
+    if (kind === "sad") { yell(c, t, 330, 170, 0.7, 0.05); yell(c, t + 0.08, 280, 150, 0.7, 0.04); noiseBurst(c, t, 0.7, 0.03, 600, 300, "crowd"); return; }
+    var big = kind === "big", n = big ? 10 : 5;
+    for (i = 0; i < n; i++) noiseBurst(c, t + i * 0.11 + Math.random() * 0.03, 0.07, big ? 0.3 : 0.22, 1500, 0, "clap");
+    noiseBurst(c, t, big ? 1.6 : 0.8, big ? 0.14 : 0.09, 900, 1500, "crowd");
+    yell(c, t, 300, 520, big ? 0.9 : 0.5, 0.05); yell(c, t + 0.05, 380, 640, big ? 0.9 : 0.5, 0.04);
+    if (big) yell(c, t + 0.5, 340, 600, 0.8, 0.05);
+  }
+  var SH = {
+    party: ["¡Eso, mi pana!", "¡Dale, chamo!", "¡Wepa!", "¡Así se hace!", "¡Vamo'!", "¡Qué golpe!"],
+    big: ["¡Wooow!", "¡Qué batazo!", "¡Épale!", "¡Se fue!", "¡Eso, chamo!"],
+    out: ["¡Fuera!", "¡Out, chamo!", "¡Así se atrapa!", "¡Wepa!"],
+    sad: ["¡Ay, no!", "¡Qué vaina!", "¡Aaay!", "¡Se nos fue!"]
+  };
+  function shouts(team, pool, color, n) {
+    var spots = team === V.team ? WAIT.slice(0, 4).concat(RSTAND) : FL.map(function (f) { return { x: f.hx, y: f.hy }; }).concat([{ x: 180, y: 292 }]);
+    for (var i = 0; i < n; i++) {
+      (function (k) {
+        var sp = spots[Math.floor(Math.random() * spots.length)], txt = pool[Math.floor(Math.random() * pool.length)];
+        var tm = setTimeout(function () { if (S) pop(txt, Math.max(50, Math.min(310, sp.x)), sp.y - 40, color, 14); }, FAST ? 0 : k * 260);
+        timers.push(tm);
+      })(i);
+    }
+  }
+  function emote(party, sad, ms, big, extraText) {
+    var cols = ["#f0a860", "#ffd34f"], e = { party: party, sad: sad, t0: now(), big: !!big };
+    emo = e;
+    var kind = sad === null ? "cheer" : (big ? "big" : "cheer");
+    sfx(kind); if (sad !== null) timers.push(setTimeout(function () { sfx("sad"); }, FAST ? 0 : 200));
+    shouts(party, extraText || (big ? SH.big : SH.party), cols[party], big ? 4 : 3);
+    if (sad !== null) shouts(sad, SH.sad, "#cfd6e6", 1);
+    return tween(ms, function () { drawActorsLight(); }).then(function () { if (emo === e) emo = null; drawActors(); });
+  }
+  var V = { team: 0, batter: 0, bases: [null, null, null] };
+  var ov = {};
+  function syncView() { V.team = batterTeam(); V.batter = S.bat[V.team]; V.bases = S.bases.slice(); ov = {}; }
+  function drawActors() {
+    var b = V.team, d = 1 - b, bt = TEAMS[b], dt = TEAMS[d], bp = bt.all, dp = dt.all;
+    var batter = bp[V.batter], pitcher = dp[0], catcher = dp[1], specs = [], used = {};
+    specs.push({ y: 292, o: aspecto(pitcher, dt, { x: 180, y: 292, pose: poses.pitcher }), extra: "" });
+    specs.push({ y: 418, o: aspecto(catcher, dt, { x: 180, y: 418, pose: poses.catcher, crouch: true }), extra: "" });
+    FL.forEach(function (f, i) {
+      specs.push({ y: f.y, o: aspecto(dp[2 + i], dt, { x: f.x, y: f.y, pose: f.pose, rot: f.rot, flip: f.flip }), extra: "" });
+    });
+    used[V.batter] = 1;
+    if (ov[V.batter]) {
+      var q = ov[V.batter];
+      if (!q.hide) specs.push({ y: q.y, o: aspecto(batter, bt, { x: q.x, y: q.y, pose: q.pose, flip: q.flip }), extra: "" });
+    } else {
+      var bx = STANCE.x, by = STANCE.y, bh = batter.alto, hx = bx + bh * 0.27 * (batter.ancho || 1) * 0.62 * ESC, hy = by - bh * 0.74 * ESC;
+      var bate = '<g transform="translate(' + hx + " " + hy + ") rotate(" + batAngle + ") scale(" + ESC + ')"><line x1="0" y1="8" x2="0" y2="-62" stroke="#a9773c" stroke-width="4.5" stroke-linecap="round"/><line x1="0" y1="-62" x2="0" y2="-52" stroke="#7b5226" stroke-width="4.5" stroke-linecap="round"/></g>';
+      specs.push({ y: by, o: aspecto(batter, bt, { x: bx, y: by, pose: poses.batter }), extra: bate });
+    }
+    V.bases.forEach(function (pid, k) {
+      if (pid === null) return;
+      used[pid] = 1;
+      var o = ov[pid] || { x: RSTAND[k].x, y: RSTAND[k].y, pose: "idle" };
+      if (!o.hide) specs.push({ y: o.y, o: aspecto(bp[pid], bt, { x: o.x, y: o.y, pose: o.pose, flip: o.flip }), extra: "" });
+    });
+    for (var pid in ov) {
+      if (used[pid]) continue;
+      used[pid] = 1; var o2 = ov[pid];
+      if (!o2.hide) specs.push({ y: o2.y, o: aspecto(bp[pid], bt, { x: o2.x, y: o2.y, pose: o2.pose, flip: o2.flip }), extra: "" });
+    }
+    var w = 0;
+    for (var k2 = 0; k2 < bp.length; k2++) {
+      if (used[k2]) continue;
+      var sp = WAIT[w++ % WAIT.length];
+      specs.push({ y: sp.y, o: aspecto(bp[k2], bt, { x: sp.x, y: sp.y, pose: "idle" }), extra: "" });
+    }
+    specs.sort(function (p, q2) { return p.y - q2.y; });
+    $("actors").innerHTML = specs.map(function (sp2) { return kid(sp2.o) + sp2.extra; }).join("");
+    $("actors").setAttribute("data-names", batter.n + "|" + pitcher.n);
+  }
+
+  /* ---------- marcador ---------- */
+  function renderLine() {
+    var last = Math.max(5, S.inn), first = Math.max(1, last - 7), n = last - first + 1, cols = "70px repeat(" + n + ", minmax(0, 1fr)) 34px", h = "";
+    h += '<div class="r h" style="grid-template-columns:' + cols + '"><span></span>';
+    for (var i = first; i <= last; i++) h += "<span>" + i + "</span>";
+    h += "<span>C</span></div>";
+    [0, 1].forEach(function (t) {
+      h += '<div class="r" style="grid-template-columns:' + cols + '"><span class="' + TEAMS[t].cls + '">' + TEAMS[t].name + "</span>";
+      for (var i = first - 1; i < last; i++) {
+        var v = S.line[t][i], cur = !S.over && S.inn - 1 === i && S.half === t;
+        h += '<span class="' + (cur ? "cur" : "") + '">' + (v === undefined ? (cur ? S.halfRuns : "") : v) + "</span>";
+      }
+      h += '<span class="tot">' + S.runs[t] + "</span></div>";
+    });
+    $("line").innerHTML = h;
+  }
+  function dots(n, max, cls) { var h = '<span class="dots ' + (cls || "") + '">'; for (var i = 0; i < max; i++) h += '<i class="' + (i < n ? "on" : "") + '"></i>'; return h + "</span>"; }
+  function renderHud() {
+    var b = batterTeam(), bt = TEAMS[b], batter = bt.all[S.bat[b]];
+    $("hud").innerHTML =
+      '<span><span class="lbl">Meta</span><b>' + S.target + "</b></span>" +
+      '<span><span class="lbl">Inning</span><b>' + S.inn + (S.half === 0 ? " ▲" : " ▼") + "</b></span>" +
+      '<span><span class="lbl">Batea</span><b class="' + bt.cls + '" style="color:var(--' + (b ? "toston" : "mani") + ')">' + bt.name + "</b> · " + batter.n + "</span>" +
+      '<span><span class="lbl">Strikes</span>' + dots(S.strikes, 3) + "</span>" +
+      '<span><span class="lbl">Outs</span>' + dots(S.outs, S.outsMax, "out") + "</span>";
+  }
+  function say(html) { S.log.push(html); if (S.log.length > 3) S.log.shift(); $("log").innerHTML = S.log.map(function (l) { return "<div>" + l + "</div>"; }).join(""); }
+  function status(html) { $("status").innerHTML = "<span>" + html + "</span>"; }
+
+  function refresh() { syncView(); renderLine(); renderHud(); drawActors(); }
+
+  /* ---------- trayectorias ---------- */
+  function polar(theta, r) { var a = theta * Math.PI / 180; return { x: HOME.x + Math.sin(a) * r, y: HOME.y - Math.cos(a) * r }; }
+  function pitchPos(type, p) {
+    var pt = PITCHES[type], t = Math.pow(p, pt.k), sx = 190, sy = 244;
+    var x = sx + (HOME.x - sx) * t, y = sy + (HOME.y - sy) * t;
+    if (pt.curve) x += Math.sin(t * Math.PI) * 46 * (S.curveDir || 1);
+    return { x: x, y: y, z: Math.sin(t * Math.PI) * 10 };
+  }
+  function flyCap(from, to, ms, arc) {
+    return tween(ms, function (p) {
+      setCap(from.x + (to.x - from.x) * p, from.y + (to.y - from.y) * p, Math.sin(p * Math.PI) * arc);
+    });
+  }
+  function pop(text, x, y, color, size) {
+    var el = document.createElementNS("http://www.w3.org/2000/svg", "text");
+    el.setAttribute("class", "pop"); el.setAttribute("x", x); el.setAttribute("y", y); el.setAttribute("fill", color || "#fff"); el.setAttribute("font-size", size || 26);
+    el.textContent = text; $("fx").appendChild(el);
+    tween(1100, function (p) { el.setAttribute("y", y - p * 22); el.setAttribute("opacity", p < 0.7 ? 1 : (1 - p) / 0.3); }).then(function () { if (el.parentNode) el.parentNode.removeChild(el); });
+  }
+
+  /* ---------- resultado de cada lanzamiento ---------- */
+  /* ---------- defensa: correr, lanzarse y lanzar a las bases ---------- */
+  function masCerca(pt) {
+    var mejor = 0, md = 1e9;
+    FL.forEach(function (f, i) { var q = Math.hypot(f.x - pt.x, f.y - pt.y); if (q < md) { md = q; mejor = i; } });
+    return mejor;
+  }
+  function mover(f, x, y, ms, pose) {
+    var x0 = f.x, y0 = f.y;
+    f.flip = x < x0; f.pose = pose || "run";
+    return tween(ms, function (p) {
+      f.x = x0 + (x - x0) * p;
+      f.y = y0 + (y - y0) * p - Math.abs(Math.sin(p * Math.PI * ms / 170)) * 3;
+      drawActorsLight();
+    }).then(function () { f.x = x; f.y = y; drawActors(); });
+  }
+  function lanzarse(f, dir, x, y) {
+    var x0 = f.x, y0 = f.y;
+    f.pose = "dive";
+    return tween(260, function (p) {
+      f.rot = dir * 72 * p; f.x = x0 + (x - x0) * p; f.y = y0 + (y - y0) * p - Math.sin(p * Math.PI) * 8;
+      drawActorsLight();
+    }).then(function () { drawActors(); });
+  }
+  async function pararse(f) {
+    var r0 = f.rot;
+    await tween(200, function (p) { f.rot = r0 * (1 - p); drawActorsLight(); });
+    f.rot = 0; f.pose = "ready"; drawActors();
+  }
+  function volverTodos() {
+    return Promise.all(FL.map(function (f) {
+      return mover(f, f.hx, f.hy, 420, "run").then(function () { f.pose = "ready"; f.rot = 0; f.flip = false; });
+    })).then(function () { drawActors(); });
+  }
+  /* El defensor más cercano sale corriendo hacia la pelota y, si hace falta, se lanza. */
+  function perseguir(pt, ms, lanzar) {
+    var i = masCerca(pt), f = FL[i], dir = pt.x >= f.x ? 1 : -1;
+    var correr = lanzar ? Math.max(260, ms - 300) : ms;
+    var antes = lanzar ? 26 : 0;
+    return { i: i, f: f, p: (async function () {
+      await mover(f, pt.x - dir * antes, pt.y + 8, correr, "run");
+      if (lanzar) await lanzarse(f, dir, pt.x, pt.y + 8);
+    })() };
+  }
+
+  function ptOf(k) { return (k < 0 || k > 2) ? HOMEPT : RSTAND[k]; }
+  function runPlan(plan, T) {
+    return Promise.all(plan.map(function (m) {
+      var pts = [], k;
+      for (k = m.f; k <= m.t; k++) pts.push(ptOf(k));
+      if (pts.length < 2) return Promise.resolve();
+      var legs = pts.length - 1, last = pts[legs], tot = m.out ? legs - 0.15 : legs;
+      var ms = Math.max(legs * 330, (T || 0) * (m.out ? 1 : 0.88));
+      return tween(ms, function (p) {
+        var u = p * tot, i = Math.min(legs - 1, Math.floor(u)), q = u - i, a = pts[i], c = pts[i + 1];
+        ov[m.pid] = { x: a.x + (c.x - a.x) * q, y: a.y + (c.y - a.y) * q - Math.abs(Math.sin(u * Math.PI * 3)) * 3, pose: "run", flip: c.x < a.x };
+        drawActorsLight();
+      }).then(function () { ov[m.pid] = m.out ? { x: 0, y: 0, hide: true } : { x: last.x, y: last.y, pose: "idle" }; });
+    })).then(function () { drawActors(); });
+  }
+
+  async function playOutcome(kind, side, d) {
+    var catcherPt = { x: 180, y: 396 }, my = runId, res = null, rp = null;
+    if (kind === "look") {
+      await flyCap(HOME, catcherPt, 160, 4);
+      poses.catcher = "catch"; pop("¡STRIKE!", 180, 300, "#f4b54a");
+    } else if (kind === "miss") {
+      await flyCap(HOME, catcherPt, 160, 4);
+      pop("¡STRIKE!", 180, 300, "#f4b54a");
+    } else if (kind === "foul") {
+      var f = polar(side * rnd(52, 78), rnd(90, 210));
+      var cf = perseguir(f, 650, true);
+      await Promise.all([flyCap(HOME, f, 650, 40), cf.p]);
+      pop("¡FOUL!", Math.max(50, Math.min(310, f.x)), Math.max(80, f.y), "#ffd0a0");
+    } else if (kind === "hit" || kind === "double") {
+      var dbl = kind === "double", ms = dbl ? 950 : 780, ti = dbl ? 1 : 0;
+      var h = dbl ? polar(side * rnd(8, 40) + rnd(-6, 6), rnd(162, 214)) : polar(side * rnd(2, 34) + rnd(-6, 6), rnd(88, 146));
+      var rr = Math.hypot(h.x - HOME.x, h.y - HOME.y);
+      var pOut = dbl ? 0.1 : Math.max(0.08, 0.34 - (rr - 88) / 58 * 0.26);
+      var thrown = Math.random() < pOut;
+      res = commit(kind, thrown); rp = runPlan(res.plan, ms + 160 + 420);
+      var ch = perseguir(h, ms, false);
+      await Promise.all([flyCap(HOME, h, ms, dbl ? 70 : 46), ch.p]);
+      pop(dbl ? "¡DOBLETE!" : "¡HIT!", h.x, h.y - 12, dbl ? "#7fe0e8" : "#5fd39a", dbl ? 28 : 26);
+      /* recoge la chapa y la manda a la base antes de que llegue el corredor */
+      ch.f.pose = "throw"; drawActors();
+      var otro = FL[ti];
+      await sleep(160);
+      if (ch.i !== ti) await flyCap(h, { x: otro.x, y: otro.y - 14 }, 420, 24); else await sleep(420);
+      otro.pose = "catch"; ch.f.pose = "ready"; drawActors();
+      if (thrown) pop("¡OUT!", BASEPOS[ti].x, BASEPOS[ti].y - 24, "#ef7a6e", 30);
+    } else if (kind === "hr") {
+      res = commit(kind); rp = runPlan(res.plan, 0);
+      var hrp = polar(rnd(-32, 32), rnd(R_HR + 35, R_HR + 85));
+      var cr = FL[masCerca({ x: hrp.x, y: 20 })];
+      var corre = mover(cr, Math.max(30, Math.min(330, hrp.x)), 60, 1000, "run").then(function () { cr.pose = "cheer"; drawActors(); });
+      await Promise.all([flyCap(HOME, hrp, 1250, 120), corre]);
+      pop("¡JONRÓN!", 180, 120, "#ffd34f", 34);
+    } else if (kind === "fly") {
+      var lp = polar(rnd(-16, 16), rnd(105, 150));
+      var cl = perseguir(lp, 800, true);
+      await Promise.all([flyCap(HOME, lp, 800, 90), cl.p]);
+      poses.pitcher = "cheer"; drawActors();
+      pop("¡ATRAPADA!", lp.x, lp.y - 18, "#ef7a6e");
+    }
+    if (rp) await rp;
+    if (!res) res = commit(kind);
+    if (my !== runId) return { halfOver: false };
+    var bt = batterTeam(), ep = null;
+    if ((kind === "hit" || kind === "double" || kind === "hr") && !res.thrown) {
+      ep = { party: bt, sad: 1 - bt, ms: kind === "hr" ? 2300 : (kind === "double" ? 1600 : 1200), big: kind !== "hit" || res.scored > 0 };
+      if (res.scored > 0 && kind !== "hr") shouts(bt, [res.scored > 1 ? "¡" + res.scored + " carreras!" : "¡Una carrera!"], "#ffd34f", 1);
+    } else if (res.out) ep = { party: 1 - bt, sad: bt, ms: 1000, big: false, text: SH.out };
+    var finMs = ep ? ep.ms : (kind === "hr" ? 700 : 420);
+    await Promise.all([ep ? emote(ep.party, ep.sad, ep.ms, ep.big, ep.text) : sleep(finMs), (kind === "fly" || kind === "foul") ? pararse(FL.reduce(function (a, f) { return Math.abs(f.rot) > Math.abs(a.rot) ? f : a; }, FL[0])).then(volverTodos) : volverTodos()]);
+    hideCap();
+    poses.pitcher = "idle"; poses.catcher = "catch"; poses.batter = "bat"; batAngle = -18;
+    return res;
+  }
+
+  function swingAnim() {
+    poses.batter = "swing";
+    return tween(170, function (p) { batAngle = -30 + p * 150; drawActorsLight(); });
+  }
+  var lastDraw = 0;
+  function drawActorsLight() { if (now() - lastDraw > 24 || FAST) { lastDraw = now(); drawActors(); } }
+
+  /* ---------- reglas del partido ---------- */
+  function nextBatter(b) {
+    var nn = TEAMS[b].all.length, i = (S.bat[b] + 1) % nn;
+    while (S.bases.indexOf(i) !== -1) i = (i + 1) % nn;
+    return i;
+  }
+  function commit(kind, thrown) {
+    var b = batterTeam(), cur = S.bat[b], name = TEAMS[b].all[cur].n, txt = "", endBatter = false, out = false, plan = [], scored = 0, i;
+    if (kind === "look" || kind === "miss") {
+      S.strikes++; txt = kind === "look" ? "Strike sin tirar" : "Strike, swing y falla";
+      if (S.strikes >= 3) { out = true; txt = "¡Ponchado! Tercer strike"; }
+    } else if (kind === "foul") {
+      if (S.strikes < 2) S.strikes++;
+      txt = "Foul, cuenta como strike";
+    } else if (kind === "fly") {
+      out = true; txt = "Atrapada en el aire: out";
+    } else if (kind === "hit" || kind === "double") {
+      var n = kind === "hit" ? 1 : 2, nb = [null, null, null], base = n === 1 ? "primera" : "segunda";
+      var lastOut = thrown && S.outs + 1 >= S.outsMax;
+      if (lastOut) nb = S.bases.slice();
+      else for (i = 2; i >= 0; i--) {
+        if (S.bases[i] === null) continue;
+        var t = i + n;
+        plan.push({ pid: S.bases[i], f: i, t: Math.min(t, 3) });
+        if (t >= 3) scored++; else nb[t] = S.bases[i];
+      }
+      if (thrown) { plan.push({ pid: cur, f: -1, t: n - 1, out: true }); out = true; }
+      else { plan.push({ pid: cur, f: -1, t: n - 1 }); nb[n - 1] = cur; }
+      S.bases = nb; S.runs[b] += scored; S.halfRuns += scored; endBatter = true;
+      if (thrown) txt = (kind === "hit" ? "Hit de <b>" : "Doblete de <b>") + name + "</b>, pero la chapa llega a " + base + " antes: ¡out!" + (scored ? " Anota" + (scored > 1 ? "n " + scored + " carreras" : " 1 carrera") : "");
+      else txt = (kind === "hit" ? "¡Hit de <b>" : "¡Doblete de <b>") + name + "</b>!" + (scored ? " Anota" + (scored > 1 ? "n " + scored + " carreras" : " 1 carrera") : "");
+    } else if (kind === "hr") {
+      for (i = 2; i >= 0; i--) if (S.bases[i] !== null) plan.push({ pid: S.bases[i], f: i, t: 3 });
+      plan.push({ pid: cur, f: -1, t: 3 });
+      var nr = plan.length; scored = nr;
+      S.bases = [null, null, null]; S.runs[b] += nr; S.halfRuns += nr; endBatter = true;
+      txt = "¡Jonrón de <b>" + name + "</b>! Anotan " + nr + (nr === 1 ? " carrera" : " carreras");
+    }
+    if (out) { S.outs++; endBatter = true; }
+    if (endBatter) { S.strikes = 0; S.bat[b] = nextBatter(b); }
+    say(txt);
+    return { halfOver: S.outs >= S.outsMax || S.runs[b] >= S.target, plan: plan, scored: scored, out: out, kind: kind, thrown: !!thrown };
+  }
+
+  async function endHalf() {
+    var b = batterTeam();
+    S.line[b][S.inn - 1] = S.halfRuns;
+    if (S.runs[b] >= S.target) { await sleep(500); return finish(); }
+    status("Se acabó la mitad. <b>" + TEAMS[b].name + "</b> hizo " + S.halfRuns + (S.halfRuns === 1 ? " carrera." : " carreras."));
+    say("Fin de la mitad: " + TEAMS[b].name + " " + S.halfRuns);
+    await sleep(1300);
+    S.outs = 0; S.strikes = 0; S.bases = [null, null, null]; S.halfRuns = 0;
+    if (S.half === 0) { S.half = 1; } else { S.half = 0; S.inn++; }
+    poses.pitcher = "idle"; poses.batter = "bat"; batAngle = -18;
+  }
+
+  function finish() {
+    S.over = true; refresh();
+    var w = S.runs[0] > S.runs[1] ? 0 : 1;
+    var h = '<div class="card"><h2 class="' + (w === 0 ? "win" : "lose") + '">' + (w === 0 ? "¡Ganó Maní, chamo!" : "Ganó Tostón") + "</h2>";
+    h += "<p>Final: <b style='color:var(--mani)'>Maní " + S.runs[0] + "</b> – <b style='color:var(--toston)'>Tostón " + S.runs[1] + "</b></p>";
+    h += '<button class="btn" id="again">Jugar otra vez</button></div>';
+    $("overlay").innerHTML = h; $("overlay").hidden = false;
+    $("again").onclick = function () { $("overlay").hidden = true; start(); };
+    $("again").focus();
+    $("controls").innerHTML = ""; $("hint").textContent = ""; status("Juego terminado");
+  }
+
+  /* ---------- turnos ---------- */
+  async function playLoop(id) {
+    while (id === runId && !S.over) {
+      refresh();
+      var halfOver;
+      if (batterTeam() === 0) halfOver = await humanBats(id);
+      else halfOver = await humanPitches(id);
+      if (id !== runId) return;
+      refresh();
+      if (halfOver) { await endHalf(); if (id !== runId) return; if (S.over) return; }
+      else await sleep(500);
+    }
+  }
+
+  function setControls(html) { $("controls").innerHTML = html; }
+
+  async function humanBats(id) {
+    var b = 0, batter = TEAMS[0].all[S.bat[0]], pitcher = TEAMS[1].players[0];
+    setControls('<button type="button" class="btn big" id="bat" disabled>¡Batear!</button>');
+    $("hint").textContent = "Toca ¡Batear! justo cuando la chapa llegue al plato.";
+    status("<b>" + pitcher.n + "</b> se prepara a lanzar…");
+    poses.pitcher = "windup"; poses.batter = "bat"; batAngle = -18; drawActors();
+    await sleep(1000);
+    if (id !== runId) return;
+    var type = pick(PKEYS), pt = PITCHES[type];
+    S.curveDir = Math.random() < 0.5 ? -1 : 1;
+    var T = FAST ? 240 : (REDUCE ? pt.T * 0.8 : pt.T);
+    status("<b>" + pitcher.n + "</b> lanza una <b>" + pt.label + "</b>");
+    poses.pitcher = "throw"; drawActors();
+    var start = now(), A = start + T;
+    var batBtn = $("bat");
+    batBtn.disabled = false; $("ring").setAttribute("class", "ring on");
+    var tapped = null;
+    swingReq = function () { if (tapped === null) { tapped = now(); batBtn.disabled = true; } };
+    var cap = tween(T, function (p) { var q = pitchPos(type, p); setCap(q.x, q.y, q.z); });
+    await new Promise(function (res) {
+      var iv = setInterval(function () {
+        if (id !== runId) { clearInterval(iv); res(); return; }
+        if (tapped !== null || now() > A + 330) { clearInterval(iv); res(); }
+      }, 8);
+    });
+    swingReq = null; $("ring").setAttribute("class", "ring");
+    if (id !== runId) return;
+    var d = tapped === null ? null : tapped - A;
+    if (tapped !== null) { await swingAnim(); }
+    await cap;
+    if (id !== runId) return;
+    poses.pitcher = "idle";
+    var kind = evalSwing(d, batter.tall), side = d !== null && d < 0 ? -1 : 1;
+    if (d === null && FAST === false) { /* sin tirar */ }
+    setControls(""); $("hint").textContent = "";
+    var r1 = await playOutcome(kind, side, d);
+    if (id !== runId) return;
+    return r1.halfOver;
+  }
+
+  function evalSwing(d, tall) {
+    if (d === null) return "look";
+    var a = Math.abs(d), r = Math.random();
+    if (a <= 70) return r < 0.22 + (tall ? 0.05 : 0) ? "hr" : (r < 0.46 ? "double" : (r < 0.82 ? "hit" : "fly"));
+    if (a <= 140) return r < 0.04 ? "hr" : (r < 0.16 ? "double" : (r < 0.6 ? "hit" : (r < 0.84 ? "fly" : "foul")));
+    if (a <= 230) return r < 0.04 ? "double" : (r < 0.25 ? "hit" : (r < 0.5 ? "fly" : "foul"));
+    if (a <= 330) return r < 0.7 ? "foul" : "miss";
+    return "miss";
+  }
+
+  function cpuSwing(pitch, tall) {
+    var guess = (S.lastPitch && Math.random() < 0.4) ? S.lastPitch : pick(PKEYS), match = guess === pitch;
+    var w = match ? { miss: 12, look: 3, foul: 15, fly: 10, hit: 32, double: 10, hr: 18 } : { miss: 40, look: 8, foul: 17, fly: 15, hit: 13, double: 4, hr: 3 };
+    if (tall) w.hr += 3;
+    var tot = 0, k; for (k in w) tot += w[k];
+    var r = Math.random() * tot;
+    for (k in w) { r -= w[k]; if (r <= 0) return { kind: k, match: match }; }
+    return { kind: "miss", match: match };
+  }
+
+  async function humanPitches(id) {
+    var b = 1, batter = TEAMS[1].all[S.bat[1]], pitcher = TEAMS[0].players[0];
+    $("hint").textContent = "El bateador intenta adivinar tu lanzamiento. Cambia de vez en cuando.";
+    status("Tú lanzas. Bateador: <b>" + batter.n + "</b>");
+    poses.pitcher = "idle"; poses.batter = "bat"; batAngle = -18; drawActors();
+    var choice = await new Promise(function (res) {
+      setControls('<div class="pitchrow">' + PKEYS.map(function (k) {
+        var sub = k === "rapida" ? "rápida y directa" : k === "curva" ? "se abre y vuelve" : "engaña al swing";
+        return '<button type="button" class="btn" data-p="' + k + '">' + PITCHES[k].label.charAt(0).toUpperCase() + PITCHES[k].label.slice(1) + "<small>" + sub + "</small></button>";
+      }).join("") + "</div>");
+      Array.prototype.forEach.call($("controls").querySelectorAll("button"), function (bt) { bt.onclick = function () { res(bt.getAttribute("data-p")); }; });
+      swingReq = null;
+    });
+    if (id !== runId) return;
+    setControls(""); $("hint").textContent = "";
+    var pt = PITCHES[choice], T = FAST ? 120 : (REDUCE ? pt.T * 0.8 : pt.T);
+    S.curveDir = Math.random() < 0.5 ? -1 : 1;
+    status("Lanzas una <b>" + pt.label + "</b>");
+    poses.pitcher = "windup"; drawActors(); await sleep(450);
+    poses.pitcher = "throw"; drawActors();
+    var res = cpuSwing(choice, batter.tall);
+    S.lastPitch = choice;
+    var cap = tween(T, function (p) { var q = pitchPos(choice, p); setCap(q.x, q.y, q.z); });
+    if (res.kind !== "look") { await sleep(Math.max(0, T - 170)); await swingAnim(); }
+    await cap;
+    if (id !== runId) return;
+    poses.pitcher = "idle";
+    var side = Math.random() < 0.5 ? -1 : 1;
+    if (res.match && (res.kind === "hit" || res.kind === "hr")) say("<b>" + batter.n + "</b> adivinó tu lanzamiento.");
+    var r2 = await playOutcome(res.kind, side, 0);
+    if (id !== runId) return;
+    return r2.halfOver;
+  }
+
+  /* ---------- inicio ---------- */
+  function start() {
+    runId++; timers.forEach(clearTimeout); timers = []; swingReq = null;
+    S = { target: parseInt($("meta").value, 10), outsMax: parseInt($("outsMax").value, 10), inn: 1, half: 0, outs: 0, strikes: 0,
+      bases: [null, null, null], runs: [0, 0], line: [[], []], halfRuns: 0, bat: [0, 0], over: false, log: [], lastPitch: null, curveDir: 1 };
+    poses = { batter: "bat", pitcher: "idle", catcher: "catch", wait: "idle" }; batAngle = -18; initFielders();
+    hideCap(); $("fx").innerHTML = ""; $("log").innerHTML = ""; $("overlay").hidden = true;
+    say("¡Empieza el juego! <b>Maní</b> bate primero.");
+    refresh();
+    if (FAST) window.__ch = { state: function () { return S; } };
+    playLoop(runId);
+  }
+
+  function onSwing() { if (swingReq) swingReq(); }
+  $("fieldWrap").addEventListener("pointerdown", function (e) { if (e.target.closest && e.target.closest("#controls")) return; onSwing(); });
+  document.addEventListener("click", function (e) { var t = e.target; if (t && t.id === "bat") onSwing(); });
+  document.addEventListener("keydown", function (e) { if ((e.key === " " || e.key === "Enter") && swingReq && !(document.activeElement && document.activeElement.tagName === "SELECT")) { e.preventDefault(); onSwing(); } });
+
+  $("rulesBtn").onclick = function () {
+    var r = $("rules"), open = r.hidden;
+    r.hidden = !open;
+    this.setAttribute("aria-expanded", open ? "true" : "false");
+  };
+  $("meta").onchange = start;
+  $("snd").onchange = function () { SND.on = this.checked; };
+  $("outsMax").onchange = start;
+  start();
+})();
+</script>
+</body>
+</html>

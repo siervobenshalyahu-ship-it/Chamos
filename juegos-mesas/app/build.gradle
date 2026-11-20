@@ -1,0 +1,25 @@
+plugins { id 'com.android.application' }
+
+android {
+    namespace 'com.chamos.juegosmesas'
+    compileSdk 34
+    defaultConfig {
+        applicationId 'com.chamos.juegosmesas'
+        minSdk 24
+        targetSdk 34
+        versionCode 1
+        versionName '1.0.0'
+    }
+    signingConfigs {
+        release {
+            storeFile file('../juegos.keystore')
+            storePassword 'chamosjuegos'
+            keyAlias 'juegos'
+            keyPassword 'chamosjuegos'
+        }
+    }
+    buildTypes {
+        release { signingConfig signingConfigs.release; minifyEnabled false }
+    }
+    compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
+}
