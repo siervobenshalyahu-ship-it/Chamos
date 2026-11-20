@@ -23,8 +23,17 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: 8.9
+      - name: Clave de firma (secretos del repo)
+        env:
+          KS_B64: ${{ secrets.JUEGOS_KEYSTORE_B64 }}
+          KS_PW: ${{ secrets.JUEGOS_KEYSTORE_PASSWORD }}
+        run: |
+          if [ -z "$KS_B64" ] || [ -z "$KS_PW" ]; then echo "Faltan los secretos JUEGOS_KEYSTORE_B64 y JUEGOS_KEYSTORE_PASSWORD"; exit 1; fi
+          echo "$KS_B64" | base64 -d > juegos-mesas/juegos.keystore
       - name: Compilar
         working-directory: juegos-mesas
+        env:
+          JUEGOS_KEYSTORE_PASSWORD: ${{ secrets.JUEGOS_KEYSTORE_PASSWORD }}
         run: gradle assembleRelease --no-daemon
       - name: Renombrar
         run: |

@@ -13,9 +13,9 @@ android {
     signingConfigs {
         release {
             storeFile file('../juegos.keystore')
-            storePassword 'chamosjuegos'
+            storePassword System.getenv('JUEGOS_KEYSTORE_PASSWORD')
             keyAlias 'juegos'
-            keyPassword 'chamosjuegos'
+            keyPassword System.getenv('JUEGOS_KEYSTORE_PASSWORD')
         }
     }
     buildTypes {
