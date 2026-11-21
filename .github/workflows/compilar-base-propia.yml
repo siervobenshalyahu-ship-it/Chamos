@@ -127,7 +127,7 @@ jobs:
           ELEMENT_ANDROID_MAPTILER_DARK_MAP_ID: streets-v2-dark
         run: |
           set -o pipefail
-          ./gradlew :app:assemble${FLAVOR}${TIPO_TASK} -PuseLegacyPackaging=true --stacktrace --no-configuration-cache 2>&1 | tee ../gradle.log
+          ./gradlew -Dorg.gradle.jvmargs="-Xmx9g -XX:MaxMetaspaceSize=1g -Dfile.encoding=UTF-8 -XX:+UseG1GC" --max-workers=2 :app:assemble${FLAVOR}${TIPO_TASK} -PuseLegacyPackaging=true --stacktrace --no-configuration-cache 2>&1 | tee ../gradle.log
 
       - name: Mostrar errores de compilación
         if: failure()
