@@ -87,6 +87,7 @@ h1 { font-family:var(--font-serif); font-size:26px; line-height:1.1; margin:0; f
   <div class="panel res" id="res" hidden></div>
   <div class="acc"><button class="btn alt" id="bNueva" hidden>Jugar otra vez</button></div>
 </div>
+<script src="creditos.js"></script>
 <script src="cartas.js"></script>
 <script>
 (function () {
@@ -300,6 +301,7 @@ h1 { font-family:var(--font-serif); font-size:26px; line-height:1.1; margin:0; f
     soltar(i, h);
   }
   function acabar() {
+    if (window.Creditos) Creditos.alTerminar();
     fin = true; ocupado = true; dibujar();
     var max = Math.max.apply(null, jug.map(function (p) { return p.pila.length; }));
     var h = "<h2>Cuenta final</h2><table><tr><th>Jugador</th><th>Cartas</th><th></th></tr>";

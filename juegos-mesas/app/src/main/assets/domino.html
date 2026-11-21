@@ -168,6 +168,7 @@ h1 { font-family: var(--font-serif); font-size: 30px; line-height: 1.1; margin: 
 
 <div class="overlay" id="overlay" hidden></div>
 
+<script src="creditos.js"></script>
 <script>
 (function () {
   "use strict";
@@ -329,6 +330,7 @@ h1 { font-family: var(--font-serif); font-size: 30px; line-height: 1.1; margin: 
     render();
     var title, cls = "";
     if (gameOver) {
+      if (window.Creditos) Creditos.alTerminar();
       var us = total[0] >= goal && total[0] >= total[1];
       title = us ? "¡Ganaron la partida!" : "Ellos ganaron la partida"; cls = us ? "win" : "lose";
     } else if (winnerTeam === null) title = "Mano empatada";

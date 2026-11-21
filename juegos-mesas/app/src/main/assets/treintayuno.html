@@ -83,6 +83,7 @@ h1 { font-family:var(--font-serif); font-size:26px; line-height:1.1; margin:0; f
   <div class="panel res" id="res" hidden></div>
   <div class="acc"><button class="btn alt" id="bNueva" hidden>Siguiente ronda</button><button class="btn alt" id="bReinicio" hidden>Jugar otra vez</button></div>
 </div>
+<script src="creditos.js"></script>
 <script src="cartas.js"></script>
 <script>
 (function () {
@@ -204,6 +205,7 @@ h1 { font-family:var(--font-serif); font-size:26px; line-height:1.1; margin:0; f
     msg(p.nombre + " pasó."); terminarTurno(i);
   }
   function acabar() {
+    if (window.Creditos) Creditos.alTerminar();
     fin = true; ocupado = true; sel = -1;
     var vs = vivos(), min = 99;
     vs.forEach(function (p) { p.pt = puntos(p.mano); if (p.pt < min) min = p.pt; });

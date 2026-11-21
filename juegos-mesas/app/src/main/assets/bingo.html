@@ -219,6 +219,7 @@ h1 { font-family: var(--font-serif); font-size: 26px; line-height: 1.1; margin: 
   </div>
 </div>
 
+<script src="creditos.js"></script>
 <script>
 (function () {
   "use strict";
@@ -685,6 +686,7 @@ h1 { font-family: var(--font-serif); font-size: 26px; line-height: 1.1; margin: 
     $("go").textContent = ult ? "Nueva partida" : "Siguiente ronda";
     $("canto").disabled = false;
     if (ult) {
+      if (window.Creditos) Creditos.alTerminar();
       var mx = Math.max.apply(null, fichas), g = fichas.map(function (f, m) { return f === mx ? m + 1 : 0; }).filter(Boolean);
       $("dicho").textContent = "Fin de la partida. Gana la Mesa " + g.join(" y ") + " con " + mx + " fichas.";
       fase = "fin";

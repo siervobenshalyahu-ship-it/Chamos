@@ -148,6 +148,7 @@ h1 { font-family: var(--font-serif); font-size: 26px; line-height: 1.1; margin: 
 
 <div class="overlay" id="overlay" hidden></div>
 
+<script src="creditos.js"></script>
 <script>
 (function () {
   "use strict";
@@ -625,6 +626,7 @@ h1 { font-family: var(--font-serif); font-size: 26px; line-height: 1.1; margin: 
     setTimeout(function () { if (S && S.fase === "juego") setStatus(""); }, 1800);
   }
   function terminar() {
+    if (window.Creditos) Creditos.alTerminar();
     S.fase = "fin";
     var gane = S.marc[0] > S.marc[1];
     var o = $("overlay");

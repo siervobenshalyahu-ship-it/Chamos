@@ -168,6 +168,7 @@ h1 { font-family: var(--font-serif); font-size: 26px; line-height: 1.1; margin: 
 
 <div class="overlay" id="overlay" hidden></div>
 
+<script src="creditos.js"></script>
 <script src="cartas.js"></script>
 <script>
 (function () {
@@ -467,6 +468,7 @@ h1 { font-family: var(--font-serif); font-size: 26px; line-height: 1.1; margin: 
   }
 
   function endGame(kind) {
+    if (window.Creditos) Creditos.alTerminar();
     clearTimeout(timer);
     var me = G.chips[0], t, d;
     if (kind === "lost") { t = "Te quedaste sin chapas"; d = "Fin de la partida. ¡Revancha!"; }

@@ -197,6 +197,7 @@ h1 { font-family: var(--font-serif); font-size: 26px; line-height: 1.1; margin: 
 
 <div class="overlay" id="overlay" hidden></div>
 
+<script src="creditos.js"></script>
 <script src="cartas.js"></script>
 <script>
 (function () {
@@ -513,6 +514,7 @@ h1 { font-family: var(--font-serif); font-size: 26px; line-height: 1.1; margin: 
     showEnd(w, why);
   }
   function showEnd(w, why) {
+    if (window.Creditos) Creditos.alTerminar();
     finished = true;
     var h = '<div class="card"><h2 class="' + (w === 0 ? "win" : "lose") + '">' + (w === 0 ? "¡Ganaste, chamo!" : "Ganó Don Pedro") + "</h2>";
     if (why) h += "<p>" + why + "</p>";
