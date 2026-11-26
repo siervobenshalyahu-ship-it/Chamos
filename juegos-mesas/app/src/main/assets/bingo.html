@@ -605,7 +605,7 @@ h1 { font-family: var(--font-serif); font-size: 26px; line-height: 1.1; margin: 
     var num = cand.length ? cand[Math.floor(Math.random() * cand.length)] : bolas[bolas.length - 1];
     $("regano").innerHTML = "";
     var p1 = "¡Díganme un número!";
-    anotar("La señora del globo: «" + p1 + "»"); frase(p1);
+    anotar("La señora del globo: «" + p1 + "»"); frase(p1, false, "pide");
     programar(function () {
       var m = Math.floor(Math.random() * 4), quien = miembros[m][Math.floor(Math.random() * 4)];
       var xy = MESAS_XY[m], txt = "¡" + letra(num) + " " + num + "!";
@@ -619,7 +619,7 @@ h1 { font-family: var(--font-serif); font-size: 26px; line-height: 1.1; margin: 
     programar(function () {
       $("dice").style.display = "none";
       var p2 = "¡Te lo ganaste, " + nombre + "! ¡Llévatelo pa tu casa!";
-      anotar("La señora del globo: «" + p2 + "»"); frase(p2);
+      anotar("La señora del globo: «" + p2 + "»"); frase(p2, false, "ganaste");
     }, $("voz").value === "1" ? 5200 : 3600);
   }
   function desenojar() {
