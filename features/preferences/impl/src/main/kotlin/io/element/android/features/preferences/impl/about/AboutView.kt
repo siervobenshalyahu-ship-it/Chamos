@@ -50,23 +50,16 @@ fun AboutView(
             supportingContent = { Text("Chamos es software libre bajo licencia AGPL-3.0. Toca para ver el código.") },
             onClick = { abrir("https://github.com/siervobenshalyahu-ship-it/Chamos/tree/base-propia") }
         )
+        // Enlaces legales propios de Chamos (ya no los de element.io)
         ListItem(
-            content = { Text("Basado en Element X Android") },
-            supportingContent = { Text("© Element Creations Ltd. y colaboradores, licencia AGPL-3.0. Toca para ver el proyecto original.") },
-            onClick = { abrir("https://github.com/element-hq/element-x-android") }
+            content = { Text("Política de privacidad") },
+            onClick = { abrir("https://chamos.pages.dev/privacidad.html") }
         )
-        state.elementLegals.forEach { elementLegal ->
-            ListItem(
-                content = {
-                    Text(stringResource(id = elementLegal.titleRes))
-                },
-                onClick = { onElementLegalClick(elementLegal) }
-            )
-        }
         ListItem(
             content = {
                 Text(stringResource(id = CommonStrings.common_open_source_licenses))
             },
+            supportingContent = { Text("Basada en Element X (AGPL-3.0) y Matrix") },
             onClick = onOpenSourceLicensesClick,
         )
     }
