@@ -57,7 +57,7 @@ fun AboutView(
         )
         // Créditos del equipo de Chamos
         ListItem(
-            content = { Text("Testers e ingenieros") },
+            content = { Text("Ingenieros de testeo") },
             supportingContent = { Text("José Gregorio Castillo\nDigna Rosa Mora Mora\nYelly Katherine Castillo\nLeovag Barú Mora\nHaide María Mora\nMaria Herlinda Mora\nYeray Jhiret Martínez\nJairo Javier Mora\nJoel David Castillo\nJohana Custon\nJuaidy Jesiel Mora\nMayerling Carina Granados\nWilly Jesús Granados\nLeoneiner Mora Flores\nEdixon Martínez\nWilliams Sining\nAntonio José Mora\nAlejandro José Mora") },
         )
         ListItem(
