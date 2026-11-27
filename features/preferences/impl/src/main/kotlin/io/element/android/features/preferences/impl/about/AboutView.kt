@@ -10,7 +10,12 @@ package io.element.android.features.preferences.impl.about
 
 import android.content.Intent
 import android.net.Uri
+import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -59,8 +64,14 @@ fun AboutView(
             content = {
                 Text(stringResource(id = CommonStrings.common_open_source_licenses))
             },
-            supportingContent = { Text("Basada en Element X (AGPL-3.0) y Matrix") },
             onClick = onOpenSourceLicensesClick,
+        )
+        // Crédito mínimo exigido por la AGPL: una sola línea, discreta y al final
+        Text(
+            text = "Basada en Element X (AGPL-3.0) y Matrix",
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+            style = TextStyle(fontSize = 10.sp),
+            color = Color.Gray.copy(alpha = 0.6f),
         )
     }
 }
