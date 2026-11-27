@@ -39,6 +39,11 @@ fun AboutView(
         onBackClick = onBackClick,
         title = stringResource(id = CommonStrings.common_about)
     ) {
+        // Chamos: sello del autor
+        ListItem(
+            content = { Text("Chamos, por BENSHALYAHU") },
+            supportingContent = { Text("El hebreo de Venezuela") },
+        )
         // Chamos: aviso de licencia (AGPL-3.0) con enlace al código fuente
         ListItem(
             content = { Text("Código fuente de Chamos") },
