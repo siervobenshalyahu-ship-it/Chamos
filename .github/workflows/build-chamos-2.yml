@@ -295,6 +295,9 @@ jobs:
       - name: Traductor por sala
         run: python3 chamos-repo/patches/traductor.py chamos chamos-repo/patches
 
+      - name: Sello del creador en Ajustes
+        run: python3 chamos-repo/patches/sello.py chamos chamos-repo/assets/marca_benshalyahu.png
+
       - name: Notificaciones push (Firebase) si ya están configuradas
         run: |
           if [ -f chamos-repo/firebase/google-services.json ] && [ -s chamos-repo/firebase/gateway-url.txt ]; then
