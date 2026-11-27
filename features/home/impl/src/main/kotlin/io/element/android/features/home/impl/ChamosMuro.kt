@@ -321,6 +321,9 @@ fun rememberChamosMuro(
                 }
             }
             sala.liveTimeline.timelineItems.collect { items ->
+                // Al publicar o repostear, Matrix puede reiniciar la línea de tiempo y emitir una lista vacía por un instante:
+                // se conserva lo que ya estaba en pantalla en vez de mostrar "Todavía no hay publicaciones".
+                if (items.none { it is MatrixTimelineItem.Event } && todos.isNotEmpty()) return@collect
                 val lista = mutableListOf<MuroPost>()
                 var pendientes = 0
                 fallidosTx.clear()
