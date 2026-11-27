@@ -57,20 +57,36 @@ fun AboutView(
         )
         // Créditos del equipo de Chamos
         ListItem(
+            content = { Text("CEO") },
+            supportingContent = { Text("Jefferson Castillo") },
+        )
+        ListItem(
             content = { Text("Desarrollador general del proyecto") },
             supportingContent = { Text("Jefferson Castillo") },
         )
         ListItem(
-            content = { Text("Ingenieros de testeo") },
-            supportingContent = { Text("José Gregorio Castillo\nDigna Rosa Mora Mora\nYelly Katherine Castillo\nLeovag Barú Mora\nHaide María Mora\nMaria Herlinda Mora\nYeray Jhiret Martínez\nJairo Javier Mora\nJoel David Castillo\nJohana Custon\nJuaidy Jesiel Mora\nMayerling Carina Granados\nWilly Jesús Granados\nLeoneiner Mora Flores\nEdixon Martínez\nWilliams Sining\nAntonio José Mora\nAlejandro José Mora") },
+            content = { Text("Desarrollador de aplicaciones móviles") },
+            supportingContent = { Text("Jefferson Castillo") },
+        )
+        ListItem(
+            content = { Text("Desarrollador dedicado a la versión Android") },
+            supportingContent = { Text("Jhonfer Castillo") },
+        )
+        ListItem(
+            content = { Text("Desarrolladores de interfaz gráfica") },
+            supportingContent = { Text("Yulie O. Castillo\nWilly J. Granados\nJeison D. Castillo") },
+        )
+        ListItem(
+            content = { Text("Ingeniero administrador de capacidades y servidores") },
+            supportingContent = { Text("Jeison D. Castillo") },
         )
         ListItem(
             content = { Text("Desarrollo web") },
-            supportingContent = { Text("Jefferson Castillo: Programador HTML\nJhonfer Castillo: Programador CS5\nJeison Castillo: Administrador de base de datos") },
+            supportingContent = { Text("Jefferson Castillo: Programador HTML\nJhonfer Castillo: Programador CS5\nJeison D. Castillo: Administrador de base de datos") },
         )
         ListItem(
-            content = { Text("Equipo") },
-            supportingContent = { Text("Yulie Castillo") },
+            content = { Text("Ingenieros de testeo") },
+            supportingContent = { Text("José Gregorio Castillo\nDigna Rosa Mora Mora\nYelly Katherine Castillo\nLeovag Barú Mora\nHaide María Mora\nMaria Herlinda Mora\nYeray Jhiret Martínez\nJairo Javier Mora\nJoel David Castillo\nJohana Custon\nJuaidy Jesiel Mora\nMayerling Carina Granados\nWilly Jesús Granados\nLeoneiner Mora Flores\nEdixon Martínez\nWilliams Sining\nAntonio José Mora\nAlejandro José Mora") },
         )
         // Enlaces legales propios de Chamos (ya no los de element.io)
         ListItem(
