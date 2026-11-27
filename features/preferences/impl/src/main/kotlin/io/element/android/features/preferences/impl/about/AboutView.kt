@@ -55,6 +55,19 @@ fun AboutView(
             supportingContent = { Text("Chamos es software libre bajo licencia AGPL-3.0. Toca para ver el código.") },
             onClick = { abrir("https://github.com/siervobenshalyahu-ship-it/Chamos/tree/base-propia") }
         )
+        // Créditos del equipo de Chamos
+        ListItem(
+            content = { Text("Testers e ingenieros") },
+            supportingContent = { Text("José Gregorio Castillo\nDigna Rosa Mora Mora\nYelly Katherine Castillo\nLeovag Barú Mora\nHaide María Mora\nMaria Herlinda Mora\nYeray Jhiret Martínez\nJairo Javier Mora\nJoel David Castillo\nJohana Custon\nJuaidy Jesiel Mora\nMayerling Carina Granados\nWilly Jesús Granados\nLeoneiner Mora Flores\nEdixon Martínez\nWilliams Sining\nAntonio José Mora\nAlejandro José Mora") },
+        )
+        ListItem(
+            content = { Text("Desarrollo web") },
+            supportingContent = { Text("Jefferson Castillo: Programador HTML\nJhonfer Castillo: Programador CS5\nJeison Castillo: Administrador de base de datos") },
+        )
+        ListItem(
+            content = { Text("Equipo") },
+            supportingContent = { Text("Yulie Castillo") },
+        )
         // Enlaces legales propios de Chamos (ya no los de element.io)
         ListItem(
             content = { Text("Política de privacidad") },
